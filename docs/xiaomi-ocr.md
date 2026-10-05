@@ -1,6 +1,8 @@
 # Xiaomi-OCR-0 BF16 adaptation
 
-This fork adds the small dense Xiaomi-OCR-0 checkpoint to NInfer. The validated
+This fork adds Qwen3.5-0.8B architecture support to NInfer, validated with
+Xiaomi-OCR-0, which is trained from Qwen3.5-0.8B-Base. Standalone Base weights
+have not been separately benchmarked. The validated
 source base is upstream `594930e7b609efa4bcea3ae4f24cd9d66b5f224f`.
 The restored source archive matches all 1,127 archived files at that revision.
 The original upstream README and Apache-2.0 license are retained.
@@ -42,8 +44,8 @@ also executed on the 5070 Ti through a private compatible runtime. WSL's system 
 was not replaced. The Python baseline compiled on each GPU independently.
 
 ```bash
-git clone https://github.com/ByronLeeeee/ninfer-xiaomi-ocr-0.git
-cd ninfer-xiaomi-ocr-0
+git clone https://github.com/ByronLeeeee/ninfer.git
+cd ninfer
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 

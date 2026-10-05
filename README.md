@@ -1,44 +1,67 @@
-# NInfer Xiaomi OCR 0
+# NInfer
 
-这是 [Neroued/ninfer](https://github.com/Neroued/ninfer) 的 Xiaomi-OCR-0 专用 fork。
-原版 README 与 Apache-2.0 许可证保留在本仓库；下方上游说明描述的是原版范围。
-本 fork 额外验证了 RTX 5070 Ti 和 RTX 6000D（`sm_120a`），并支持 Xiaomi OCR 的 BF16 v3 模型。
+This fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) extends the general
+C++/CUDA inference engine with **Qwen3.5-0.8B architecture and BF16/A16 kernel
+support**. The added path has been validated with
+[Xiaomi-OCR-0](https://huggingface.co/SeerRay-Lab/Xiaomi-OCR-0), an OCR vision-language
+model trained from **Qwen3.5-0.8B-Base**, on RTX 5070 Ti and RTX 6000D.
+Standalone Qwen3.5-0.8B-Base weights have not been separately benchmarked here.
 
-## 本 fork 具体改动
+## Additions in this fork
 
-- 为 1024 隐藏维度添加 BF16/A16 的 GDN、attention、linear-add 和 SwiGLU 投影路径。
-- 支持文本 attention 的 D256/H8/KV2 几何，以及视觉 D64/H12 的分块 attention。
-- 修正视觉位置排列、二维 RoPE、6144 通道卷积和 Unicode tokenizer/added-token 处理。
-- 添加 BF16 权重转换与内嵌 processor/tokenizer 资源；完整 CMake 构建包含新内核和 PCRE2 链接。
-- 提供原版 Transformers 参考工具：语言 prefill 和视觉 GPU 计算 `fullgraph=True` 编译，
-  图外初始化 KV 存储，保留 decode CUDA Graph；记录实际容量和编译执行计数。
-- 默认部署示例为 32K 上下文、4 路、BF16 KV。FP8 KV 可选，长上下文另行评估。
+- BF16/A16 Gated DeltaNet, attention, linear-add and SwiGLU projection paths for
+  the 1,024-wide Qwen3.5-0.8B configuration.
+- Text attention with D256/H8/KV2 and segmented vision attention with D64/H12.
+- Vision position ordering, two-axis RoPE, 6,144-channel causal convolution,
+  Unicode pre-tokenization and original added-token metadata handling.
+- A BF16 v3 conversion recipe with embedded tokenizer/processor resources;
+  complete CMake builds include the new kernels and PCRE2 linkage.
+- Optional Transformers reference tools compile both language prefill and vision
+  GPU computation with `fullgraph=True`. Cache storage is initialized outside
+  Dynamo to preserve decode CUDA Graphs. Actual cache capacity and compiled
+  execution counters are checked. These Python tools optimize the comparison
+  baseline; NInfer itself uses native C++/CUDA execution.
 
-[构建、转换与使用](docs/xiaomi-ocr.md) · [速度、显存、输出差异与验证范围](docs/xiaomi-ocr-performance.md)
+[Build, conversion and validation](docs/xiaomi-ocr.md) ·
+[Performance and accuracy scope](docs/xiaomi-ocr-performance.md) ·
+[Validated Xiaomi-OCR-0 BF16 artifact](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer)
 
-本机 prefill 耗时降低约 17%–30%；6000D 约 0.7%–1.3%，可视为基本不变。
-比较采用两边相同的 4K/单路配置，不能套用到 32K/4 路服务。
-本轮三份输出一致（公式只比较 256-token 前缀），历史完整手写公式样例仍有差异，报告没有省略。
+The validated native target is `sm_120a`. Tests cover RTX 5070 Ti 16 GB (WSL2) and
+RTX 6000D (Linux); they do not qualify every Blackwell architecture.
+The small-model extension does not establish new validation results for other
+upstream checkpoints.
 
-NInfer 模型文件在 Hugging Face 单独分发，必须依赖本 fork 的运行时；不放进 Git 源码仓库。
-预转换权重发布状态：待 Hugging Face 上传。当前可按转换文档从原权重生成。
-
-## 构建
+## Build this fork
 
 ```bash
-git clone https://github.com/ByronLeeeee/ninfer-xiaomi-ocr-0.git
-cd ninfer-xiaomi-ocr-0
+git clone https://github.com/ByronLeeeee/ninfer.git
+cd ninfer
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-依赖 Linux、支持 sm_120a 的 CUDA、C++20、CMake >=3.28、Ninja、FFmpeg 开发库、
-libcurl >=7.85、pkg-config 和 **libpcre2-dev**。完整源码已干净构建并在两张卡运行。
-权重与本 fork 的新增代码基于上游 `594930e7`；没有把服务器的预编译静态库当作源码构建交付。
+Use Linux, a CUDA toolkit supporting `sm_120a`, C++20, CMake >=3.28, Ninja,
+FFmpeg development libraries, libcurl >=7.85, pkg-config and **libpcre2-dev**.
+The complete source was clean-built with CUDA 13.2/GCC 15.2 and executed on both
+validated GPUs. Model artifacts are distributed on Hugging Face.
+
+## Xiaomi-OCR-0 validation summary
+
+BF16 weights/KV, 4K capacity, one active request, warmed execution:
+
+| GPU | Transformers prefill tok/s | NInfer prefill tok/s | Transformers decode tok/s | NInfer decode tok/s |
+|---|---:|---:|---:|---:|
+| RTX 5070 Ti | 22,197–23,060 | 19,859–21,924 | 169.4–173.7 | 427.1–438.7 |
+| RTX 6000D | 35,990–36,193 | 33,031–35,306 | 232.2–235.1 | 511.0–514.4 |
+
+Prefill includes both vision encoding and language processing. The Transformers
+baseline uses compiled prefill/vision and compiled decode with fused kernels.
+Two synthetic text pages have CER 0% on both engines; three compared outputs
+match exactly on both GPUs, including a truncated formula prefix. These results
+do not establish general OCR accuracy. See the linked report for full-output
+historical differences and measurement details.
 
 ---
-
-以下保留上游原版 README：
 
 # NInfer
 

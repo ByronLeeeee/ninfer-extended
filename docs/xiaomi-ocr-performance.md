@@ -36,7 +36,37 @@ The native binary was built from the complete published source in a fresh build 
 | RTX 6000D | en_contract | 36154 | 35140 | 232.2 | 514.4 | 584.7 / 316.1 |
 | RTX 6000D | dense-equations | 35990 | 33031 | 235.1 | 511.0 | 1206.7 / 618.1 |
 
-## Output and memory scope
+## OCR accuracy and output agreement
+
+Accuracy against ground truth and agreement between engines measure different things.
+
+| GPU | Transformers normalized character accuracy | NInfer normalized character accuracy | Exact output agreement | Normalized character difference |
+|---|---:|---:|---:|---:|
+| RTX 5070 Ti | 100% (CER 0%) | 100% (CER 0%) | 3/3 (100%) | 0% |
+| RTX 6000D | 100% (CER 0%) | 100% (CER 0%) | 3/3 (100%) | 0% |
+
+**The accuracy columns cover only two synthetic text pages, with 478 ground-truth
+characters per GPU.** Both pages finish naturally (113 and 114 output tokens).
+CER is Levenshtein edits divided by ground-truth character count after NFKC
+normalization, whitespace removal and Markdown heading/emphasis removal;
+character accuracy is 1 - CER. This is a small transcription check, not a general
+document-parsing benchmark or a claim of 100% accuracy on real documents.
+
+The agreement columns cover those two complete outputs plus the dense-equations
+**256-token prefix**. Exact agreement compares raw text; normalized difference
+uses NFKC and whitespace removal, with summed edits divided by the sum of the
+larger output lengths. The formula page reaches the output limit and has no
+full-page accuracy score in this run.
+
+A separate historical 32K/four-lane **full-output** comparison on the RTX 5070 Ti
+matched 10/11 pages exactly (90.91%), with 0.1933% weighted normalized character
+difference. One handwritten-formula page differed; visual inspection favored
+Transformers at two locations. That test used the earlier native binary and was
+not repeated with the clean build at 4K, so it is historical evidence rather than
+the acceptance result of this release. There is no independently annotated
+full-page benchmark for the published native artifact on either GPU.
+
+## Memory scope
 
 Fresh HTTP comparisons match on all three outputs on both GPUs. The two text pages finish naturally;
 dense-equations is a 256-token prefix. The fresh normalized character difference is 0%.
