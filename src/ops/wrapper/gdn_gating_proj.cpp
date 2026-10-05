@@ -1,3 +1,5 @@
+#include "ninfer/ops/rmsnorm.h"
+#include "ops/xiaomi_bf16.h"
 #include "core/weight.h"
 #include "ninfer/ops/gdn_gating_proj.h"
 
@@ -88,6 +90,8 @@ void require_execution(DeviceExecutionView execution, const char* op) {
 std::size_t gdn_gating_proj_workspace_capacity_bytes(std::int32_t heads, std::int32_t input_rows,
                                                      std::int32_t min_tokens,
                                                      std::int32_t max_tokens) {
+if(heads==16&&input_rows==1024)return 0;
+
     return detail::bf16_gdn_gating_capacity_workspace_bytes(heads, input_rows, min_tokens,
                                                             max_tokens);
 }
@@ -96,6 +100,8 @@ std::size_t gdn_norm_gating_proj_workspace_capacity_bytes(std::int32_t heads,
                                                           std::int32_t input_rows,
                                                           std::int32_t min_tokens,
                                                           std::int32_t max_tokens) {
+if(heads==16&&input_rows==1024)return 0;
+
     return detail::bf16_gdn_norm_gating_capacity_workspace_bytes(heads, input_rows, min_tokens,
                                                                  max_tokens);
 }
@@ -120,6 +126,8 @@ void gdn_gating_proj(const Tensor& x, const Weight& a_weight, const Weight& b_we
 void gdn_gating_proj(const Tensor& x, const Weight& ab_weight, const Tensor& A_log,
                      const Tensor& dt_bias, WorkspaceArena& ws, Tensor& g, Tensor& beta,
                      DeviceExecutionView execution) {
+if(ab_weight.n==32&&ab_weight.k==1024){detail::xiaomi_bf16_control(x,ab_weight,A_log,dt_bias,g,beta,execution.stream);return;}
+
     constexpr const char* op                = "gdn_gating_proj";
     const std::int32_t tokens               = x.ne[1];
     const GdnControlParentGeometry geometry = require_bf16_parent(ab_weight);
@@ -163,6 +171,8 @@ void gdn_norm_gating_proj(const Tensor& x, const Tensor& norm_weight, float eps,
                           const Weight& ab_weight, const Tensor& A_log, const Tensor& dt_bias,
                           WorkspaceArena& ws, Tensor& h, Tensor& g, Tensor& beta,
                           DeviceExecutionView execution) {
+if(ab_weight.n==32&&ab_weight.k==1024){rmsnorm(x,norm_weight,eps,true,h,execution.stream);detail::xiaomi_bf16_control(h,ab_weight,A_log,dt_bias,g,beta,execution.stream);return;}
+
     constexpr const char* op  = "gdn_norm_gating_proj";
     const std::int32_t tokens = x.ne[1];
     if (!(eps > 0.0F) || !std::isfinite(eps)) {

@@ -1,3 +1,4 @@
+#include "ops/xiaomi_bf16.h"
 #include "core/weight.h"
 #include "ninfer/ops/linear_add.h"
 
@@ -92,6 +93,8 @@ std::size_t linear_add_workspace_capacity_bytes(QType qtype, std::int32_t output
 std::size_t linear_add_workspace_capacity_bytes(QType qtype, std::int32_t output_rows,
                                                 std::int32_t input_rows, LinearPolicy policy,
                                                 std::int32_t min_tokens, std::int32_t max_tokens) {
+if(qtype==QType::BF16 && detail::xiaomi_bf16_shape(output_rows,input_rows)) return std::size_t(output_rows)*max_tokens*2+256;
+
     validate_policy(policy);
     if (min_tokens <= 0 || max_tokens < min_tokens) {
         throw std::invalid_argument("linear_add workspace: invalid token interval");
@@ -147,6 +150,8 @@ void linear_add(const Tensor& x, const Weight& w, Tensor& residual_out, Workspac
 
 void linear_add(const Tensor& x, const Weight& w, Tensor& residual_out, LinearPolicy policy,
                 WorkspaceArena& ws, cudaStream_t stream) {
+if(w.qtype==QType::BF16 && detail::xiaomi_bf16_shape(w.n,w.k)){detail::xiaomi_bf16_add(x,w,residual_out,ws,stream);return;}
+
     validate_policy(policy);
     const std::int32_t t = x.ne[1];
     if (t <= 0) { throw std::invalid_argument("linear_add: T must be positive"); }

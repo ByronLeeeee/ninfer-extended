@@ -14,6 +14,7 @@ namespace ninfer::ops::detail {
 // the destination row counts and refuses anything else.
 enum class CausalConvSplitGeometry {
     Rows2048x2048x4096,
+    Rows2048x2048x2048,
     Rows2048x2048x6144,
 };
 

@@ -1,3 +1,4 @@
+#include "ops/xiaomi_bf16.h"
 #include "core/weight.h"
 #include "ninfer/ops/linear_swiglu.h"
 
@@ -34,6 +35,8 @@ std::size_t linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gat
                                                    std::int32_t input_rows, LinearPolicy policy,
                                                    std::int32_t min_tokens,
                                                    std::int32_t max_tokens) {
+if(qtype==QType::BF16 && gate_up_rows==7168 && input_rows==1024) return std::size_t(gate_up_rows)*max_tokens*2+256;
+
     validate_policy(policy);
     if (min_tokens <= 0 || max_tokens < min_tokens || (gate_up_rows % 2) != 0) {
         throw std::invalid_argument("linear_swiglu workspace: invalid profile or token interval");
@@ -67,6 +70,8 @@ std::size_t linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gat
 
 void linear_swiglu(const Tensor& x, const Weight& gate_up_weight, Tensor& out, LinearPolicy policy,
                    WorkspaceArena& ws, cudaStream_t stream) {
+if(gate_up_weight.qtype==QType::BF16 && gate_up_weight.n==7168 && gate_up_weight.k==1024){detail::xiaomi_bf16_swiglu(x,gate_up_weight,out,ws,stream);return;}
+
     validate_policy(policy);
     if (x.dtype != DType::BF16 || out.dtype != DType::BF16) {
         throw std::invalid_argument("linear_swiglu: x/out must be BF16");

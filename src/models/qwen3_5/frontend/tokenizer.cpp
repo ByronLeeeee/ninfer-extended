@@ -4,6 +4,9 @@
 
 #include <nlohmann/json.hpp>
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
+#include <memory>
 #include <algorithm>
 #include <charconv>
 #include <cctype>
@@ -30,6 +33,8 @@ constexpr std::int64_t kMaxTokenId = 1'000'000;
 constexpr std::string_view kQwenSplitPattern =
     R"qwen((?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?[\p{L}\p{M}]+|\p{N}| ?[^\s\p{L}\p{M}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+)qwen";
 
+constexpr std::string_view kXiaomiSplitPattern = R"xiaomi((?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+)xiaomi";
+
 void validate_pipeline(const Json& root, const Json& model) {
     const auto require = [](bool valid, const char* field) {
         if (!valid) {
@@ -51,7 +56,8 @@ void validate_pipeline(const Json& root, const Json& model) {
         const auto& split = pre["pretokenizers"][0];
         const auto& bytes = pre["pretokenizers"][1];
         require(type(split, "Split") && split.contains("pattern") && split["pattern"].is_object() &&
-                    split["pattern"].value("Regex", std::string{}) == kQwenSplitPattern &&
+                    (split["pattern"].value("Regex", std::string{}) == kQwenSplitPattern ||
+                     split["pattern"].value("Regex", std::string{}) == kXiaomiSplitPattern) &&
                     split.value("behavior", std::string{}) == "Isolated" &&
                     split.value("invert", Json(false)) == false,
                 "pre_tokenizer.Split");
@@ -548,6 +554,35 @@ std::size_t qwen_word_end(std::string_view text, std::size_t begin) {
     return after_first;
 }
 
+
+// Split's Isolated semantics retain unmatched gaps as independent BPE words.
+// This fixed checkpoint pattern contains escaped ASCII classes, so PCRE2 UTF
+// matches the source Oniguruma expressions without substituting canonical Qwen.
+std::size_t xiaomi_word_end(std::string_view text, std::size_t begin) {
+    struct Matcher {
+        pcre2_code* code;
+        pcre2_match_data* data;
+        Matcher() {
+            int error; PCRE2_SIZE offset;
+            code = pcre2_compile(reinterpret_cast<PCRE2_SPTR>(kXiaomiSplitPattern.data()),
+                                 kXiaomiSplitPattern.size(), PCRE2_UTF | PCRE2_UCP, &error, &offset, nullptr);
+            if (!code) throw std::invalid_argument("Xiaomi Split pattern compilation failed");
+            data = pcre2_match_data_create_from_pattern(code, nullptr);
+            if (!data) { pcre2_code_free(code); throw std::bad_alloc(); }
+        }
+        ~Matcher() { pcre2_match_data_free(data); pcre2_code_free(code); }
+    };
+    thread_local Matcher matcher;
+    const int result = pcre2_match(matcher.code, reinterpret_cast<PCRE2_SPTR>(text.data()),
+                                   text.size(), begin, 0, matcher.data, nullptr);
+    if (result == PCRE2_ERROR_NOMATCH) return text.size();
+    if (result < 0) throw std::invalid_argument("Xiaomi Split matching failed");
+    const PCRE2_SIZE* offsets = pcre2_get_ovector_pointer(matcher.data);
+    const std::size_t end = offsets[0] > begin ? offsets[0] : offsets[1];
+    if (end <= begin) throw std::logic_error("Xiaomi Split made no progress");
+    return end;
+}
+
 bool is_stop_token_id(std::span<const int> stop_token_ids, int id) {
     return std::find(stop_token_ids.begin(), stop_token_ids.end(), id) != stop_token_ids.end();
 }
@@ -597,12 +632,12 @@ bool append_normalized_bpe_ids(std::vector<int>& ids, std::string_view normalize
                                const BpeMergeTable& merge_rules,
                                const std::array<int, 256>& byte_token_ids, std::size_t max_tokens,
                                std::vector<std::size_t>* token_ends = nullptr,
-                               std::vector<BpeWordEnd>* word_ends   = nullptr) {
+                               std::vector<BpeWordEnd>* word_ends   = nullptr, bool xiaomi_split = false) {
     if (normalized.empty()) { return true; }
     if (ids.size() == max_tokens) { return false; }
 
     for (std::size_t begin = 0; begin < normalized.size();) {
-        const std::size_t end = qwen_word_end(normalized, begin);
+        const std::size_t end = xiaomi_split ? xiaomi_word_end(normalized, begin) : qwen_word_end(normalized, begin);
         const std::string_view word(normalized.data() + begin, end - begin);
         std::vector<BpeNode> nodes(word.size());
         for (std::size_t index = 0; index < word.size(); ++index) {
@@ -687,7 +722,7 @@ struct IndexedByteBoundary {
 bool append_ordinary_text(BoundaryEncodedText& encoded, std::string_view text,
                           std::size_t text_offset, std::span<const IndexedByteBoundary> boundaries,
                           const BpeMergeTable& merge_rules,
-                          const std::array<int, 256>& byte_token_ids, std::size_t max_tokens) {
+                          const std::array<int, 256>& byte_token_ids, std::size_t max_tokens, bool xiaomi_split) {
     const std::size_t token_base = encoded.input_ids.size();
     if (text.empty()) {
         for (const IndexedByteBoundary boundary : boundaries) {
@@ -708,7 +743,7 @@ bool append_ordinary_text(BoundaryEncodedText& encoded, std::string_view text,
     if (has_internal_boundary) { token_ends.reserve(normalized.size()); }
     if (!append_normalized_bpe_ids(encoded.input_ids, normalized, merge_rules, byte_token_ids,
                                    max_tokens, has_internal_boundary ? &token_ends : nullptr,
-                                   has_internal_boundary ? &word_ends : nullptr)) {
+                                   has_internal_boundary ? &word_ends : nullptr, xiaomi_split)) {
         return false;
     }
     const std::size_t token_end = encoded.input_ids.size();
@@ -794,6 +829,8 @@ Tokenizer::Tokenizer(TokenizerResources resources) {
         read_json_asset(resources.tokenizer_config_json, tokenizer_config_label);
     const Json& model = require_object_field(root, "model", tokenizer_label);
     validate_pipeline(root, model);
+    xiaomi_split_ = root.contains("pre_tokenizer") &&
+        root["pre_tokenizer"]["pretokenizers"][0]["pattern"].value("Regex", std::string{}) == kXiaomiSplitPattern;
 
     VocabMetadata vocab_metadata = load_vocab(model, tokenizer_label);
     decoded_token_bytes_         = std::move(vocab_metadata.id_to_token);
@@ -876,7 +913,7 @@ BoundaryEncodedText Tokenizer::encode_with_boundaries(
             append_ordinary_text(encoded, text.substr(begin, end - begin), begin,
                                  std::span<const IndexedByteBoundary>(boundaries)
                                      .subspan(boundary_cursor, request_end - boundary_cursor),
-                                 bpe_merge_rules_, byte_token_ids_, options.max_tokens);
+                                 bpe_merge_rules_, byte_token_ids_, options.max_tokens, xiaomi_split_);
         boundary_cursor = request_end;
         return complete;
     };

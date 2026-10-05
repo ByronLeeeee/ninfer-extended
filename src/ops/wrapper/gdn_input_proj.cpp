@@ -1,3 +1,4 @@
+#include "ops/xiaomi_bf16.h"
 #include "core/weight.h"
 #include "ninfer/ops/gdn_input_proj.h"
 
@@ -289,6 +290,8 @@ void validate_policy(LinearPolicy policy) {
 
 void dispatch_single_parent(const Tensor& x, const Weight& weight, Tensor& qkv, Tensor& z,
                             LinearPolicy policy, WorkspaceArena* workspace, cudaStream_t stream) {
+if(weight.qtype==QType::BF16&&weight.n==8192&&weight.k==1024){if(!workspace)throw std::invalid_argument("Xiaomi GDN requires workspace");detail::xiaomi_bf16_split(x,weight,qkv,z,*workspace,stream);return;}
+
     validate_policy(policy);
     const std::int32_t cols = x.ne[1];
     if (cols <= 0) { throw std::invalid_argument("gdn_input_proj: T must be positive"); }
@@ -413,6 +416,17 @@ void dispatch_single_parent_snapshot(const Tensor& x, const Weight& weight,
                                      const Tensor& snapshot_base_slots, Tensor& query, Tensor& key,
                                      Tensor& value, Tensor& z, LinearPolicy policy,
                                      WorkspaceArena& workspace, cudaStream_t stream) {
+if(weight.qtype==QType::BF16&&weight.n==8192&&weight.k==1024){
+        auto scope=workspace.scope();const auto geometry=require_snapshot_input(x,1024);
+        require_snapshot_operands(conv_weight,conv_states,valid_columns,initial_state_slots,snapshot_base_slots,6144,geometry);
+        Tensor projected=workspace.alloc(DType::BF16,{6144,geometry.width,geometry.batch},256);
+        Tensor flat_x(x.data,DType::BF16,{1024,geometry.aggregate_columns});
+        Tensor flat_p(projected.data,DType::BF16,{6144,geometry.aggregate_columns});
+        Tensor flat_z(z.data,DType::BF16,{2048,geometry.aggregate_columns});
+        detail::xiaomi_bf16_split(flat_x,weight,flat_p,flat_z,workspace,stream);
+        detail::gdn_projected_conv_snapshot_launch(projected,conv_weight,conv_states,valid_columns,initial_state_slots,snapshot_base_slots,query,key,value,stream);return;
+    }
+
     validate_policy(policy);
 
     if (weight.qtype == QType::NVFP4) {
@@ -559,6 +573,15 @@ void dispatch_single_parent_record(const Tensor& x, const Weight& weight, const 
                                    Tensor& query, Tensor& key, Tensor& value, Tensor& z,
                                    LinearPolicy policy, WorkspaceArena& workspace,
                                    cudaStream_t stream) {
+if(weight.qtype==QType::BF16&&weight.n==8192&&weight.k==1024){
+        const auto geometry=require_record_input(x,1024);
+        Tensor flat_x(x.data,DType::BF16,{1024,geometry.aggregate_columns});
+        Tensor flat_p(conv_record.data,DType::BF16,{6144,geometry.aggregate_columns});
+        Tensor flat_z(z.data,DType::BF16,{2048,geometry.aggregate_columns});
+        detail::xiaomi_bf16_split(flat_x,weight,flat_p,flat_z,workspace,stream);
+        detail::gdn_projected_conv_record_launch(conv_record,conv_weight,conv_states,valid_columns,initial_state_slots,query,key,value,stream);return;
+    }
+
     validate_policy(policy);
 
     if (weight.qtype == QType::NVFP4) {
@@ -717,6 +740,8 @@ std::size_t gdn_input_proj_workspace_capacity_bytes(QType parent_qtype, std::int
                                                     std::int32_t input_rows, LinearPolicy policy,
                                                     std::int32_t min_tokens,
                                                     std::int32_t max_tokens) {
+if(parent_qtype==QType::BF16&&parent_rows==8192&&input_rows==1024)return std::size_t(parent_rows)*max_tokens*2+256;
+
     validate_policy(policy);
     if (min_tokens <= 0 || max_tokens < min_tokens) {
         throw std::invalid_argument("gdn_input_proj workspace: invalid token interval");
@@ -800,6 +825,8 @@ std::size_t gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
 std::size_t gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
     QType parent_qtype, std::int32_t parent_rows, std::int32_t input_rows, LinearPolicy policy,
     std::int32_t batch_size, std::int32_t min_width, std::int32_t max_width) {
+if(parent_qtype==QType::BF16&&parent_rows==8192&&input_rows==1024)return std::size_t(8192+6144)*batch_size*max_width*2+512;
+
     validate_policy(policy);
     require_snapshot_capacity_domain(batch_size, min_width, max_width);
     if (parent_qtype == QType::FP8_E4M3FN_ROW_BF16 &&
@@ -849,6 +876,8 @@ std::size_t gdn_input_proj_conv_record_workspace_capacity_bytes(
 std::size_t gdn_input_proj_conv_record_workspace_capacity_bytes(
     QType parent_qtype, std::int32_t parent_rows, std::int32_t input_rows, LinearPolicy policy,
     std::int32_t batch_size, std::int32_t min_width, std::int32_t max_width) {
+if(parent_qtype==QType::BF16&&parent_rows==8192&&input_rows==1024)return std::size_t(8192)*batch_size*max_width*2+256;
+
     validate_policy(policy);
     require_record_capacity_domain(batch_size, min_width, max_width);
     if (parent_qtype == QType::FP8_E4M3FN_ROW_BF16 &&

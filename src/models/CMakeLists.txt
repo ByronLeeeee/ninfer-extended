@@ -1,7 +1,7 @@
 # Immutable loading and mutable execution have separate compile owners.
 add_library(ninfer_model_loading STATIC registry.cpp)
 ninfer_internal_includes(ninfer_model_loading)
-target_link_libraries(ninfer_model_loading PUBLIC ninfer_artifact ninfer_text ninfer_ops)
+target_link_libraries(ninfer_model_loading PUBLIC ninfer_artifact ninfer_text ninfer_ops PkgConfig::PCRE2)
 
 add_library(ninfer_model_runtime STATIC)
 ninfer_internal_includes(ninfer_model_runtime)

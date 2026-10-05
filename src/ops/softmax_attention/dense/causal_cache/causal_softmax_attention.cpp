@@ -25,7 +25,7 @@ constexpr std::uint32_t kThreeChunkPromptVisibleKeys = 1024;
 std::int32_t causal_attention_chunk_tokens(std::int32_t q_heads, std::int32_t width,
                                            std::int32_t batch_size, KvCacheStorage storage,
                                            CausalAttentionExecutionEnvelope envelope) {
-    if (q_heads == 16) return 6;
+    if (q_heads == 16 || q_heads == 8) return 6;
     // Balance the two narrow BF16 chunks; INT8 benefits from 5+4/5 at long contexts.
     if (batch_size == 1 && ((storage == KvCacheStorage::BFloat16 && width >= 9 && width <= 12) ||
                             (storage == KvCacheStorage::Int8Group64 && width >= 9 && width <= 10 &&
@@ -37,7 +37,7 @@ std::int32_t causal_attention_chunk_tokens(std::int32_t q_heads, std::int32_t wi
 void require_causal_geometry(AttentionHeadGeometry geometry, const char* op) {
     if (!valid_attention_head_geometry(geometry) || geometry.head_dim != kHeadDim ||
         !((geometry.query_heads == 24 && geometry.kv_heads == 4) ||
-          (geometry.query_heads == 16 && geometry.kv_heads == 2))) {
+          ((geometry.query_heads == 16 || geometry.query_heads == 8) && geometry.kv_heads == 2))) {
         throw std::invalid_argument(std::string(op) + ": unsupported head geometry");
     }
 }
@@ -345,6 +345,7 @@ namespace detail {
 CausalAttentionRoute causal_attention_resolve_route(std::int32_t q_heads, std::int32_t width,
                                                     std::int32_t batch_size, KvCacheStorage storage,
                                                     CausalAttentionExecutionEnvelope envelope) {
+    if(q_heads==8&&storage!=KvCacheStorage::BFloat16&&storage!=KvCacheStorage::Fp8E4M3Row256)throw std::invalid_argument("Xiaomi H8/KV2 profile supports BF16 or FP8 KV storage");
     if (q_heads == 24 && width <= kMaximumVerifyTokens) {
         if (batch_size == 1) {
             std::uint32_t prompt_limit = 0;
@@ -373,7 +374,7 @@ CausalAttentionRoute causal_attention_resolve_route(std::int32_t q_heads, std::i
     if (batch_size > 1) return CausalAttentionRoute::ChunkedSmallT;
     const std::uint32_t prompt_visible_keys =
         width <= 12 ? kTwoChunkPromptVisibleKeys : kThreeChunkPromptVisibleKeys;
-    if (q_heads == 16 && width <= kMaximumVerifyTokens &&
+    if ((q_heads == 16 || q_heads == 8) && width <= kMaximumVerifyTokens &&
         envelope.max_visible_keys > prompt_visible_keys)
         return CausalAttentionRoute::ChunkedSmallT;
     return CausalAttentionRoute::Prompt;

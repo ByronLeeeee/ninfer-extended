@@ -1,3 +1,4 @@
+#include "ops/xiaomi_bf16.h"
 #include "core/weight.h"
 #include "ninfer/ops/attn_input_proj.h"
 
@@ -87,6 +88,8 @@ void validate_policy(LinearPolicy policy) {
 void dispatch_single_parent(const Tensor& x, const Weight& weight, Tensor& q, Tensor& gate,
                             Tensor& k, Tensor& v, LinearPolicy policy, WorkspaceArena* workspace,
                             cudaStream_t stream) {
+if(weight.qtype==QType::BF16&&weight.n==5120&&weight.k==1024){if(!workspace)throw std::invalid_argument("Xiaomi attention requires workspace");detail::xiaomi_bf16_attn(x,weight,q,gate,k,v,*workspace,stream);return;}
+
     validate_policy(policy);
     if (weight.qtype == QType::BF16) {
         constexpr std::int32_t kHidden = 5120;
@@ -166,6 +169,8 @@ std::size_t attn_input_proj_workspace_capacity_bytes(QType parent_qtype, std::in
                                                      std::int32_t input_rows, LinearPolicy policy,
                                                      std::int32_t min_tokens,
                                                      std::int32_t max_tokens) {
+if(parent_qtype==QType::BF16&&parent_rows==5120&&input_rows==1024)return std::size_t(parent_rows)*max_tokens*2+256;
+
     validate_policy(policy);
     if (min_tokens <= 0 || max_tokens < min_tokens) {
         throw std::invalid_argument("attn_input_proj workspace: invalid token interval");

@@ -1,3 +1,6 @@
+#include <fstream>
+#include <cstdlib>
+#include <vector>
 #include "models/qwen3_5/program/internal.h"
 #include "models/qwen3_5/execution/vision.h"
 
@@ -26,6 +29,13 @@
 
 namespace ninfer::models::qwen3_5::execution {
 namespace {
+
+
+void xiaomi_trace(const Tensor& t,const std::string& name,cudaStream_t stream){
+ const char* dir=std::getenv("XIAOMI_TRACE_DIR");if(!dir||!*dir)return;
+ std::vector<char> data(t.bytes());CUDA_CHECK(cudaMemcpyAsync(data.data(),t.data,t.bytes(),cudaMemcpyDeviceToHost,stream));CUDA_CHECK(cudaStreamSynchronize(stream));
+ std::ofstream file(std::string(dir)+"/"+name+".bin",std::ios::binary);file.write(data.data(),data.size());
+}
 
 std::size_t checked_mul(std::size_t a, std::size_t b, const char* label) {
     if (b != 0 && a > std::numeric_limits<std::size_t>::max() / b) {
@@ -326,6 +336,7 @@ void VisionContext::encode(const VisionItemView& item, Tensor& output, DeviceSpa
                                       static_cast<std::uint64_t>(patches64));
         copy_host(control.position_ids.data(), position_ids, stream);
         copy_host(item.patches.data(), patch_bf16, stream);
+        xiaomi_trace(patch_bf16,"patches",stream);
         project(patch_bf16, parameters_.patch_embedding, x, layout.patch_scratch);
         ops::add_bias(parameters_.patch_embedding_bias, x, stream);
         // The artifact records the source table shape [rows,hidden], while Tensor's
@@ -336,6 +347,7 @@ void VisionContext::encode(const VisionItemView& item, Tensor& output, DeviceSpa
         Tensor position_table = parameters_.position_embedding.reshape(
             {dimension(config_.hidden_size), dimension(config_.num_position_embeddings)});
         ops::vision_pos_embed_add(position_table, pos_indices, pos_weights, x, stream);
+        xiaomi_trace(x,"positioned",stream);
     }
     for (std::size_t layer = 0; layer < parameters_.layers.size(); ++layer) {
         nvtx::ScopedRange layer_range(nvtx::Name::VisionLayer, nvtx::Category::Vision,
@@ -402,6 +414,7 @@ void VisionContext::encode(const VisionItemView& item, Tensor& output, DeviceSpa
             ops::add_bias(block.fc2_bias, down, stream);
             ops::residual_add(down, x, stream);
         }
+        xiaomi_trace(x,"layer_"+std::to_string(layer),stream);
     }
 
     {
@@ -417,6 +430,7 @@ void VisionContext::encode(const VisionItemView& item, Tensor& output, DeviceSpa
         ops::gelu(hidden, ops::GeluMode::Exact, stream);
         project(hidden, parameters_.merger_fc2, output, layout.merger_second_scratch);
         ops::add_bias(parameters_.merger_fc2_bias, output, stream);
+        xiaomi_trace(output,"vision_output",stream);
     }
 }
 

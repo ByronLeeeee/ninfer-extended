@@ -1,3 +1,45 @@
+# NInfer Xiaomi OCR 0
+
+这是 [Neroued/ninfer](https://github.com/Neroued/ninfer) 的 Xiaomi-OCR-0 专用 fork。
+原版 README 与 Apache-2.0 许可证保留在本仓库；下方上游说明描述的是原版范围。
+本 fork 额外验证了 RTX 5070 Ti 和 RTX 6000D（`sm_120a`），并支持 Xiaomi OCR 的 BF16 v3 模型。
+
+## 本 fork 具体改动
+
+- 为 1024 隐藏维度添加 BF16/A16 的 GDN、attention、linear-add 和 SwiGLU 投影路径。
+- 支持文本 attention 的 D256/H8/KV2 几何，以及视觉 D64/H12 的分块 attention。
+- 修正视觉位置排列、二维 RoPE、6144 通道卷积和 Unicode tokenizer/added-token 处理。
+- 添加 BF16 权重转换与内嵌 processor/tokenizer 资源；完整 CMake 构建包含新内核和 PCRE2 链接。
+- 提供原版 Transformers 参考工具：语言 prefill 和视觉 GPU 计算 `fullgraph=True` 编译，
+  图外初始化 KV 存储，保留 decode CUDA Graph；记录实际容量和编译执行计数。
+- 默认部署示例为 32K 上下文、4 路、BF16 KV。FP8 KV 可选，长上下文另行评估。
+
+[构建、转换与使用](docs/xiaomi-ocr.md) · [速度、显存、输出差异与验证范围](docs/xiaomi-ocr-performance.md)
+
+本机 prefill 耗时降低约 17%–30%；6000D 约 0.7%–1.3%，可视为基本不变。
+比较采用两边相同的 4K/单路配置，不能套用到 32K/4 路服务。
+本轮三份输出一致（公式只比较 256-token 前缀），历史完整手写公式样例仍有差异，报告没有省略。
+
+NInfer 模型文件在 Hugging Face 单独分发，必须依赖本 fork 的运行时；不放进 Git 源码仓库。
+预转换权重发布状态：待 Hugging Face 上传。当前可按转换文档从原权重生成。
+
+## 构建
+
+```bash
+git clone https://github.com/ByronLeeeee/ninfer-xiaomi-ocr-0.git
+cd ninfer-xiaomi-ocr-0
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
+
+依赖 Linux、支持 sm_120a 的 CUDA、C++20、CMake >=3.28、Ninja、FFmpeg 开发库、
+libcurl >=7.85、pkg-config 和 **libpcre2-dev**。完整源码已干净构建并在两张卡运行。
+权重与本 fork 的新增代码基于上游 `594930e7`；没有把服务器的预编译静态库当作源码构建交付。
+
+---
+
+以下保留上游原版 README：
+
 # NInfer
 
 > Selected checkpoints. Maximum single-GPU inference performance.

@@ -114,6 +114,8 @@ template <class Publish>
 void dispatch(const Tensor& projected, const Tensor& conv_weight, const Tensor& state_read,
               const Tensor& valid_columns, const Tensor& initial_state_slots, Tensor& query,
               Tensor& key, Tensor& value, Publish publish, cudaStream_t stream) {
+if(projected.ne[0]==6144&&query.ne[0]==2048&&key.ne[0]==2048&&value.ne[0]==2048){launch<6144,2048,2048,2048>(projected,conv_weight,state_read,valid_columns,initial_state_slots,query,key,value,publish,stream);return;}
+
     if (projected.ne[0] == 10240 && query.ne[0] == 2048 && key.ne[0] == 2048 &&
         value.ne[0] == 6144) {
         launch<10240, 2048, 2048, 6144>(projected, conv_weight, state_read, valid_columns,

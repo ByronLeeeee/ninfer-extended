@@ -1,0 +1,35 @@
+#include "ninfer/ops/softmax_attention.h"
+#include "ninfer/ops/rope.h"
+#include "ninfer/ops/causal_conv1d_silu.h"
+#include "core/device.h"
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+#include <cmath>
+#include <vector>
+#include <random>
+#include <iostream>
+#include <algorithm>
+using namespace ninfer;
+std::mt19937 rng(314159);std::normal_distribution<float> gaussian(0,.4);
+std::vector<__nv_bfloat16> random_bf(int count){std::vector<__nv_bfloat16>a(count);for(auto&v:a)v=__float2bfloat16(gaussian(rng));return a;}
+double bf(__nv_bfloat16 v){return __bfloat162float(v);}
+void upload(DeviceBuffer& b,const auto& v){b.copy_from_host(v.data(),v.size()*sizeof(v[0]));}
+bool metric(const char*name,const std::vector<double>&actual,const std::vector<double>&oracle,bool comma){double ss=0,dd=0,mx=0;for(int i=0;i<actual.size();++i){double d=actual[i]-oracle[i];ss+=oracle[i]*oracle[i];dd+=d*d;mx=std::max(mx,std::abs(d));}double rms=std::sqrt(ss/actual.size()),nrms=std::sqrt(dd/actual.size())/rms;bool ok=std::isfinite(nrms)&&nrms<.006&&mx/rms<.045;std::cout<<(comma?",":"")<<"{\"case\":\""<<name<<"\",\"nrms\":"<<nrms<<",\"max_error_over_reference_rms\":"<<mx/rms<<",\"pass\":"<<(ok?"true":"false")<<"}"<<std::flush;return ok;}
+bool attention(int d,int heads,int kvheads,int tokens,bool causal,bool comma){
+ auto q=random_bf(d*heads*tokens),k=random_bf(d*kvheads*tokens),v=random_bf(d*kvheads*tokens);std::vector<__nv_bfloat16> out(q.size());
+ DeviceBuffer qb(q.size()*2),kb(k.size()*2),vb(v.size()*2),ob(out.size()*2);upload(qb,q);upload(kb,k);upload(vb,v);
+ Tensor tq(qb.p,DType::BF16,{d,heads,tokens}),tk(kb.p,DType::BF16,{d,kvheads,tokens}),tv(vb.p,DType::BF16,{d,kvheads,tokens}),to(ob.p,DType::BF16,{d,heads,tokens});
+ int pages=(tokens+63)/64;DeviceBuffer kp(d*64*kvheads*pages*2),vp(kp.bytes),tp(pages*4),pos(tokens*4),row(4);std::vector<int> table(pages),positions(tokens);for(int i=0;i<pages;++i)table[i]=i;for(int i=0;i<tokens;++i)positions[i]=i;upload(tp,table);upload(pos,positions);std::vector<int>zero{0};upload(row,zero);
+ PagedKVLayerView cache{.k_pages=Tensor(kp.p,DType::BF16,{d,64,kvheads,pages}),.v_pages=Tensor(vp.p,DType::FP16,{d,64,kvheads,pages}),.block_table=Tensor(tp.p,DType::I32,{pages}),.head_dim=d,.num_kv_heads=kvheads,.storage=KvCacheStorage::BFloat16};
+ ops::AttentionHeadGeometry geometry{d,heads,kvheads};ops::CausalAttentionExecutionEnvelope envelope{1,(unsigned)tokens};std::size_t capacity=causal?std::max(ops::causal_softmax_attention_workspace_capacity_bytes(geometry,KvCacheStorage::BFloat16,envelope,1,tokens,tokens),ops::causal_softmax_attention_workspace_capacity_bytes(geometry,KvCacheStorage::BFloat16,envelope,1,1,1)):256;WorkspaceArena workspace(capacity+256);
+ if(causal)ops::causal_softmax_attention(tq,tk,tv,Tensor(pos.p,DType::I32,{tokens}),Tensor{},Tensor(row.p,DType::I32,{1}),geometry,1.f/std::sqrt(float(d)),single_row_paged_kv_batch_view(cache),envelope,workspace,to,nullptr);
+ else ops::packed_softmax_attention(tq,tk,tv,geometry,1.f/std::sqrt(float(d)),tokens,to,nullptr);
+ CUDA_CHECK(cudaDeviceSynchronize());ob.copy_to_host(out.data(),out.size()*2);
+ auto compare=[&](bool cached){std::vector<double>a,o;for(int i:std::vector<int>{0,tokens/2,tokens-1}){if(cached&&i!=tokens-1)continue;int visible=causal?i+1:tokens;for(int h=0;h<heads;++h){int kh=h/(heads/kvheads);std::vector<double> scores(visible);double maximum=-1e300;for(int j=0;j<visible;++j){double score=0;for(int z=0;z<d;++z)score+=bf(q[(i*heads+h)*d+z])*bf(k[(j*kvheads+kh)*d+z]);scores[j]=score/std::sqrt(double(d));maximum=std::max(maximum,scores[j]);}double total=0;for(auto&s:scores){s=std::exp(s-maximum);total+=s;}for(int z=0;z<d;++z){double value=0;for(int j=0;j<visible;++j){double vv=bf(v[(j*kvheads+kh)*d+z]);if(causal)vv=__half2float(__float2half(float(vv)));value+=scores[j]/total*vv;}a.push_back(bf(out[(i*heads+h)*d+z]));o.push_back(value);}}}std::string name=(causal?"causal_":"vision_")+std::to_string(tokens)+(cached?"_cached_decode":"_prefill");return metric(name.c_str(),a,o,cached?true:comma);};
+ bool ok=compare(false);
+ if(causal){Tensor lastq(static_cast<char*>(qb.p)+(tokens-1)*d*heads*2,DType::BF16,{d,heads,1}),lastout(static_cast<char*>(ob.p)+(tokens-1)*d*heads*2,DType::BF16,{d,heads,1}),lastpos(static_cast<char*>(pos.p)+(tokens-1)*4,DType::I32,{1});workspace.reset();ops::causal_softmax_attention_cached(lastq,lastpos,geometry,1.f/std::sqrt(float(d)),cache,envelope,workspace,lastout,nullptr);CUDA_CHECK(cudaDeviceSynchronize());ob.copy_to_host(out.data(),out.size()*2);ok=compare(true)&&ok;}
+ return ok;
+}
+bool rope(bool comma){int d=64,h=12,t=7;auto x=random_bf(d*h*t),result=x;std::vector<int>positions(2*t);for(int i=0;i<t;++i){positions[i]=i*13;positions[t+i]=i*17;}DeviceBuffer xb(x.size()*2),pb(positions.size()*4);upload(xb,x);upload(pb,positions);Tensor tx(xb.p,DType::BF16,{d,h,t});ops::rope(Tensor(pb.p,DType::I32,{t,2}),d,10000.f,tx,nullptr);CUDA_CHECK(cudaDeviceSynchronize());xb.copy_to_host(result.data(),result.size()*2);std::vector<double>a,o;for(int i=0;i<t;++i)for(int head=0;head<h;++head)for(int pair=0;pair<d/2;++pair){int axis=pair/(d/4),local=pair%(d/4),base=(i*h+head)*d;double angle=positions[axis*t+i]*std::pow(10000.,-2.*local/(d/2)),c=std::cos(angle),s=std::sin(angle),first=bf(x[base+pair]),second=bf(x[base+pair+d/2]);a.push_back(bf(result[base+pair]));o.push_back(first*c-second*s);a.push_back(bf(result[base+pair+d/2]));o.push_back(second*c+first*s);}return metric("vision_rope_D64",a,o,comma);}
+bool convolution(int t,bool comma){int c=6144,part=2048;auto x=random_bf(c*t),w=random_bf(c*4),state=random_bf(c*3);DeviceBuffer xb(x.size()*2),wb(w.size()*2),sb(state.size()*2),next(sb.bytes),q(part*t*2),k(q.bytes),v(q.bytes);upload(xb,x);upload(wb,w);upload(sb,state);Tensor tq(q.p,DType::BF16,{part,t}),tk(k.p,DType::BF16,{part,t}),tv(v.p,DType::BF16,{part,t}),ns(next.p,DType::BF16,{c,3});ops::causal_conv1d_silu_split(Tensor(xb.p,DType::BF16,{c,t}),Tensor(wb.p,DType::BF16,{c,4}),Tensor(sb.p,DType::BF16,{c,3}),ns,tq,tk,tv,nullptr);CUDA_CHECK(cudaDeviceSynchronize());std::vector<__nv_bfloat16>oq(part*t),ok(oq.size()),ov(oq.size());q.copy_to_host(oq.data(),q.bytes);k.copy_to_host(ok.data(),k.bytes);v.copy_to_host(ov.data(),v.bytes);std::vector<double>a,o;for(int i=0;i<t;++i)for(int z=0;z<c;++z){double sum=0;for(int tap=0;tap<4;++tap){int j=i-3+tap;double input=j<0?bf(state[(j+3)*c+z]):bf(x[j*c+z]);sum+=input*bf(w[tap*c+z]);}double ideal=sum/(1+std::exp(-sum));int p=z/part;auto&out=p==0?oq:p==1?ok:ov;a.push_back(bf(out[i*part+z%part]));o.push_back(ideal);}return metric(("conv_6144_T"+std::to_string(t)).c_str(),a,o,comma);}
+int main(){try{std::cout<<"{\"oracle\":\"Naive FP64 on represented BF16 inputs, BF16 K and FP16(BF16 V) cache boundary\",\"cases\":[";bool ok=rope(false);for(int t:{1,9,65})ok=convolution(t,true)&&ok;for(int t:{65,197})ok=attention(64,12,12,t,false,true)&&ok;for(int t:{65,513})ok=attention(256,8,2,t,true,true)&&ok;std::cout<<"],\"pass\":"<<(ok?"true":"false")<<"}\n";return ok?0:1;}catch(const std::exception&e){std::cerr<<e.what()<<std::endl;return 2;}}

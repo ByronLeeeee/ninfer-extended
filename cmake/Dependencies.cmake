@@ -1,6 +1,7 @@
 find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
+pkg_check_modules(PCRE2 REQUIRED IMPORTED_TARGET libpcre2-8)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
   libavformat libavcodec libavutil libswscale)
 
