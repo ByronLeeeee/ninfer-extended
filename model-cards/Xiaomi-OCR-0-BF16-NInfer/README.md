@@ -22,14 +22,14 @@ representations, and tied embedding/output weights remain shared.
 
 ## Required runtime
 
-**Build [ByronLeeeee/ninfer](https://github.com/ByronLeeeee/ninfer) from its `main` branch.** This fork adds the
+**Build [ByronLeeeee/ninfer-qwen3.5-0.8b](https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b) from its `main` branch.** This fork adds the
 small Qwen3.5-0.8B kernel shapes and frontend support required by this artifact.
 An unmodified upstream NInfer binary must not be assumed to load it.
 The `.ninfer` file is not Transformers safetensors or GGUF.
 
 ```bash
-git clone https://github.com/ByronLeeeee/ninfer.git
-cd ninfer
+git clone https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b.git
+cd ninfer-qwen3.5-0.8b
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 
@@ -46,7 +46,7 @@ FFmpeg development libraries, libcurl >=7.85, pkg-config and libpcre2-dev.
 The complete native source was clean-built using CUDA 13.2/GCC 15.2. Its binary
 was executed on **RTX 5070 Ti 16 GB (WSL2)** and **RTX 6000D (Linux)**, both compute
 capability 12.0. Other Blackwell architectures are not automatically qualified.
-See [build and conversion details](https://github.com/ByronLeeeee/ninfer/blob/main/docs/xiaomi-ocr.md).
+See [build and conversion details](https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b/blob/main/docs/xiaomi-ocr.md).
 
 The 32K/four-lane command is a deployment example; the measurements below use
 4K/one lane on both engines. FP8 KV is optional and needs separate output checks.
@@ -129,8 +129,8 @@ Local video/VSR was paused; server services remained resident and idle.
 All ten independent FP64 attention/RoPE/convolution qualification cases passed.
 Compiler-op schema, fake-layout and initial-state ownership checks passed.
 
-[Measurement report](https://github.com/ByronLeeeee/ninfer/blob/main/docs/xiaomi-ocr-performance.md) ·
-[Sanitized data](https://github.com/ByronLeeeee/ninfer/blob/main/docs/xiaomi-ocr-results.json)
+[Measurement report](https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b/blob/main/docs/xiaomi-ocr-performance.md) ·
+[Sanitized data](https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b/blob/main/docs/xiaomi-ocr-results.json)
 
 ## Provenance and license
 

@@ -1,4 +1,4 @@
-# NInfer
+# NInfer with Qwen3.5-0.8B Support
 
 This fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) extends the general
 C++/CUDA inference engine with **Qwen3.5-0.8B architecture and BF16/A16 kernel
@@ -34,8 +34,8 @@ upstream checkpoints.
 ## Build this fork
 
 ```bash
-git clone https://github.com/ByronLeeeee/ninfer.git
-cd ninfer
+git clone https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b.git
+cd ninfer-qwen3.5-0.8b
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
@@ -103,7 +103,7 @@ Build the product binaries:
 
 ```bash
 git clone https://github.com/Neroued/ninfer.git
-cd ninfer
+cd ninfer-qwen3.5-0.8b
 
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j

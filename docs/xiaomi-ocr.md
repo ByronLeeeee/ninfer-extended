@@ -44,8 +44,8 @@ also executed on the 5070 Ti through a private compatible runtime. WSL's system 
 was not replaced. The Python baseline compiled on each GPU independently.
 
 ```bash
-git clone https://github.com/ByronLeeeee/ninfer.git
-cd ninfer
+git clone https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b.git
+cd ninfer-qwen3.5-0.8b
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 
