@@ -16,6 +16,8 @@ using SmallT = Bf16SimtSchedule<4, 1, 2, 8, 1, 4, Bf16SimtActivationAccess::Warp
     Bf16WeightCache::Default, Bf16PhaseOrder::Sequential, 1, 1, 1, 2>;
 using Mma = Bf16MmaSchedule<64, 64, 64, 32, 32, 2, 2, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
+using WideMma = Bf16MmaSchedule<64, 128, 64, 32, 64, 2, 1, Cache::cg, Cache::cg,
+    Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 
 struct ContiguousOutput {
     __nv_bfloat16* data;
@@ -71,18 +73,44 @@ void small_projection(const Tensor& x, const Weight& w, Output output, cudaStrea
             static_cast<const __nv_bfloat16*>(w.qdata), output, x.ne[1]);
 }
 
-template <class Geometry, class Output>
-void mma_projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
-    const int blocks = Geometry::kOutputRows / Mma::kBlockRows * div_up(x.ne[1], Mma::kBlockCols);
-    if (x.ne[1] % Mma::kBlockCols == 0)
-        bf16_gemm_mma_kernel<Geometry, Mma, true>
-            <<<blocks, Mma::kThreads, Mma::kSharedBytes, stream>>>(
+template <class Geometry, class Schedule, class Output>
+void mma_projection_variant(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
+    const int blocks = Geometry::kOutputRows / Schedule::kBlockRows * div_up(x.ne[1], Schedule::kBlockCols);
+    if (x.ne[1] % Schedule::kBlockCols == 0)
+        bf16_gemm_mma_kernel<Geometry, Schedule, true>
+            <<<blocks, Schedule::kThreads, Schedule::kSharedBytes, stream>>>(
                 static_cast<const __nv_bfloat16*>(x.data),
                 static_cast<const __nv_bfloat16*>(w.qdata), output, x.ne[1]);
-    else bf16_gemm_mma_kernel<Geometry, Mma, false>
-        <<<blocks, Mma::kThreads, Mma::kSharedBytes, stream>>>(
+    else bf16_gemm_mma_kernel<Geometry, Schedule, false>
+        <<<blocks, Schedule::kThreads, Schedule::kSharedBytes, stream>>>(
             static_cast<const __nv_bfloat16*>(x.data),
             static_cast<const __nv_bfloat16*>(w.qdata), output, x.ne[1]);
+}
+
+template <class Geometry, class Output>
+void mma_projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
+    constexpr int n = Geometry::kOutputRows, k = Geometry::kInputRows;
+    if constexpr (n == 8192 && k == 1024) {
+        // These columns fill the same padded extent with half as many weight tiles.
+        // Retain the narrower tile when a short final column tile would add MMA work.
+        const int tail = x.ne[1] % WideMma::kBlockCols;
+        if (x.ne[1] >= 65 && (tail == 0 || tail > Mma::kBlockCols)) {
+            mma_projection_variant<Geometry, WideMma>(x, w, output, stream);
+            return;
+        }
+    } else if constexpr (n == 3072 && k == 768) {
+        // Larger column extents provide enough CTAs for the wider accumulator tile.
+        if (x.ne[1] >= 2048) {
+            mma_projection_variant<Geometry, WideMma>(x, w, output, stream);
+            return;
+        }
+    } else if constexpr ((n == 768 && k == 3072) || (n == 2304 && k == 768)) {
+        if (x.ne[1] >= 4096) {
+            mma_projection_variant<Geometry, WideMma>(x, w, output, stream);
+            return;
+        }
+    }
+    mma_projection_variant<Geometry, Mma>(x, w, output, stream);
 }
 
 template <int N, int K, class Output>

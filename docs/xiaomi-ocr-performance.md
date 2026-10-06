@@ -1,5 +1,128 @@
 # Xiaomi-OCR-0 test results
 
+## RTX 5070 Ti BF16 prefill projection
+
+Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14,
+CUDA 13.3.33 and GCC 13.3.0. The baseline is `b33b81b8`, which includes the
+grouped-query attention update below. Both versions use BF16 weights and KV.
+
+BF16 prefill projections now use a 64-row x 128-column MMA block with
+32-row x 64-column warp tiles on selected matrix geometries and column extents.
+The wider column tile reuses each weight tile across more input columns and
+reduces the number of CTAs. Four warps and two pipeline stages are retained.
+Dynamic shared memory per CTA increases from 32 KiB to 48 KiB; the Op needs no
+additional global workspace. Weight storage, KV allocation and precision are unchanged.
+
+The selection is private to the BF16 projection implementation and applies to
+the public `linear` and `gdn_input_proj` Ops. `N` is output rows, `K` is input
+rows, and `T` is input columns:
+
+| N x K | Wide-tile selection |
+|---|---|
+| 8,192 x 1,024 | T >= 65, with T % 128 == 0 or T % 128 > 64 |
+| 3,072 x 768 | T >= 2,048 |
+| 768 x 3,072 | T >= 4,096 |
+| 2,304 x 768 | T >= 4,096 |
+
+The column-tail condition avoids extra padded MMA work. The other cutoffs follow
+the measured occupancy crossover. Eight small-batch candidates and ten MMA
+candidates were evaluated; the existing small-batch and vocabulary projections
+were retained. The delivered change therefore targets prefill.
+
+Both complete public-Op implementations run in one CUDA process with the same
+input, weight and output addresses. Baseline host symbols are renamed to link
+the two archives; device computation is unchanged. The comparison uses a rotating
+weight pool of at least 128 MiB, 64 complete calls per CUDA Graph, at least 200 ms
+of GPU warmup per engine and point, and six A-B-B-A cycles. The table shows the
+median of twelve samples per version on the selected routes; boundary controls
+and all samples are included in the linked JSON.
+
+| Public Op | N x K | T | Baseline us | Updated us | Latency reduction |
+|---|---:|---:|---:|---:|---:|
+| gdn_input_proj | 8,192 x 1,024 | 65 | 32.69 | 29.54 | 9.6% |
+| gdn_input_proj | 8,192 x 1,024 | 128 | 32.38 | 28.65 | 11.5% |
+| gdn_input_proj | 8,192 x 1,024 | 193 | 59.75 | 56.14 | 6.1% |
+| gdn_input_proj | 8,192 x 1,024 | 512 | 106.93 | 103.73 | 3.0% |
+| gdn_input_proj | 8,192 x 1,024 | 1,024 | 207.12 | 195.35 | 5.7% |
+| linear | 8,192 x 1,024 | 65 | 31.16 | 26.50 | 14.9% |
+| linear | 8,192 x 1,024 | 1,024 | 204.97 | 188.95 | 7.8% |
+| linear | 3,072 x 768 | 2,048 | 118.18 | 110.19 | 6.8% |
+| linear | 3,072 x 768 | 2,049 | 120.40 | 114.39 | 5.0% |
+| linear | 3,072 x 768 | 7,168 | 401.38 | 373.02 | 7.1% |
+| linear | 768 x 3,072 | 4,096 | 231.40 | 217.43 | 6.0% |
+| linear | 768 x 3,072 | 4,097 | 249.15 | 217.09 | 12.9% |
+| linear | 768 x 3,072 | 7,168 | 409.51 | 360.36 | 12.0% |
+| linear | 2,304 x 768 | 4,096 | 174.57 | 165.14 | 5.4% |
+| linear | 2,304 x 768 | 4,097 | 175.38 | 163.93 | 6.5% |
+| linear | 2,304 x 768 | 7,153 | 296.86 | 275.73 | 7.1% |
+
+The measured complete public-Op reductions are **3–15%**. These numbers
+include the GDN output split where applicable.
+
+Whole-model runs use 4K context per request, a 1,024-token prefill chunk, decode
+CUDA Graphs, and a 256-token output cap. Prefix reuse and media caching are
+disabled. Sampling uses temperature 0, presence/frequency penalties 0, top-p 1,
+top-k 0, min-p 0 and seed 123. Both real servers stay resident; one engine's burst
+executes at a time. After two warmups per input and engine, five A-B-B-A cycles
+produce ten measured bursts per input and version. Tables show medians.
+Prefill includes vision and language GPU processing; concurrent decode speed is
+per request. Total throughput includes client wall time, preparation and scheduling.
+
+| Lanes | Input | Baseline prefill tok/s | Updated prefill tok/s | Prefill change | Baseline decode tok/s/request | Updated decode tok/s/request | Decode change |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | zh_legal | 22,053 | 22,358 | +1.38% | 421.9 | 421.9 | +0.01% |
+| 1 | en_contract | 21,654 | 22,198 | +2.51% | 421.3 | 419.3 | -0.48% |
+| 1 | dense-equations | 20,435 | 20,443 | +0.04% | 417.2 | 418.7 | +0.35% |
+| 2 | zh_legal | 21,992 | 22,291 | +1.36% | 410.4 | 409.8 | -0.15% |
+| 2 | en_contract | 21,760 | 22,362 | +2.76% | 409.8 | 410.3 | +0.11% |
+| 4 | zh_legal | 21,969 | 22,072 | +0.47% | 379.0 | 379.9 | +0.25% |
+| 4 | en_contract | 21,635 | 21,957 | +1.49% | 378.1 | 377.1 | -0.28% |
+
+| Lanes | Input | Baseline total tok/s | Updated total tok/s | Total change |
+|---:|---|---:|---:|---:|
+| 1 | zh_legal | 274.3 | 274.3 | +0.02% |
+| 1 | en_contract | 271.4 | 261.5 | -3.63% |
+| 1 | dense-equations | 310.7 | 312.0 | +0.42% |
+| 2 | zh_legal | 423.1 | 428.1 | +1.19% |
+| 2 | en_contract | 430.7 | 430.9 | +0.04% |
+| 4 | zh_legal | 618.9 | 619.8 | +0.15% |
+| 4 | en_contract | 618.2 | 614.5 | -0.61% |
+
+Complete vision/language prefill improves by **0–2.8%** in this primary run;
+decode remains essentially flat. The single-English total result varied more
+than its GPU timings, so the same binaries and settings were checked in ten
+additional A-B-B-A cycles, twenty bursts per engine. That confirmation measured:
+
+| Input | Baseline prefill tok/s | Updated prefill tok/s | Baseline decode tok/s | Updated decode tok/s | Baseline total tok/s | Updated total tok/s |
+|---|---:|---:|---:|---:|---:|---:|
+| en_contract, one lane | 21,826 | 22,235 | 421.4 | 422.3 | 260.2 | 266.6 |
+
+Confirmation changes are **+1.87% prefill**,
+**+0.22% decode** and
+**+2.47% total throughput**. The initial
+single-English total regression did not repeat; both runs are recorded above.
+End-to-end throughput remains sensitive to preparation and scheduling at these
+short output lengths.
+
+All **340 formal OCR outputs** match their baseline exactly: 300 in the primary
+comparison and 40 in confirmation. Agreement is 100%, normalized character
+difference is 0%, and both versions score CER 0% on the two complete text pages
+with 478 annotated characters. The dense-equations comparison covers its first
+256 generated tokens. A separate 32K/four-request check completes Chinese text,
+English text, mixed numbers and a formula page, with every output matching
+sequential execution and baseline.
+
+All **225 independent FP64 checks** pass, including 28 new projection checks at
+column-tail and occupancy boundaries. The large projection checks compare
+97 output rows at every input column with a full independent FP64 reduction;
+smaller checks compare every output. Every output element is also checked for
+finiteness. The independent oracle uses represented BF16 inputs and the existing
+NRMS < 0.006 and peak-error/reference-RMS < 0.045 criteria. The same-process
+public-Op comparison passes 48 further FP64 checks, with bitwise equality at all
+24 compared points. Candidate selection passed 240 independent FP64 checks.
+
+[BF16 prefill projection measurements](xiaomi-ocr-5070ti-prefill-projection.json)
+
 ## RTX 5070 Ti grouped-query decode attention
 
 Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14,

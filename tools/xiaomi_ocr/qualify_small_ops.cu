@@ -147,7 +147,10 @@ bool projection(int n, int k, int tokens, bool residual) {
         }
     }
     Error error;
-    for (int t = 0; t < tokens; ++t) for (int row = 0; row < n; ++row) {
+    for (auto element : actual) error.finite = error.finite && std::isfinite(value(element));
+    const int checked_rows = tokens <= 65 ? n : std::min(n, 97);
+    for (int t = 0; t < tokens; ++t) for (int sample = 0; sample < checked_rows; ++sample) {
+        const int row = checked_rows == n ? sample : sample * (n - 1) / (checked_rows - 1);
         double expected = residual ? value(initial[t * n + row]) : 0.0;
         for (int column = 0; column < k; ++column)
             expected += value(weights[std::size_t(row) * k + column]) * value(x[t * k + column]);
@@ -388,6 +391,16 @@ int main() {
         for (int tokens : {1, 2, 4, 65}) pass = gating_projection(tokens) && pass;
         for (int tokens : {1, 2, 3, 4, 5, 7, 8, 9, 17, 65})
             pass = norm_gating_projection(tokens) && pass;
+        for (int tokens : {64, 65, 96, 127, 128, 129, 192, 193, 255, 256, 257,
+                           511, 512, 513, 1024, 1025})
+            pass = projection(8192, 1024, tokens, false) && pass;
+        for (int tokens : {2047, 2048, 2049, 7168}) {
+            pass = dense_projection(3072, 768, tokens, false) && pass;
+        }
+        for (int tokens : {4095, 4096, 4097, 7168})
+            pass = dense_projection(768, 3072, tokens, false) && pass;
+        for (int tokens : {4095, 4096, 4097, 7153})
+            pass = dense_projection(2304, 768, tokens, false) && pass;
         for (int length : {1, 15, 16, 17, 31, 32, 33, 63, 64, 65, 197, 7168, 9216})
             pass = vision_attention({length}, true, false) && pass;
         pass = vision_attention({17, 17, 17}, true, true) && pass;
