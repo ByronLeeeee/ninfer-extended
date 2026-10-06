@@ -163,10 +163,17 @@ __device__ __forceinline__ int bf16_phase_index(int iteration, int row0) {
     }
 }
 
-template <class Geometry, class Schedule>
+struct Bf16ContiguousRows {
+    __device__ __forceinline__ int weight_row(int row0, int local_row) const {
+        return row0 + local_row;
+    }
+};
+
+template <class Geometry, class Schedule, class Rows = Bf16ContiguousRows>
 __device__ __forceinline__ void compute_bf16_gemv_rows(
     const __nv_bfloat16* activation, const __nv_bfloat16* weight, int row0, int warp_in_row,
-    int lane, float (&accumulators)[Schedule::kRowsPerWarp][Schedule::kAccumulatorChains]) {
+    int lane, float (&accumulators)[Schedule::kRowsPerWarp][Schedule::kAccumulatorChains],
+    Rows rows = {}) {
     constexpr int kValuesPerPhase = Schedule::kWarpsPerRow * kWarpSize * Schedule::kValuesPerLane;
     static_assert((Geometry::kInputRows % kValuesPerPhase) == 0);
     constexpr int kPhases = Geometry::kInputRows / kValuesPerPhase;
@@ -181,7 +188,7 @@ __device__ __forceinline__ void compute_bf16_gemv_rows(
 #pragma unroll
             for (int local_row = 0; local_row < Schedule::kRowsPerWarp; ++local_row) {
                 const Pack w_values = load_bf16_weight_phase<Geometry, Schedule>(
-                    weight, row0 + local_row, phase, warp_in_row, lane);
+                    weight, rows.weight_row(row0, local_row), phase, warp_in_row, lane);
                 accumulate_bf16_packs(w_values, x_values, accumulators[local_row]);
             }
         }
@@ -193,7 +200,7 @@ __device__ __forceinline__ void compute_bf16_gemv_rows(
 #pragma unroll
         for (int local_row = 0; local_row < Schedule::kRowsPerWarp; ++local_row) {
             current_w[local_row] = load_bf16_weight_phase<Geometry, Schedule>(
-                weight, row0 + local_row, first_phase, warp_in_row, lane);
+                weight, rows.weight_row(row0, local_row), first_phase, warp_in_row, lane);
         }
 
 #pragma unroll Schedule::kPhaseUnroll
@@ -207,7 +214,7 @@ __device__ __forceinline__ void compute_bf16_gemv_rows(
 #pragma unroll
                 for (int local_row = 0; local_row < Schedule::kRowsPerWarp; ++local_row) {
                     next_w[local_row] = load_bf16_weight_phase<Geometry, Schedule>(
-                        weight, row0 + local_row, next_phase, warp_in_row, lane);
+                        weight, rows.weight_row(row0, local_row), next_phase, warp_in_row, lane);
                 }
             }
 #pragma unroll

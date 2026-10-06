@@ -46,14 +46,16 @@ linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gate_up_rows,
  *
  * Logical shapes / supported domain:
  *   T may be any positive value. The registered profiles are:
+ *   - BF16 Contiguous weight [7168,1024], x [1024,T], out [3584,T];
+ *   - BF16 Contiguous weight [14336,5120], x [5120,T], out [7168,T];
  *   - Q4_G64_FP16 weight [34816,5120], x [5120,T], out [17408,T];
  *   - Q8_G32_FP16 weight [12288,2048], x [2048,T], out [6144,T];
  *   - Q8_G32_FP16 weight [34816,5120], x [5120,T], out [17408,T];
  *   - NVFP4 BlockScaleK16M128x4 weight [34816,5120], x [5120,T], out [17408,T];
  *   - FP8_E4M3FN_ROW_BF16 RowScale weight [34816,5120], x [5120,T], out [17408,T].
  *   Inputs and output are contiguous BF16. Q4/Q8 scales are FP16, NVFP4 scales are E4M3FN, and
- *   row-scaled FP8 has one BF16 multiplier per gate/up parent row. Gate rows `[0,17408)` precede
- *   their matching up rows `[17408,34816)`.
+ *   row-scaled FP8 has one BF16 multiplier per gate/up parent row. For M=gate_up_rows/2,
+ *   gate rows `[0,M)` precede their matching up rows `[M,2*M)`.
  *
  * Numeric:
  *   The oracle exact-decodes the registered weight and evaluates `ideal` naively in FP64 from the
@@ -69,6 +71,7 @@ linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gate_up_rows,
  *
  * Workspace:
  *   Caller-owned transient storage reported by linear_swiglu_workspace_capacity_bytes(),
+ *   including BF16 projection storage when the selected route materializes gate/up.
  *   scoped to the call. Q8, NVFP4 A16, and row-scaled FP8 A16 require zero bytes; A4/A8 routes use
  *   caller-owned activation storage and may use private projection storage. There is no persistent
  *   state side effect.

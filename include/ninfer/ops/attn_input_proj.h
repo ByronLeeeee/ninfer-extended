@@ -44,6 +44,8 @@ void attn_input_proj(const Tensor& x, const Weight& query_key_weight,
  *
  * Registered parent forms are:
  *
+ * - BF16 Contiguous `[5120,1024]`, with row counts `[2048,512,2048,512]`. `x` is
+ *   BF16 `[1024,T]`, q/gate are BF16 `[2048,T]`, and k/v are BF16 `[512,T]`.
  * - Q8_G32_FP16 RowSplit `[9216,2048]`, with row counts `[4096,512,4096,512]`. `x` is
  *   BF16 `[2048,T]`, q/gate are BF16 `[4096,T]`, and k/v are BF16 `[512,T]`.
  * - BF16 Contiguous `[14336,5120]`, with row counts `[6144,1024,6144,1024]`. `x` is

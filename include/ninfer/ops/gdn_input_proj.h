@@ -46,6 +46,7 @@ void gdn_input_proj(const Tensor& x, const Weight& qk_weight, const Weight& valu
 /**
  * Single-parent GDN projection. Registered parent forms are:
  *
+ * - BF16 Contiguous [8192,1024], with stored row counts [2048,2048,2048,2048];
  * - Q8_G32_FP16 RowSplit [12288,2048], with stored row counts [2048,2048,4096,4096];
  * - NVFP4 BlockScaleK16M128x4 [16384,5120], with stored row counts [2048,2048,6144,6144].
  * - FP8_E4M3FN_ROW_BF16 RowScale [16384,5120], with stored row counts

@@ -1,4 +1,4 @@
-#include "ops/xiaomi_bf16.h"
+#include "ops/linear/bf16/bf16_projection.h"
 #include "core/weight.h"
 #include "ninfer/ops/linear_swiglu.h"
 
@@ -35,12 +35,13 @@ std::size_t linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gat
                                                    std::int32_t input_rows, LinearPolicy policy,
                                                    std::int32_t min_tokens,
                                                    std::int32_t max_tokens) {
-if(qtype==QType::BF16 && gate_up_rows==7168 && input_rows==1024) return std::size_t(gate_up_rows)*max_tokens*2+256;
-
     validate_policy(policy);
     if (min_tokens <= 0 || max_tokens < min_tokens || (gate_up_rows % 2) != 0) {
         throw std::invalid_argument("linear_swiglu workspace: invalid profile or token interval");
     }
+    if (qtype == QType::BF16 && detail::bf16_swiglu_shape(gate_up_rows, input_rows))
+        return max_tokens <= detail::bf16_swiglu_small_max_tokens(gate_up_rows, input_rows)
+            ? 0 : std::size_t(gate_up_rows) * max_tokens * sizeof(std::uint16_t);
     if (qtype == QType::Q8_G32_FP16) {
         (void)detail::q8_linear_swiglu_resolve_plan(
             {gate_up_rows, gate_up_rows / 2, input_rows, input_rows, min_tokens});
@@ -70,9 +71,12 @@ std::size_t linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gat
 
 void linear_swiglu(const Tensor& x, const Weight& gate_up_weight, Tensor& out, LinearPolicy policy,
                    WorkspaceArena& ws, cudaStream_t stream) {
-if(gate_up_weight.qtype==QType::BF16 && gate_up_weight.n==7168 && gate_up_weight.k==1024){detail::xiaomi_bf16_swiglu(x,gate_up_weight,out,ws,stream);return;}
-
     validate_policy(policy);
+    if (gate_up_weight.qtype == QType::BF16 &&
+        detail::bf16_swiglu_shape(gate_up_weight.n, gate_up_weight.k)) {
+        detail::bf16_projection_swiglu(x, gate_up_weight, out, ws, stream);
+        return;
+    }
     if (x.dtype != DType::BF16 || out.dtype != DType::BF16) {
         throw std::invalid_argument("linear_swiglu: x/out must be BF16");
     }

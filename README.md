@@ -7,7 +7,7 @@ This fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) adds **Qwen3.5-
 - BF16/A16 Gated DeltaNet, attention, linear-add, and SwiGLU kernels for the 1,024-wide Qwen3.5-0.8B configuration.
 - Text attention with 256-dimensional heads (8 query heads, 2 KV heads) and segmented vision attention with 64-dimensional heads (12 heads).
 - Vision position ordering, two-axis RoPE, and 6,144-channel causal convolution for prefill and decode.
-- Compact D64 vision attention and fused BF16 decode projection/residual and output splitting, measured on RTX 5070 Ti.
+- Compact D64 vision attention, small-batch BF16 projections, and fused residual, output splitting, and SwiGLU kernels, measured on RTX 5070 Ti. These kernels are selected by matrix shape and token count through the public Ops.
 - Unicode tokenization through PCRE2 and export of the original added-token metadata.
 - A BF16 v3 conversion recipe that embeds tokenizer and image/video processor resources in the model file.
 - Transformers comparison tools with compiled vision encoding, language prefill, and decode. Cache storage is initialized outside compilation to preserve decode CUDA Graphs.
@@ -40,7 +40,13 @@ NInfer decode is **2.46–2.59×** faster on the 5070 Ti and **2.17–2.22×** f
 
 Both engines scored CER 0% on two synthetic text pages with 478 annotated characters. All three compared outputs matched exactly on both GPUs: two complete text pages and the first 256 tokens of a formula page. The [test report](docs/xiaomi-ocr-performance.md) includes the scoring method, memory usage, and an earlier 11-page comparison.
 
-The local 5070 Ti operator optimization improved complete vision/language prefill throughput by **4.0–7.0%** and decode by **0.9–1.8%** in a same-toolchain A-B-B-A comparison. All outputs matched, and all **40 independent FP64 checks** passed. See the [operator optimization results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-operator-optimization).
+The first local 5070 Ti operator optimization improved complete vision/language prefill throughput by **4.0–7.0%** and decode by **0.9–1.8%** in a same-toolchain A-B-B-A comparison. All outputs matched, and all **40 independent FP64 checks** passed. See the [operator optimization results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-operator-optimization).
+
+The latest shared BF16 operator update improves **two-/four-request decode by
+35.2–39.5%** and end-to-end total throughput by
+15.0–20.9% against the preceding optimized build.
+All outputs match, and all **145 FP64 checks** pass. See the
+[small-batch operator results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-small-batch-bf16-operators).
 
 ---
 

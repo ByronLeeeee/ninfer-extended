@@ -1,0 +1,255 @@
+{
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "baseline_commit": "75ad8669",
+  "toolchain": {
+    "cuda": "13.3.33",
+    "gcc": "13.3.0",
+    "driver": "617.14"
+  },
+  "configuration": {
+    "weights": "bf16",
+    "kv": "bf16",
+    "context_per_request": 4096,
+    "concurrency": [
+      1,
+      2,
+      4
+    ],
+    "prefill_chunk": 1024,
+    "max_output_tokens": 256,
+    "greedy": true,
+    "prefix_reuse": false,
+    "media_cache_mib": 0
+  },
+  "method": "A-B-B-A; two warmups and five measured requests/bursts per fixture per phase; ten measurements per variant; homogeneous simultaneous bursts for multi-request measurements",
+  "single": [
+    {
+      "fixture": "zh_legal",
+      "baseline": {
+        "vision_ms": 44.88516807556152,
+        "text_prefill_ms": 44.59541456286621,
+        "prefill_ms": 89.244392,
+        "decode_ms": 277.5967754999999,
+        "decode_tps": 403.5281715502901,
+        "request_ms": 455.43330699999274,
+        "prompt_tokens": 1807,
+        "completion_tokens": 113,
+        "prefill_tps": 20247.770862733872,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "gpu_memory_increment_mib_estimate": 2069.5,
+        "cer": 0.0
+      },
+      "optimized": {
+        "vision_ms": 44.80904006958008,
+        "text_prefill_ms": 39.49080668640137,
+        "prefill_ms": 84.44637499999999,
+        "decode_ms": 271.3639059999999,
+        "decode_tps": 412.72993889361453,
+        "request_ms": 443.1496174999836,
+        "prompt_tokens": 1807,
+        "completion_tokens": 113,
+        "prefill_tps": 21398.195008370698,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "gpu_memory_increment_mib_estimate": 2073.5,
+        "cer": 0.0
+      },
+      "prefill_gain_pct": 5.6817323419744215,
+      "decode_gain_pct": 2.2803283617033987,
+      "exact_output_agreement": true,
+      "character_difference_rate": 0.0
+    },
+    {
+      "fixture": "en_contract",
+      "baseline": {
+        "vision_ms": 44.310848236083984,
+        "text_prefill_ms": 43.02561115661621,
+        "prefill_ms": 87.31036399999999,
+        "decode_ms": 279.01480749999996,
+        "decode_tps": 404.9986926408835,
+        "request_ms": 454.85516349998534,
+        "prompt_tokens": 1807,
+        "completion_tokens": 114,
+        "prefill_tps": 20696.282975065824,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "gpu_memory_increment_mib_estimate": 2069.5,
+        "cer": 0.0
+      },
+      "optimized": {
+        "vision_ms": 44.72955131530762,
+        "text_prefill_ms": 39.66638703588866,
+        "prefill_ms": 84.5058235,
+        "decode_ms": 274.30179250000003,
+        "decode_tps": 411.95504670608227,
+        "request_ms": 444.9212874999944,
+        "prompt_tokens": 1807,
+        "completion_tokens": 114,
+        "prefill_tps": 21383.14171922128,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "gpu_memory_increment_mib_estimate": 2073.5,
+        "cer": 0.0
+      },
+      "prefill_gain_pct": 3.3187541211286975,
+      "decode_gain_pct": 1.7176238322742066,
+      "exact_output_agreement": true,
+      "character_difference_rate": 0.0
+    },
+    {
+      "fixture": "dense-equations",
+      "baseline": {
+        "vision_ms": 66.47991943359375,
+        "text_prefill_ms": 55.00898852807617,
+        "prefill_ms": 121.986183,
+        "decode_ms": 639.0801434999996,
+        "decode_tps": 399.0110286471912,
+        "request_ms": 852.1336249999933,
+        "prompt_tokens": 2368,
+        "completion_tokens": 256,
+        "prefill_tps": 19412.034558044987,
+        "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+        "gpu_memory_increment_mib_estimate": 2069.5
+      },
+      "optimized": {
+        "vision_ms": 66.54702377319336,
+        "text_prefill_ms": 54.67368472680665,
+        "prefill_ms": 121.2207085,
+        "decode_ms": 631.783059,
+        "decode_tps": 403.61967043554057,
+        "request_ms": 839.565936500037,
+        "prompt_tokens": 2368,
+        "completion_tokens": 256,
+        "prefill_tps": 19534.61606768286,
+        "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+        "gpu_memory_increment_mib_estimate": 2073.5
+      },
+      "prefill_gain_pct": 0.6314717258066649,
+      "decode_gain_pct": 1.1550161417779758,
+      "exact_output_agreement": true,
+      "character_difference_rate": 0.0
+    }
+  ],
+  "batches": [
+    {
+      "fixture": "zh_legal",
+      "concurrency": 2,
+      "baseline": {
+        "burst_ms": 686.5616695000085,
+        "end_to_end_total_tps": 329.1779828642333,
+        "per_request_decode_tps": 283.90523801236685,
+        "per_request_prefill_tps": 20527.189256872138,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "observed_decode_batch": 1.9736842105263157
+      },
+      "optimized": {
+        "burst_ms": 569.2108164999468,
+        "end_to_end_total_tps": 397.04115348398915,
+        "per_request_decode_tps": 395.99737852630244,
+        "per_request_prefill_tps": 21438.88248918985,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "observed_decode_batch": 1.9734513274336283
+      },
+      "decode_gain_pct": 39.48223755880576,
+      "end_to_end_gain_pct": 20.615950687001284,
+      "exact_output_agreement": true
+    },
+    {
+      "fixture": "en_contract",
+      "concurrency": 2,
+      "baseline": {
+        "burst_ms": 686.7188765000378,
+        "end_to_end_total_tps": 332.0139950724797,
+        "per_request_decode_tps": 283.99624453579,
+        "per_request_prefill_tps": 20871.7263394103,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "observed_decode_batch": 1.9736842105263157
+      },
+      "optimized": {
+        "burst_ms": 568.2569914999931,
+        "end_to_end_total_tps": 401.23985416763736,
+        "per_request_decode_tps": 395.78828124493964,
+        "per_request_prefill_tps": 20977.669632855886,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "observed_decode_batch": 1.9734513274336283
+      },
+      "decode_gain_pct": 39.36391373480337,
+      "end_to_end_gain_pct": 20.850283458697415,
+      "exact_output_agreement": true
+    },
+    {
+      "fixture": "zh_legal",
+      "concurrency": 4,
+      "baseline": {
+        "burst_ms": 935.409952499981,
+        "end_to_end_total_tps": 483.210770366371,
+        "per_request_decode_tps": 271.42844164327676,
+        "per_request_prefill_tps": 20522.376142106434,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "observed_decode_batch": 3.869565217391304
+      },
+      "optimized": {
+        "burst_ms": 813.227647500014,
+        "end_to_end_total_tps": 555.8102767024429,
+        "per_request_decode_tps": 366.8459830916493,
+        "per_request_prefill_tps": 21254.733449432126,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "observed_decode_batch": 3.878260869565217
+      },
+      "decode_gain_pct": 35.15384786896227,
+      "end_to_end_gain_pct": 15.024397382746034,
+      "exact_output_agreement": true
+    },
+    {
+      "fixture": "en_contract",
+      "concurrency": 4,
+      "baseline": {
+        "burst_ms": 928.4989134999364,
+        "end_to_end_total_tps": 491.1153038945814,
+        "per_request_decode_tps": 271.48533706273975,
+        "per_request_prefill_tps": 20551.53059006377,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "observed_decode_batch": 3.869565217391304
+      },
+      "optimized": {
+        "burst_ms": 803.6532874999693,
+        "end_to_end_total_tps": 567.4088817396114,
+        "per_request_decode_tps": 369.14104636454266,
+        "per_request_prefill_tps": 21393.8794013203,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "observed_decode_batch": 3.878260869565217
+      },
+      "decode_gain_pct": 35.97089638739306,
+      "end_to_end_gain_pct": 15.53475879086157,
+      "exact_output_agreement": true
+    }
+  ],
+  "quality": {
+    "single_exact_agreement": "3/3",
+    "weighted_character_difference_rate": 0.0,
+    "gold_characters": 478,
+    "batch_outputs_consistent": true
+  },
+  "numerical": {
+    "new_and_retained_cases": 135,
+    "attention_rope_convolution_cases": 10,
+    "all_pass": true,
+    "maximum_nrms": 0.0032233
+  },
+  "binary_sha256": {
+    "baseline": "49204bad78e8729f48b0b6b67a3bc8628da6741542310cf70f824ab1861e6533",
+    "optimized": "b38d9b5d03462ccd0aff0f359c971be1d4e432a2abfc88c2da230d8e4e721beb"
+  },
+  "mixed_four_request_check": {
+    "context_per_request": 32768,
+    "shared_kv": 131072,
+    "concurrency": 4,
+    "inputs": [
+      "zh_legal",
+      "en_contract",
+      "mixed_numbers",
+      "formula"
+    ],
+    "complete_pages": true,
+    "all_match_sequential_and_baseline": true,
+    "optimized_observed_peak_interval_average_decode_batch": 3.3840579710144927
+  },
+  "measurement_date": "2026-10-06"
+}

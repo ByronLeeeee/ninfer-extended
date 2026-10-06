@@ -54,6 +54,7 @@ void gdn_gating_proj(const Tensor& x, const Weight& a_weight, const Weight& b_we
  *
  * - Qwen3.8-27B: BF16 `ab_weight [96,5120]`, with A in rows [0,48) and B in [48,96);
  * - Qwen3.6-35B-A3B: BF16 `ab_weight [64,2048]`, with A in rows [0,32) and B in [32,64).
+ * - BF16 `ab_weight [32,1024]`, with A in rows [0,16) and B in [16,32).
  *
  * The complete immutable parent is the public weight. Its halves are consumed as zero-copy views
  * and produce FP32 g/beta `[heads,T]` under the same logical formula and oracle. All other effects

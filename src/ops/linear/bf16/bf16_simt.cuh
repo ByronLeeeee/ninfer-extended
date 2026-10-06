@@ -91,12 +91,12 @@ __device__ __forceinline__ void bf16_simt_accumulate_direct_phase(
     }
 }
 
-template <class Geometry, int ActiveTokens, class Schedule>
+template <class Geometry, int ActiveTokens, class Schedule, class Rows = Bf16ContiguousRows>
 __device__ __forceinline__ void bf16_simt_compute_rows(
     const __nv_bfloat16* __restrict__ x, const __nv_bfloat16* __restrict__ weight, int row0,
     int warp_in_row, int lane,
     float (&accumulators)[Schedule::kRowsPerWarp][ActiveTokens][Schedule::kAccumulatorChains],
-    int live_tokens = ActiveTokens) {
+    int live_tokens = ActiveTokens, Rows rows = {}) {
     constexpr int kValuesPerPhase = Schedule::kWarpsPerRow * kWarpSize * Schedule::kValuesPerLane;
     static_assert((Geometry::kInputRows % kValuesPerPhase) == 0);
     constexpr int kPhases = Geometry::kInputRows / kValuesPerPhase;
@@ -122,7 +122,7 @@ __device__ __forceinline__ void bf16_simt_compute_rows(
 #pragma unroll
             for (int local_row = 0; local_row < Schedule::kRowsPerWarp; ++local_row) {
                 const Pack packed_weight = load_bf16_weight_phase<Geometry, Schedule>(
-                    weight, row0 + local_row, phase, warp_in_row, lane);
+                    weight, rows.weight_row(row0, local_row), phase, warp_in_row, lane);
                 const auto weight_values = bf16_simt_decode_pack(packed_weight);
 #pragma unroll
                 for (int token = 0; token < ActiveTokens; ++token) {
@@ -140,7 +140,7 @@ __device__ __forceinline__ void bf16_simt_compute_rows(
 #pragma unroll
             for (int local_row = 0; local_row < Schedule::kRowsPerWarp; ++local_row) {
                 packed_weights[local_row] = load_bf16_weight_phase<Geometry, Schedule>(
-                    weight, row0 + local_row, phase, warp_in_row, lane);
+                    weight, rows.weight_row(row0, local_row), phase, warp_in_row, lane);
             }
             bf16_simt_accumulate_direct_phase<Geometry, ActiveTokens, Schedule>(
                 x, phase, warp_in_row, lane, packed_weights, accumulators, live_tokens);
@@ -151,7 +151,7 @@ __device__ __forceinline__ void bf16_simt_compute_rows(
 #pragma unroll
         for (int local_row = 0; local_row < Schedule::kRowsPerWarp; ++local_row) {
             current_weights[local_row] = load_bf16_weight_phase<Geometry, Schedule>(
-                weight, row0 + local_row, phase, warp_in_row, lane);
+                weight, rows.weight_row(row0, local_row), phase, warp_in_row, lane);
         }
 
 #pragma unroll Schedule::kPhaseUnroll
@@ -163,7 +163,7 @@ __device__ __forceinline__ void bf16_simt_compute_rows(
 #pragma unroll
                 for (int local_row = 0; local_row < Schedule::kRowsPerWarp; ++local_row) {
                     next_weights[local_row] = load_bf16_weight_phase<Geometry, Schedule>(
-                        weight, row0 + local_row, next_phase, warp_in_row, lane);
+                        weight, rows.weight_row(row0, local_row), next_phase, warp_in_row, lane);
                 }
             }
             bf16_simt_accumulate_direct_phase<Geometry, ActiveTokens, Schedule>(

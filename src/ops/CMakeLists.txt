@@ -1,6 +1,5 @@
 # Compile policy is owned here; each semantic family explicitly contributes sources.
 add_library(ninfer_ops STATIC)
-target_sources(ninfer_ops PRIVATE xiaomi_bf16.cu)
 ninfer_internal_includes(ninfer_ops)
 ninfer_cuda_archive(ninfer_ops)
 target_link_libraries(ninfer_ops PUBLIC ninfer_core PRIVATE ninfer_nvfp4_non_rdc)

@@ -1,5 +1,5 @@
 #include "ninfer/ops/rmsnorm.h"
-#include "ops/xiaomi_bf16.h"
+#include "ops/linear/bf16/bf16_projection.h"
 #include "core/weight.h"
 #include "ninfer/ops/gdn_gating_proj.h"
 
@@ -126,7 +126,7 @@ void gdn_gating_proj(const Tensor& x, const Weight& a_weight, const Weight& b_we
 void gdn_gating_proj(const Tensor& x, const Weight& ab_weight, const Tensor& A_log,
                      const Tensor& dt_bias, WorkspaceArena& ws, Tensor& g, Tensor& beta,
                      DeviceExecutionView execution) {
-if(ab_weight.n==32&&ab_weight.k==1024){detail::xiaomi_bf16_control(x,ab_weight,A_log,dt_bias,g,beta,execution.stream);return;}
+if(ab_weight.n==32&&ab_weight.k==1024){detail::bf16_gating_projection(x,ab_weight,A_log,dt_bias,g,beta,execution.stream);return;}
 
     constexpr const char* op                = "gdn_gating_proj";
     const std::int32_t tokens               = x.ne[1];
@@ -171,7 +171,7 @@ void gdn_norm_gating_proj(const Tensor& x, const Tensor& norm_weight, float eps,
                           const Weight& ab_weight, const Tensor& A_log, const Tensor& dt_bias,
                           WorkspaceArena& ws, Tensor& h, Tensor& g, Tensor& beta,
                           DeviceExecutionView execution) {
-if(ab_weight.n==32&&ab_weight.k==1024){rmsnorm(x,norm_weight,eps,true,h,execution.stream);detail::xiaomi_bf16_control(h,ab_weight,A_log,dt_bias,g,beta,execution.stream);return;}
+if(ab_weight.n==32&&ab_weight.k==1024){rmsnorm(x,norm_weight,eps,true,h,execution.stream);detail::bf16_gating_projection(h,ab_weight,A_log,dt_bias,g,beta,execution.stream);return;}
 
     constexpr const char* op  = "gdn_norm_gating_proj";
     const std::int32_t tokens = x.ne[1];

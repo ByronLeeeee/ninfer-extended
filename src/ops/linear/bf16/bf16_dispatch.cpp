@@ -1,4 +1,4 @@
-#include "ops/xiaomi_bf16.h"
+#include "ops/linear/bf16/bf16_projection.h"
 #include "ops/linear/bf16/bf16_dispatch.h"
 #include "ops/linear/bf16/bf16_shapes.h"
 #include <array>
@@ -23,7 +23,7 @@ Bf16Launch select_bf16_a16_launch(std::int32_t n, std::int32_t k, std::int32_t t
     for (const auto& entry : kShapes) {
         if (entry.n == n && entry.k == k) return entry.select(t);
     }
-    if(xiaomi_bf16_shape(n,k)) return xiaomi_bf16_linear;
+    if(bf16_projection_shape(n,k)) return bf16_projection_linear;
     throw std::invalid_argument("bf16 linear: unsupported shape");
 }
 

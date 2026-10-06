@@ -10,6 +10,12 @@ Xiaomi-OCR-0, which is based on Qwen3.5-0.8B-Base. It builds on upstream
   including GDN input/gating projections, attention projections, linear-add and
   SwiGLU. Shared input embedding/output weights remain tied. Norms and mathematical
   scalars retain the converter's prescribed representations.
+- Shared BF16 projection kernels select GEMV, small-batch SIMT, or MMA from the
+  matrix shape and token count. Residual and split-output projections write their
+  final destinations directly during both prefill and decode. Fused SwiGLU pairs
+  gate/up rows without changing the stored weights; its qualified profiles are
+  7,168×1,024 and 14,336×5,120. These paths use the public Ops and their workspace
+  capacity queries.
 - Text causal attention for head dimension 256, eight query heads and two KV heads;
   BF16 and optional FP8 paged KV support for this geometry.
 - Packed vision attention for head dimension 64 and twelve heads, with tiled
@@ -52,7 +58,8 @@ hf download ByronLeeee/Xiaomi-OCR-0-Ninfer xiaomi-ocr-0-bf16.ninfer --local-dir 
 ```
 
 The command starts a service with a 32K context and four concurrent requests.
-The performance comparison uses a 4K context and one request on both engines.
+The Transformers comparison uses a 4K context and one request on both engines.
+The latest local operator comparison also measures two and four concurrent requests.
 Image token counts depend on resolution. BF16 KV works well for this OCR setup;
 FP8 KV is available to reduce cache memory at longer contexts.
 
@@ -112,9 +119,12 @@ python tools/xiaomi_ocr/benchmark_prefill.py \
 Qualification checks represented BF16 inputs against independent naive FP64 math,
 including cache casts, causal attention prefill/cached decode, vision attention,
 vision RoPE and convolution at state/chunk boundaries. The second executable adds
-30 checks of the small BF16 residual/GDN/attention projections at T=1, 2 and 4,
-and D64 vision attention at tile boundaries, 7,168/9,216 patches, packed segment
-boundaries and padded token strides. All 40 checks passed on the local 5070 Ti build.
+135 checks of BF16 linear, residual, GDN/attention split, control and SwiGLU projections,
+covering T=1, 2, 3, 4, 5, 7, 8, 9, 17, 64 and 65. It also checks D64 vision
+attention at tile boundaries, 7,168/9,216 patches, packed segment boundaries and
+padded token strides. All 145 checks passed on the local 5070 Ti build. SwiGLU
+preserves the established BF16 projection and SiLU rounding boundaries and uses
+the repository's A16 relative-L2 and maximum-absolute-error criteria.
 The reference benchmark performs A-B-B-A phases, excluding one
 warmup per fixture per phase, keeping compiled decode in both variants. The published measurement used
 two synthetic pages and one official example; dense-equations is capped at 256 output

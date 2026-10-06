@@ -1,5 +1,77 @@
 # Xiaomi-OCR-0 test results
 
+## RTX 5070 Ti small-batch BF16 operators
+
+Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14,
+with CUDA 13.3.33 and GCC 13.3.0. The baseline is `75ad8669`, which already
+includes the D64 vision and single-column projection optimizations reported below.
+Both variants use unchanged BF16 weights and KV, a 4,096-token context per
+request, a 1,024-token prefill chunk, greedy decoding and a 256-token output cap.
+Prefix reuse and media caching are disabled; decode CUDA Graphs remain enabled.
+
+The new routes share the BF16 GEMV/SIMT computation cores and use matrix shape
+and token count to select a kernel through the public Ops:
+
+- Small-batch projections use exact T=2/3/4 kernels and a masked T=5–8 kernel.
+  The vocabulary projection and larger token batches retain their MMA routes.
+- Residual and split-output projections write their final destinations directly
+  in both prefill and decode, removing intermediate projection buffers and
+  separate add/split launches. The corresponding projection Ops need no scratch.
+- Fused SwiGLU pairs gate/up weight rows in the same warp and writes the final
+  activation directly. It preserves BF16 projection and SiLU rounding and keeps
+  the existing stored weight layout. The selected intervals are T=1–4 for
+  7,168×1,024 and T=1–8 for 14,336×5,120; larger batches use materialized MMA.
+- Control projections retain compile-time geometry for constant division and
+  loop optimization.
+
+The A-B-B-A sequence uses two warmups and five measured requests or bursts per
+input per phase, giving ten measurements per variant. Multi-request bursts
+submit the same page simultaneously on each lane. Tables report medians.
+Prefill includes vision encoding and language prefill, excluding CPU image
+preprocessing. Concurrent decode speed is per request. End-to-end total speed
+is all completion tokens divided by the burst's client wall time, including
+prefill and scheduling.
+
+| Input | Baseline prefill tok/s | Optimized prefill tok/s | Baseline decode tok/s | Optimized decode tok/s | Decode change |
+|---|---:|---:|---:|---:|---:|
+| zh_legal | 20,248 | 21,398 | 403.5 | 412.7 | +2.3% |
+| en_contract | 20,696 | 21,383 | 405.0 | 412.0 | +1.7% |
+| dense-equations | 19,412 | 19,535 | 399.0 | 403.6 | +1.2% |
+
+| Lanes | Input | Baseline decode tok/s/request | Optimized decode tok/s/request | Decode gain | Baseline end-to-end total tok/s | Optimized end-to-end total tok/s | Total gain |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 2 | zh_legal | 283.9 | 396.0 | 39.5% | 329.2 | 397.0 | 20.6% |
+| 2 | en_contract | 284.0 | 395.8 | 39.4% | 332.0 | 401.2 | 20.9% |
+| 4 | zh_legal | 271.4 | 366.8 | 35.2% | 483.2 | 555.8 | 15.0% |
+| 4 | en_contract | 271.5 | 369.1 | 36.0% | 491.1 | 567.4 | 15.5% |
+
+Observed interval-average decode batches reached 1.97 and
+3.88, confirming that both multi-request routes ran.
+The main throughput gain comes from small-batch decode. Single-request decode
+improves by 1.2–2.3% in this comparison.
+
+All 60 measured single-request outputs and 240 concurrent-request outputs were
+stable and matched the baseline exactly. Raw agreement is 100%, and normalized
+character difference is 0%. Both variants score CER 0% on the two complete text
+pages, totaling 478 annotated characters; the formula page compares its first
+256 output tokens.
+
+A separate 32K-context/four-request check submits Chinese text, English text,
+mixed numbers and a formula page together. All four pages finish and match both
+sequential execution and the baseline. Its interval-average decode batch reaches
+3.38.
+
+All **145 independent FP64 checks** passed: 135 projection, SwiGLU,
+control and D64 vision checks, plus ten attention, RoPE and convolution checks.
+Projection/SwiGLU coverage includes T=1, 2, 3, 4, 5, 7, 8, 9, 17, 64 and 65,
+with full output checks for the hot small-token profiles and independent sampled
+row reductions for larger extents. SwiGLU uses the existing A16 relative-L2 and
+maximum-absolute-error criteria. All output elements are checked for finiteness.
+Warmed single-request GPU-memory increments were about 2.02/2.02
+GiB for baseline/optimized, estimated from WDDM total-GPU readings.
+
+[Small-batch measurements](xiaomi-ocr-5070ti-small-batch.json)
+
 ## RTX 5070 Ti operator optimization
 
 Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14.
