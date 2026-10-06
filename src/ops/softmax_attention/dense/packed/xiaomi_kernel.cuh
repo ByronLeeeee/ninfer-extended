@@ -15,7 +15,7 @@ inline constexpr int kXiaomiPackedAttentionHeadDim = 64;
 inline constexpr int kXiaomiPackedAttentionHeads   = 12;
 inline constexpr int kXiaomiPackedAttentionBr      = 64;
 inline constexpr int kXiaomiPackedAttentionBc      = 64;
-inline constexpr int kXiaomiPackedAttentionPaddedD = 128;
+inline constexpr int kXiaomiPackedAttentionPaddedD = kXiaomiPackedAttentionHeadDim;
 
 struct alignas(16) XiaomiPackedAttentionTile {
     std::int32_t q0;
@@ -113,7 +113,7 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
     constexpr int Dp            = kXiaomiPackedAttentionPaddedD;
     constexpr int Threads       = Br * 2;
     constexpr int QKNt          = Bc / 8;
-    constexpr int QKKs          = 5; // ceil(72 / 16)
+    constexpr int QKKs          = D / 16;
     constexpr int PVNt          = D / 8;
     constexpr int PVKs          = Bc / 16;
     constexpr int RowBytes      = Dp * static_cast<int>(sizeof(__nv_bfloat16));

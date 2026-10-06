@@ -7,6 +7,7 @@ This fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) adds **Qwen3.5-
 - BF16/A16 Gated DeltaNet, attention, linear-add, and SwiGLU kernels for the 1,024-wide Qwen3.5-0.8B configuration.
 - Text attention with 256-dimensional heads (8 query heads, 2 KV heads) and segmented vision attention with 64-dimensional heads (12 heads).
 - Vision position ordering, two-axis RoPE, and 6,144-channel causal convolution for prefill and decode.
+- Compact D64 vision attention and fused BF16 decode projection/residual and output splitting, measured on RTX 5070 Ti.
 - Unicode tokenization through PCRE2 and export of the original added-token metadata.
 - A BF16 v3 conversion recipe that embeds tokenizer and image/video processor resources in the model file.
 - Transformers comparison tools with compiled vision encoding, language prefill, and decode. Cache storage is initialized outside compilation to preserve decode CUDA Graphs.
@@ -20,7 +21,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-Dependencies: 64-bit Linux, CUDA supporting `sm_120a`, C++20, CMake ≥3.28, Ninja, FFmpeg development libraries, libcurl ≥7.85, pkg-config, and **libpcre2-dev**. The tested build used CUDA 13.2 and GCC 15.2 and ran on **RTX 5070 Ti 16 GB (WSL2)** and **RTX 6000D (Linux)**.
+Dependencies: 64-bit Linux, CUDA supporting `sm_120a`, C++20, CMake ≥3.28, Ninja, FFmpeg development libraries, libcurl ≥7.85, pkg-config, and **libpcre2-dev**. The initial build used CUDA 13.2 and GCC 15.2 and ran on **RTX 5070 Ti 16 GB (WSL2)** and **RTX 6000D (Linux)**. The local 5070 Ti optimization build uses CUDA 13.3 and GCC 13.3.
 
 [Build and conversion guide](docs/xiaomi-ocr.md) · [Test report](docs/xiaomi-ocr-performance.md)
 
@@ -38,6 +39,8 @@ Both engines use BF16 weights and KV cache, a 4K context, and one active request
 NInfer decode is **2.46–2.59×** faster on the 5070 Ti and **2.17–2.22×** faster on the 6000D; compiled Transformers prefill is slightly faster on these inputs.
 
 Both engines scored CER 0% on two synthetic text pages with 478 annotated characters. All three compared outputs matched exactly on both GPUs: two complete text pages and the first 256 tokens of a formula page. The [test report](docs/xiaomi-ocr-performance.md) includes the scoring method, memory usage, and an earlier 11-page comparison.
+
+The local 5070 Ti operator optimization improved complete vision/language prefill throughput by **4.0–7.0%** and decode by **0.9–1.8%** in a same-toolchain A-B-B-A comparison. All outputs matched, and all **40 independent FP64 checks** passed. See the [operator optimization results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-operator-optimization).
 
 ---
 

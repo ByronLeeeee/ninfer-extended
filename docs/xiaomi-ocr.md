@@ -100,8 +100,9 @@ CUDA Graphs. Each response records compiled language-call counts and actual cach
 
 ```bash
 cmake -S . -B build -DNINFER_BUILD_XIAOMI_QUALIFICATION=ON
-cmake --build build --target xiaomi-ocr-qualify -j
+cmake --build build --target xiaomi-ocr-qualify xiaomi-ocr-qualify-small-ops -j
 ./build/xiaomi-ocr-qualify
+./build/xiaomi-ocr-qualify-small-ops
 
 python tools/xiaomi_ocr/benchmark_prefill.py \
   --model-dir models/Xiaomi-OCR-0 --functional-ops --vision --abba \
@@ -110,8 +111,11 @@ python tools/xiaomi_ocr/benchmark_prefill.py \
 
 Qualification checks represented BF16 inputs against independent naive FP64 math,
 including cache casts, causal attention prefill/cached decode, vision attention,
-vision RoPE and convolution at state/chunk boundaries. All ten checks passed on the
-complete fork build. The reference benchmark performs A-B-B-A phases, excluding one
+vision RoPE and convolution at state/chunk boundaries. The second executable adds
+30 checks of the small BF16 residual/GDN/attention projections at T=1, 2 and 4,
+and D64 vision attention at tile boundaries, 7,168/9,216 patches, packed segment
+boundaries and padded token strides. All 40 checks passed on the local 5070 Ti build.
+The reference benchmark performs A-B-B-A phases, excluding one
 warmup per fixture per phase, keeping compiled decode in both variants. The published measurement used
 two synthetic pages and one official example; dense-equations is capped at 256 output
 tokens and therefore is a prefix comparison. See [measured results](xiaomi-ocr-performance.md).

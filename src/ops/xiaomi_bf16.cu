@@ -6,6 +6,58 @@ namespace ninfer::ops::detail {
 namespace {
 using Gemv=Bf16GemvSchedule<4,1,8,8,4,Bf16ActivationAccess::Direct,Bf16WeightCache::Default,Bf16PhaseOrder::RowSwizzled,1,1,1,2>;
 using Mma=Bf16MmaSchedule<64,64,64,32,32,2,2,Cache::cg,Cache::cg,Bf16MmaFragmentPipeline::PingPong,Bf16MmaRaster::TokenFast>;
+
+struct ResidualOutput {
+    __nv_bfloat16* data;
+    __device__ __forceinline__ void store(int row, __nv_bfloat16 projection) const {
+        // Preserve the existing BF16 projection boundary before residual addition.
+        data[row] = __float2bfloat16_rn(__bfloat162float(projection) + __bfloat162float(data[row]));
+    }
+};
+
+struct SplitOutput {
+    __nv_bfloat16* first;
+    __nv_bfloat16* second;
+    int first_rows;
+    __device__ __forceinline__ void store(int row, __nv_bfloat16 projection) const {
+        if (row < first_rows) first[row] = projection;
+        else second[row - first_rows] = projection;
+    }
+};
+
+struct AttentionOutput {
+    __nv_bfloat16* q;
+    __nv_bfloat16* gate;
+    __nv_bfloat16* k;
+    __nv_bfloat16* v;
+    __device__ __forceinline__ void store(int row, __nv_bfloat16 projection) const {
+        if (row < 2048) q[row] = projection;
+        else if (row < 2560) k[row - 2048] = projection;
+        else if (row < 4608) gate[row - 2560] = projection;
+        else v[row - 4608] = projection;
+    }
+};
+
+template<int N, int K, class Output>
+void launch_decode(const Tensor& x, const Weight& w, Output out, cudaStream_t stream) {
+    bf16_gemv_kernel<Bf16Geometry<N, K>, Gemv>
+        <<<N / Gemv::kRowsPerCta, Gemv::kThreads, 0, stream>>>(
+            static_cast<const __nv_bfloat16*>(x.data),
+            static_cast<const __nv_bfloat16*>(w.qdata), out);
+    CUDA_CHECK(cudaGetLastError());
+}
+
+void require_input(const Tensor& x, const Weight& w) {
+    if (w.qtype != QType::BF16 || w.layout != QuantLayout::Contiguous ||
+        x.dtype != DType::BF16 || !x.is_contiguous() || x.ne[0] != w.k || x.ne[1] <= 0)
+        throw std::invalid_argument("Xiaomi BF16 linear operand mismatch");
+}
+
+void require_output(const Tensor& x, const Tensor& out, int rows) {
+    if (out.dtype != DType::BF16 || !out.is_contiguous() ||
+        out.ne[0] != rows || out.ne[1] != x.ne[1])
+        throw std::invalid_argument("Xiaomi BF16 linear output mismatch");
+}
 template<int N,int K> void launch(const Tensor& x,const Weight&w,Tensor& out,cudaStream_t s) {
     using G=Bf16Geometry<N,K>;
     if(x.ne[1]==1) launch_bf16_gemv<G,Gemv>(x,w,out,s);
@@ -46,7 +98,8 @@ bool xiaomi_bf16_shape(int n,int k) {
     return (k==1024&&(n==8192||n==5120||n==7168||n==248320)) || (n==1024&&(k==2048||k==3584||k==3072)) || (n==768&&(k==1536||k==768||k==3072)) || (n==2304&&k==768) || (n==3072&&(k==768||k==3072));
 }
 void xiaomi_bf16_linear(const Tensor&x,const Weight&w,Tensor&out,cudaStream_t s){
-    if(w.qtype!=QType::BF16||w.layout!=QuantLayout::Contiguous||x.dtype!=DType::BF16||out.dtype!=DType::BF16||!x.is_contiguous()||!out.is_contiguous()||x.ne[0]!=w.k||out.ne[0]!=w.n||out.ne[1]!=x.ne[1])throw std::invalid_argument("Xiaomi BF16 linear operand mismatch");
+    require_input(x,w);
+    require_output(x,out,w.n);
 #define SHAPE(N,K) if(w.n==N&&w.k==K){launch<N,K>(x,w,out,s);return;}
     SHAPE(8192,1024) SHAPE(5120,1024) SHAPE(7168,1024) SHAPE(248320,1024)
     SHAPE(1024,2048) SHAPE(1024,3584) SHAPE(1024,3072)
@@ -54,9 +107,42 @@ void xiaomi_bf16_linear(const Tensor&x,const Weight&w,Tensor&out,cudaStream_t s)
 #undef SHAPE
     throw std::invalid_argument("Xiaomi BF16 unregistered matrix shape");
 }
-void xiaomi_bf16_add(const Tensor&x,const Weight&w,Tensor&out,WorkspaceArena&ws,cudaStream_t s){auto scope=ws.scope();auto tmp=temporary(ws,w.n,x.ne[1]);xiaomi_bf16_linear(x,w,tmp,s);int n=w.n*x.ne[1];add_kernel<<<(n+255)/256,256,0,s>>>((const __nv_bfloat16*)tmp.data,(__nv_bfloat16*)out.data,n);CUDA_CHECK(cudaGetLastError());}
+void xiaomi_bf16_add(const Tensor&x,const Weight&w,Tensor&out,WorkspaceArena&ws,cudaStream_t s){
+    if (x.ne[1] == 1 && w.n == 1024) {
+        require_input(x,w);
+        require_output(x,out,w.n);
+        const ResidualOutput output{static_cast<__nv_bfloat16*>(out.data)};
+        if (w.k == 2048) { launch_decode<1024,2048>(x,w,output,s); return; }
+        if (w.k == 3072) { launch_decode<1024,3072>(x,w,output,s); return; }
+        if (w.k == 3584) { launch_decode<1024,3584>(x,w,output,s); return; }
+    }
+    auto scope=ws.scope();auto tmp=temporary(ws,w.n,x.ne[1]);xiaomi_bf16_linear(x,w,tmp,s);int n=w.n*x.ne[1];add_kernel<<<(n+255)/256,256,0,s>>>((const __nv_bfloat16*)tmp.data,(__nv_bfloat16*)out.data,n);CUDA_CHECK(cudaGetLastError());
+}
 void xiaomi_bf16_swiglu(const Tensor&x,const Weight&w,Tensor&out,WorkspaceArena&ws,cudaStream_t s){auto scope=ws.scope();auto tmp=temporary(ws,w.n,x.ne[1]);xiaomi_bf16_linear(x,w,tmp,s);int n=w.n/2*x.ne[1];swiglu_kernel<<<(n+255)/256,256,0,s>>>((const __nv_bfloat16*)tmp.data,(__nv_bfloat16*)out.data,w.n/2,x.ne[1]);CUDA_CHECK(cudaGetLastError());}
-void xiaomi_bf16_split(const Tensor&x,const Weight&w,Tensor&a,Tensor&b,WorkspaceArena&ws,cudaStream_t s){auto scope=ws.scope();auto tmp=temporary(ws,w.n,x.ne[1]);xiaomi_bf16_linear(x,w,tmp,s);int n=w.n*x.ne[1];split_kernel<<<(n+255)/256,256,0,s>>>((const __nv_bfloat16*)tmp.data,(__nv_bfloat16*)a.data,(__nv_bfloat16*)b.data,a.ne[0],b.ne[0],x.ne[1]);CUDA_CHECK(cudaGetLastError());}
-void xiaomi_bf16_attn(const Tensor&x,const Weight&w,Tensor&q,Tensor&gate,Tensor&k,Tensor&v,WorkspaceArena&ws,cudaStream_t s){auto scope=ws.scope();auto tmp=temporary(ws,w.n,x.ne[1]);xiaomi_bf16_linear(x,w,tmp,s);int n=w.n*x.ne[1];attn_split_kernel<<<(n+255)/256,256,0,s>>>((const __nv_bfloat16*)tmp.data,(__nv_bfloat16*)q.data,(__nv_bfloat16*)k.data,(__nv_bfloat16*)gate.data,(__nv_bfloat16*)v.data,x.ne[1]);CUDA_CHECK(cudaGetLastError());}
+void xiaomi_bf16_split(const Tensor&x,const Weight&w,Tensor&a,Tensor&b,WorkspaceArena&ws,cudaStream_t s){
+    if (x.ne[1] == 1 && w.n == 8192 && w.k == 1024) {
+        require_input(x,w);
+        require_output(x,a,6144);
+        require_output(x,b,2048);
+        launch_decode<8192,1024>(x,w,SplitOutput{static_cast<__nv_bfloat16*>(a.data),
+            static_cast<__nv_bfloat16*>(b.data),6144},s);
+        return;
+    }
+    auto scope=ws.scope();auto tmp=temporary(ws,w.n,x.ne[1]);xiaomi_bf16_linear(x,w,tmp,s);int n=w.n*x.ne[1];split_kernel<<<(n+255)/256,256,0,s>>>((const __nv_bfloat16*)tmp.data,(__nv_bfloat16*)a.data,(__nv_bfloat16*)b.data,a.ne[0],b.ne[0],x.ne[1]);CUDA_CHECK(cudaGetLastError());
+}
+void xiaomi_bf16_attn(const Tensor&x,const Weight&w,Tensor&q,Tensor&gate,Tensor&k,Tensor&v,WorkspaceArena&ws,cudaStream_t s){
+    if (x.ne[1] == 1 && w.n == 5120 && w.k == 1024) {
+        require_input(x,w);
+        require_output(x,q,2048);
+        require_output(x,gate,2048);
+        require_output(x,k,512);
+        require_output(x,v,512);
+        launch_decode<5120,1024>(x,w,AttentionOutput{static_cast<__nv_bfloat16*>(q.data),
+            static_cast<__nv_bfloat16*>(gate.data),static_cast<__nv_bfloat16*>(k.data),
+            static_cast<__nv_bfloat16*>(v.data)},s);
+        return;
+    }
+    auto scope=ws.scope();auto tmp=temporary(ws,w.n,x.ne[1]);xiaomi_bf16_linear(x,w,tmp,s);int n=w.n*x.ne[1];attn_split_kernel<<<(n+255)/256,256,0,s>>>((const __nv_bfloat16*)tmp.data,(__nv_bfloat16*)q.data,(__nv_bfloat16*)k.data,(__nv_bfloat16*)gate.data,(__nv_bfloat16*)v.data,x.ne[1]);CUDA_CHECK(cudaGetLastError());
+}
 void xiaomi_bf16_control(const Tensor&x,const Weight&w,const Tensor&alog,const Tensor&dt,Tensor&g,Tensor&beta,cudaStream_t s){int warps=16*x.ne[1];control_kernel<<<(warps+7)/8,256,0,s>>>((const __nv_bfloat16*)x.data,(const __nv_bfloat16*)w.qdata,(const float*)alog.data,(const float*)dt.data,(float*)g.data,(float*)beta.data,x.ne[1]);CUDA_CHECK(cudaGetLastError());}
 }

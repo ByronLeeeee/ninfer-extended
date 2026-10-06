@@ -1,5 +1,54 @@
 # Xiaomi-OCR-0 test results
 
+## RTX 5070 Ti operator optimization
+
+Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14.
+Both variants were built locally with CUDA 13.3.33 and GCC 13.3.0. The comparison
+uses BF16 weights and KV, a 4K context, one request, a 1,024-token prefill chunk,
+greedy decode and a 256-token output limit. Prefix and media reuse are disabled.
+An A-B-B-A run uses two warmups and five measured requests per input in each
+phase; results below are medians of ten measurements per variant.
+
+The implementation changes are:
+
+- D64 vision attention stages 64 features instead of padding them to 128.
+  Its 64×64 tile uses 24 KiB of shared memory instead of 48 KiB, and QK uses
+  four MMA iterations instead of five.
+- Single-column BF16 residual projections write the sum directly, retaining
+  BF16 projection rounding before the addition.
+- Single-column GDN and attention projections write their final output planes
+  directly. This removes the intermediate projection and split launches.
+
+Decode CUDA Graphs remain enabled.
+
+| Input | Baseline prefill tok/s | Optimized prefill tok/s | Prefill gain | Baseline decode tok/s | Optimized decode tok/s | Decode gain |
+|---|---:|---:|---:|---:|---:|---:|
+| zh_legal | 19,446 | 20,401 | 4.9% | 400.0 | 403.6 | 0.9% |
+| en_contract | 19,666 | 20,446 | 4.0% | 401.5 | 407.9 | 1.6% |
+| dense-equations | 18,207 | 19,487 | 7.0% | 394.9 | 402.0 | 1.8% |
+
+Prefill includes vision encoding and language prefill. Vision encoding time
+fell by 11.0–11.6%. Median request times were 455.7→457.8 ms, 459.1→444.4 ms,
+and 864.3→843.3 ms, respectively. The gain is concentrated in prefill; decode
+improvements are small. The original deployed binary was also rerun and gave
+comparable baseline decode speeds of 394.7–404.9 tok/s in this session.
+
+All 60 measured requests produced stable output. Baseline and optimized outputs
+matched exactly on all three inputs: two complete text pages and the first
+256 tokens of dense-equations. Character difference was 0%, and both versions
+scored CER 0% on the 478 annotated characters.
+
+All 40 independent FP64 checks passed. The 30 added checks cover the changed
+projection routes, T=1/2/4, attention tile boundaries, packed segments, padded
+strides, and the actual 7,168/9,216-patch vision workloads. Warmed GPU-memory
+increments were approximately 2.02 GiB and 2.03 GiB under WDDM.
+
+A separate 32K/four-request check submitted four complete pages together. The
+optimized service's final interval averaged 3.50 active decode rows per round;
+all four outputs matched both its sequential outputs and the baseline service.
+
+[Optimization measurements](xiaomi-ocr-5070ti-optimization.json)
+
 ## Prefill and decode performance
 
 Measured on 2026-10-06 with BF16 weights and KV cache, a 4K context, one active request, identical images and prompts, greedy decoding, and up to 256 output tokens. Each input had two warmups and three measured runs; the table reports medians.
