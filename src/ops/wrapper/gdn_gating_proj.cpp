@@ -51,6 +51,10 @@ struct GdnControlParentGeometry {
 };
 
 GdnControlParentGeometry require_bf16_parent(const Weight& parent) {
+    if (parent.n == 32 && parent.k == 1024) {
+        require_bf16_weight(parent, 32, 1024, "ab_weight");
+        return {.input_rows = 1024, .heads = 16};
+    }
     if (parent.n == 96 && parent.k == 5120) {
         require_bf16_weight(parent, 96, 5120, "ab_weight");
         return {.input_rows = 5120, .heads = 48};
@@ -72,7 +76,7 @@ void require_vector_tensor(const Tensor& t, DType dtype, std::int32_t n0, const 
 
 void require_sequence_tensor(const Tensor& t, DType dtype, std::int32_t n0, std::int32_t tokens,
                              const char* op, const char* name) {
-    if (t.dtype != dtype || t.ne[0] != n0 || t.ne[1] != tokens || t.ne[2] != 1 || t.ne[3] != 1 ||
+    if (tokens <= 0 || t.dtype != dtype || t.ne[0] != n0 || t.ne[1] != tokens || t.ne[2] != 1 || t.ne[3] != 1 ||
         !t.is_contiguous() || !aligned_to(t.data, dtype == DType::FP32 ? 4 : 16)) {
         throw std::invalid_argument(std::string(op) + ": invalid " + name);
     }
@@ -90,7 +94,11 @@ void require_execution(DeviceExecutionView execution, const char* op) {
 std::size_t gdn_gating_proj_workspace_capacity_bytes(std::int32_t heads, std::int32_t input_rows,
                                                      std::int32_t min_tokens,
                                                      std::int32_t max_tokens) {
-if(heads==16&&input_rows==1024)return 0;
+    if (heads == 16 && input_rows == 1024) {
+        if (min_tokens <= 0 || max_tokens < min_tokens)
+            throw std::invalid_argument("gdn_gating_proj: invalid token interval");
+        return 0;
+    }
 
     return detail::bf16_gdn_gating_capacity_workspace_bytes(heads, input_rows, min_tokens,
                                                             max_tokens);
@@ -100,7 +108,11 @@ std::size_t gdn_norm_gating_proj_workspace_capacity_bytes(std::int32_t heads,
                                                           std::int32_t input_rows,
                                                           std::int32_t min_tokens,
                                                           std::int32_t max_tokens) {
-if(heads==16&&input_rows==1024)return 0;
+    if (heads == 16 && input_rows == 1024) {
+        if (min_tokens <= 0 || max_tokens < min_tokens)
+            throw std::invalid_argument("gdn_norm_gating_proj: invalid token interval");
+        return 0;
+    }
 
     return detail::bf16_gdn_norm_gating_capacity_workspace_bytes(heads, input_rows, min_tokens,
                                                                  max_tokens);
@@ -126,8 +138,6 @@ void gdn_gating_proj(const Tensor& x, const Weight& a_weight, const Weight& b_we
 void gdn_gating_proj(const Tensor& x, const Weight& ab_weight, const Tensor& A_log,
                      const Tensor& dt_bias, WorkspaceArena& ws, Tensor& g, Tensor& beta,
                      DeviceExecutionView execution) {
-if(ab_weight.n==32&&ab_weight.k==1024){detail::bf16_gating_projection(x,ab_weight,A_log,dt_bias,g,beta,execution.stream);return;}
-
     constexpr const char* op                = "gdn_gating_proj";
     const std::int32_t tokens               = x.ne[1];
     const GdnControlParentGeometry geometry = require_bf16_parent(ab_weight);
@@ -138,6 +148,10 @@ if(ab_weight.n==32&&ab_weight.k==1024){detail::bf16_gating_projection(x,ab_weigh
     require_sequence_tensor(beta, DType::FP32, geometry.heads, tokens, op, "beta");
     require_execution(execution, op);
 
+    if (geometry.input_rows == 1024) {
+        detail::bf16_gating_projection(x, ab_weight, A_log, dt_bias, g, beta, execution.stream);
+        return;
+    }
     const Weight a_weight = bf16_row_view(ab_weight, 0, geometry.heads);
     const Weight b_weight = bf16_row_view(ab_weight, geometry.heads, geometry.heads);
     detail::bf16_gdn_gating_dispatch(x, a_weight, b_weight, A_log, dt_bias, ws, g, beta, execution);
@@ -171,8 +185,6 @@ void gdn_norm_gating_proj(const Tensor& x, const Tensor& norm_weight, float eps,
                           const Weight& ab_weight, const Tensor& A_log, const Tensor& dt_bias,
                           WorkspaceArena& ws, Tensor& h, Tensor& g, Tensor& beta,
                           DeviceExecutionView execution) {
-if(ab_weight.n==32&&ab_weight.k==1024){rmsnorm(x,norm_weight,eps,true,h,execution.stream);detail::bf16_gating_projection(h,ab_weight,A_log,dt_bias,g,beta,execution.stream);return;}
-
     constexpr const char* op  = "gdn_norm_gating_proj";
     const std::int32_t tokens = x.ne[1];
     if (!(eps > 0.0F) || !std::isfinite(eps)) {
@@ -188,6 +200,15 @@ if(ab_weight.n==32&&ab_weight.k==1024){rmsnorm(x,norm_weight,eps,true,h,executio
     require_sequence_tensor(beta, DType::FP32, geometry.heads, tokens, op, "beta");
     require_execution(execution, op);
 
+    if (geometry.input_rows == 1024) {
+        if (tokens <= 8) detail::bf16_gdn_norm_gating_small_launch(x, norm_weight, eps, h,
+            ab_weight, A_log, dt_bias, g, beta, execution.stream);
+        else {
+            rmsnorm(x, norm_weight, eps, true, h, execution.stream);
+            detail::bf16_gating_projection(h, ab_weight, A_log, dt_bias, g, beta, execution.stream);
+        }
+        return;
+    }
     const Weight a_weight = bf16_row_view(ab_weight, 0, geometry.heads);
     const Weight b_weight = bf16_row_view(ab_weight, geometry.heads, geometry.heads);
     detail::bf16_gdn_norm_gating_dispatch(x, norm_weight, eps, h, a_weight, b_weight, A_log,

@@ -1,5 +1,69 @@
 # Xiaomi-OCR-0 test results
 
+## RTX 5070 Ti fused normalization and GDN controls
+
+Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14,
+CUDA 13.3.33 and GCC 13.3.0. The baseline is `bddacdc3`, which includes the
+small-batch operators below. Both versions use BF16 weights and KV, a 4K context
+per request, a 1,024-token prefill chunk and a 256-token output cap. Prefix reuse
+and media caching are disabled; decode CUDA Graphs are enabled. The paired runs
+use temperature 0, presence penalty 1.5 and the remaining model sampling defaults.
+
+The public `gdn_norm_gating_proj` Op now fuses offset RMSNorm and GDN control
+projections for the 1,024-input/16-head profile at T=1–8. A 512-thread CTA owns
+one token. The first 256 threads retain the existing pair-wise norm reduction;
+all 16 warps then project the shared BF16 normalized values into controls.
+The explicit normalized output and gate/beta results match the composed Ops
+bit for bit on the qualification inputs. Larger positive T uses composition.
+The stored weight layout and the zero-scratch contract are preserved.
+
+Matched CUDA Graph microbenchmarks with a 128 MiB rotating control-weight pool
+reduce the combined norm/control segment from about 4.2 µs to 3.0 µs at T=1–8.
+Public-Op qualification and complete OCR measurements follow candidate selection.
+The initial long-phase A-B-B-A run showed about 10% baseline decode variation,
+so the tables use a shorter paired comparison. Both real servers stay resident,
+and requests alternate in five A-B-B-A cycles, after two warmups per input and
+engine. Only one engine's burst runs at a time. All ten formal bursts per input
+and variant are included; tables show medians.
+Prefill includes vision encoding and language processing, excluding CPU image
+preprocessing. Concurrent decode is per request. Total speed divides all
+completion tokens by client burst time, including prefill and scheduling.
+
+| Input | Baseline prefill tok/s | Optimized prefill tok/s | Baseline decode tok/s | Optimized decode tok/s | Decode change |
+|---|---:|---:|---:|---:|---:|
+| zh_legal | 22,012 | 22,199 | 427.0 | 428.7 | +0.4% |
+| en_contract | 21,828 | 21,540 | 415.9 | 420.2 | +1.0% |
+| dense-equations | 19,959 | 20,014 | 408.6 | 412.8 | +1.0% |
+
+| Lanes | Input | Baseline decode tok/s/request | Optimized decode tok/s/request | Decode change | Baseline total tok/s | Optimized total tok/s | Total change |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 2 | zh_legal | 400.7 | 404.2 | +0.9% | 401.3 | 403.6 | +0.6% |
+| 2 | en_contract | 400.6 | 404.1 | +0.9% | 406.9 | 408.1 | +0.3% |
+| 4 | zh_legal | 373.0 | 377.9 | +1.3% | 574.1 | 586.0 | +2.1% |
+| 4 | en_contract | 372.5 | 375.3 | +0.7% | 580.1 | 578.0 | -0.4% |
+
+The paired full-model decode changes are **+0.4–1.3%**, much smaller than the
+operator-segment gain. Prefill and end-to-end changes are small and mixed.
+
+All **600 formal outputs** across the original and paired comparisons match
+their baseline under the same settings: 100% agreement and 0% normalized
+character difference. The original single-request comparison uses presence
+penalty 0; its formula prefix differs from the presence-penalty-1.5 runs, with
+exact baseline/optimized agreement in each configuration.
+Both versions score CER 0% on two complete text pages with 478 annotated
+characters; the formula page compares its first 256 output tokens.
+A separate 32K/four-request test completes Chinese text, English text,
+mixed numbers and a formula page, all matching sequential execution and baseline.
+
+All **165 independent FP64 checks** pass. The normalized-control coverage
+includes T=1, 2, 3, 4, 5, 7, 8, 9, 17 and 65, with complete output checks and
+bitwise comparison against the composed public Ops. Existing numerical criteria
+are retained. Warmed single-request GPU-memory increments are about
+2.02/2.02 GiB for baseline/optimized,
+estimated from WDDM total-GPU readings.
+
+[Normalized-control measurements](xiaomi-ocr-5070ti-norm-gating.json)
+
 ## RTX 5070 Ti small-batch BF16 operators
 
 Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14,

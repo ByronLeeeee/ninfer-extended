@@ -4,6 +4,7 @@
 #include "ninfer/ops/linear_add.h"
 #include "ninfer/ops/linear.h"
 #include "ninfer/ops/linear_swiglu.h"
+#include "ninfer/ops/rmsnorm.h"
 #include "ninfer/ops/softmax_attention.h"
 #include "core/device.h"
 
@@ -212,6 +213,9 @@ bool gating_projection(int tokens) {
     Weight w;
     w.qtype = QType::BF16; w.layout = QuantLayout::Contiguous; w.qdata = wb.p;
     w.n = 2 * heads; w.k = k;
+    w.ndim = 2; w.shape[0] = w.padded_shape[0] = w.n;
+    w.shape[1] = w.padded_shape[1] = k;
+    w.payload = static_cast<std::uint8_t*>(wb.p); w.payload_bytes = weights.size() * 2;
     Tensor tx(xb.p, DType::BF16, {k, tokens}), ta(ab.p, DType::FP32, {heads});
     Tensor td(db.p, DType::FP32, {heads}), tg(gb.p, DType::FP32, {heads, tokens});
     Tensor tb(bb.p, DType::FP32, {heads, tokens});
@@ -236,6 +240,71 @@ bool gating_projection(int tokens) {
         error.add(beta[t * heads + h], 1.0 / (1.0 + std::exp(-b)));
     }
     return error.report("gdn_gating_T" + std::to_string(tokens));
+}
+
+bool norm_gating_projection(int tokens) {
+    constexpr int k = 1024, heads = 16;
+    constexpr float eps = 1e-6f;
+    const auto x = random_values(k * tokens), norm = random_values(k);
+    const auto weights = random_values(2 * heads * k);
+    std::vector<float> alog(heads), bias(heads);
+    for (int head = 0; head < heads; ++head) { alog[head] = normal(rng); bias[head] = normal(rng); }
+    DeviceBuffer xb(x.size() * 2), nb(norm.size() * 2), wb(weights.size() * 2);
+    DeviceBuffer ab(heads * 4), db(heads * 4), hb(x.size() * 2), gb(heads * tokens * 4), bb(gb.bytes);
+    DeviceBuffer hr(hb.bytes), gr(gb.bytes), br(bb.bytes);
+    upload(xb, x); upload(nb, norm); upload(wb, weights); upload(ab, alog); upload(db, bias);
+    Weight w;
+    w.qtype = QType::BF16; w.layout = QuantLayout::Contiguous; w.qdata = wb.p;
+    w.n = 2 * heads; w.k = k; w.ndim = 2;
+    w.shape[0] = w.padded_shape[0] = w.n; w.shape[1] = w.padded_shape[1] = k;
+    w.payload = static_cast<std::uint8_t*>(wb.p); w.payload_bytes = weights.size() * 2;
+    Tensor tx(xb.p, DType::BF16, {k, tokens}), tn(nb.p, DType::BF16, {k});
+    Tensor ta(ab.p, DType::FP32, {heads}), td(db.p, DType::FP32, {heads});
+    Tensor th(hb.p, DType::BF16, {k, tokens}), tg(gb.p, DType::FP32, {heads, tokens});
+    Tensor tb(bb.p, DType::FP32, {heads, tokens});
+    Tensor rh(hr.p, DType::BF16, {k, tokens}), rg(gr.p, DType::FP32, {heads, tokens});
+    Tensor rb(br.p, DType::FP32, {heads, tokens});
+    if (ops::gdn_norm_gating_proj_workspace_capacity_bytes(heads, k, tokens, tokens) != 0)
+        throw std::runtime_error("Norm/control projection should require no workspace");
+    WorkspaceArena workspace(1);
+    ops::gdn_norm_gating_proj(tx, tn, eps, w, ta, td, workspace, th, tg, tb, {nullptr, 70});
+    ops::rmsnorm(tx, tn, eps, true, rh, nullptr);
+    ops::gdn_gating_proj(rh, w, ta, td, workspace, rg, rb, {nullptr, 70});
+    CUDA_CHECK(cudaDeviceSynchronize());
+    std::vector<__nv_bfloat16> h(k * tokens), reference(h.size());
+    std::vector<float> g(heads * tokens), beta(g.size()), g_ref(g.size()), b_ref(g.size());
+    hb.copy_to_host(h.data(), hb.bytes); hr.copy_to_host(reference.data(), hr.bytes);
+    gb.copy_to_host(g.data(), gb.bytes); bb.copy_to_host(beta.data(), bb.bytes);
+    gr.copy_to_host(g_ref.data(), gr.bytes); br.copy_to_host(b_ref.data(), br.bytes);
+    Error norm_error, control_error;
+    for (int t = 0; t < tokens; ++t) {
+        double ss = 0;
+        for (int j = 0; j < k; ++j) ss += value(x[t * k + j]) * value(x[t * k + j]);
+        const double inverse = 1.0 / std::sqrt(ss / k + eps);
+        std::vector<double> ideal(k);
+        for (int j = 0; j < k; ++j) {
+            ideal[j] = value(x[t * k + j]) * inverse * (1.0 + value(norm[j]));
+            norm_error.add(value(h[t * k + j]), ideal[j]);
+            if (value(h[t * k + j]) != value(reference[t * k + j]))
+                throw std::runtime_error("Fused normalized output differs from composed Op");
+        }
+        for (int head = 0; head < heads; ++head) {
+            double a = 0, b = 0;
+            for (int j = 0; j < k; ++j) {
+                a += ideal[j] * value(weights[head * k + j]);
+                b += ideal[j] * value(weights[(heads + head) * k + j]);
+            }
+            const double z = a + bias[head];
+            const int i = t * heads + head;
+            control_error.add(g[i], -std::exp(double(alog[head])) *
+                (std::max(z, 0.0) + std::log1p(std::exp(-std::abs(z)))));
+            control_error.add(beta[i], 1.0 / (1.0 + std::exp(-b)));
+            if (g[i] != g_ref[i] || beta[i] != b_ref[i])
+                throw std::runtime_error("Fused controls differ from composed Op");
+        }
+    }
+    const bool norm_pass = norm_error.report("gdn_norm_hidden_T" + std::to_string(tokens));
+    return control_error.report("gdn_norm_controls_T" + std::to_string(tokens)) && norm_pass;
 }
 
 bool vision_attention(const std::vector<int>& lengths, bool uniform, bool padded) {
@@ -317,6 +386,8 @@ int main() {
             for (int tokens : {1, 3, 8, 9})
                 pass = dense_projection(shape.first, shape.second, tokens, false) && pass;
         for (int tokens : {1, 2, 4, 65}) pass = gating_projection(tokens) && pass;
+        for (int tokens : {1, 2, 3, 4, 5, 7, 8, 9, 17, 65})
+            pass = norm_gating_projection(tokens) && pass;
         for (int length : {1, 15, 16, 17, 31, 32, 33, 63, 64, 65, 197, 7168, 9216})
             pass = vision_attention({length}, true, false) && pass;
         pass = vision_attention({17, 17, 17}, true, true) && pass;

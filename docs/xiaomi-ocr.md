@@ -16,6 +16,9 @@ Xiaomi-OCR-0, which is based on Qwen3.5-0.8B-Base. It builds on upstream
   gate/up rows without changing the stored weights; its qualified profiles are
   7,168×1,024 and 14,336×5,120. These paths use the public Ops and their workspace
   capacity queries.
+- The public normalized-control Op fuses offset RMSNorm and GDN gate projections
+  for 1,024 inputs, 16 heads and T=1–8, retaining the original BF16 boundaries.
+  See the [normalized-control results](xiaomi-ocr-performance.md#rtx-5070-ti-fused-normalization-and-gdn-controls).
 - Text causal attention for head dimension 256, eight query heads and two KV heads;
   BF16 and optional FP8 paged KV support for this geometry.
 - Packed vision attention for head dimension 64 and twelve heads, with tiled

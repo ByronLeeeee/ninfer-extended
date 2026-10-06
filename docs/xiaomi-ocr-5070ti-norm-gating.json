@@ -1,0 +1,636 @@
+{
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "baseline_commit": "bddacdc3",
+  "toolchain": {
+    "cuda": "13.3.33",
+    "gcc": "13.3.0",
+    "driver": "617.14"
+  },
+  "configuration": {
+    "weights": "bf16",
+    "kv": "bf16",
+    "context_per_request": 4096,
+    "concurrency": [
+      1,
+      2,
+      4
+    ],
+    "prefill_chunk": 1024,
+    "max_output_tokens": 256,
+    "greedy": true,
+    "prefix_reuse": false,
+    "media_cache_mib": 0
+  },
+  "method": "A-B-B-A; two warmups and five measured requests/bursts per fixture per phase; ten measurements per variant; homogeneous simultaneous bursts for multi-request measurements",
+  "single": [
+    {
+      "fixture": "zh_legal",
+      "baseline": {
+        "vision_ms": 43.25950241088867,
+        "text_prefill_ms": 37.219185494506846,
+        "prefill_ms": 80.51948800000001,
+        "decode_ms": 264.09350599999993,
+        "decode_tps": 425.7740376253703,
+        "request_ms": 433.1763945000091,
+        "prompt_tokens": 1807,
+        "completion_tokens": 113,
+        "prefill_tps": 22441.772108635363,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "gpu_memory_increment_mib_estimate": 2071.0,
+        "cer": 0.0
+      },
+      "optimized": {
+        "vision_ms": 43.271728515625,
+        "text_prefill_ms": 37.31262918737793,
+        "prefill_ms": 80.9413065,
+        "decode_ms": 260.27786649999996,
+        "decode_tps": 430.3637530750714,
+        "request_ms": 426.82345600002236,
+        "prompt_tokens": 1807,
+        "completion_tokens": 113,
+        "prefill_tps": 22324.818787055287,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "gpu_memory_increment_mib_estimate": 2071.5,
+        "cer": 0.0
+      },
+      "prefill_gain_pct": -0.5211412049544561,
+      "decode_gain_pct": 1.0779697783591669,
+      "exact_output_agreement": true,
+      "character_difference_rate": 0.0
+    },
+    {
+      "fixture": "en_contract",
+      "baseline": {
+        "vision_ms": 43.28960037231445,
+        "text_prefill_ms": 34.95980004711914,
+        "prefill_ms": 78.88560799999999,
+        "decode_ms": 258.7766359999999,
+        "decode_tps": 437.42773820069203,
+        "request_ms": 418.8184615000239,
+        "prompt_tokens": 1807,
+        "completion_tokens": 114,
+        "prefill_tps": 22906.586458711205,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "gpu_memory_increment_mib_estimate": 2071.0,
+        "cer": 0.0
+      },
+      "optimized": {
+        "vision_ms": 43.196720123291016,
+        "text_prefill_ms": 37.31328092834473,
+        "prefill_ms": 80.62465750000001,
+        "decode_ms": 263.88510299999996,
+        "decode_tps": 428.2609360266301,
+        "request_ms": 430.9814324999479,
+        "prompt_tokens": 1807,
+        "completion_tokens": 114,
+        "prefill_tps": 22412.498310457937,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "gpu_memory_increment_mib_estimate": 2071.5,
+        "cer": 0.0
+      },
+      "prefill_gain_pct": -2.156969783096463,
+      "decode_gain_pct": -2.0956152007571616,
+      "exact_output_agreement": true,
+      "character_difference_rate": 0.0
+    },
+    {
+      "fixture": "dense-equations",
+      "baseline": {
+        "vision_ms": 64.34848022460938,
+        "text_prefill_ms": 51.369644710205066,
+        "prefill_ms": 115.7947355,
+        "decode_ms": 621.3713164999999,
+        "decode_tps": 410.38266273567314,
+        "request_ms": 820.8314690000407,
+        "prompt_tokens": 2368,
+        "completion_tokens": 256,
+        "prefill_tps": 20449.979783407336,
+        "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+        "gpu_memory_increment_mib_estimate": 2071.0
+      },
+      "optimized": {
+        "vision_ms": 64.41763305664062,
+        "text_prefill_ms": 52.71333598632813,
+        "prefill_ms": 117.24895000000001,
+        "decode_ms": 615.3612114999997,
+        "decode_tps": 414.391085048792,
+        "request_ms": 831.4458339999646,
+        "prompt_tokens": 2368,
+        "completion_tokens": 256,
+        "prefill_tps": 20196.34290968064,
+        "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+        "gpu_memory_increment_mib_estimate": 2071.5
+      },
+      "prefill_gain_pct": -1.2402793372563226,
+      "decode_gain_pct": 0.9767523526452271,
+      "exact_output_agreement": true,
+      "character_difference_rate": 0.0
+    }
+  ],
+  "batches": [
+    {
+      "fixture": "zh_legal",
+      "concurrency": 2,
+      "baseline": {
+        "burst_ms": 558.7043999999821,
+        "end_to_end_total_tps": 404.50878031339425,
+        "per_request_decode_tps": 399.1796053513473,
+        "per_request_prefill_tps": 21929.06785440059,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "observed_decode_batch": 1.9801980198019802
+      },
+      "optimized": {
+        "burst_ms": 564.1939550000075,
+        "end_to_end_total_tps": 400.57147483372967,
+        "per_request_decode_tps": 403.43114526313695,
+        "per_request_prefill_tps": 21789.659601816624,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "observed_decode_batch": 1.9823008849557522
+      },
+      "prefill_gain_pct": -0.6357235679581796,
+      "decode_gain_pct": 1.065069421081155,
+      "end_to_end_gain_pct": -0.9733547629334871,
+      "exact_output_agreement": true
+    },
+    {
+      "fixture": "en_contract",
+      "concurrency": 2,
+      "baseline": {
+        "burst_ms": 564.2227890000129,
+        "end_to_end_total_tps": 404.12359782281777,
+        "per_request_decode_tps": 417.6051593853896,
+        "per_request_prefill_tps": 22377.01884088397,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "observed_decode_batch": 1.9801980198019802
+      },
+      "optimized": {
+        "burst_ms": 554.3394970000008,
+        "end_to_end_total_tps": 411.304208482473,
+        "per_request_decode_tps": 404.8483657851771,
+        "per_request_prefill_tps": 22044.907774540694,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "observed_decode_batch": 1.9823008849557522
+      },
+      "prefill_gain_pct": -1.48416135636662,
+      "decode_gain_pct": -3.0547499985362436,
+      "end_to_end_gain_pct": 1.7768352796867504,
+      "exact_output_agreement": true
+    },
+    {
+      "fixture": "zh_legal",
+      "concurrency": 4,
+      "baseline": {
+        "burst_ms": 786.9242195000083,
+        "end_to_end_total_tps": 574.3887799524755,
+        "per_request_decode_tps": 372.3882500952026,
+        "per_request_prefill_tps": 22005.53414967006,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "observed_decode_batch": 3.85
+      },
+      "optimized": {
+        "burst_ms": 778.5707945000127,
+        "end_to_end_total_tps": 580.5525427367395,
+        "per_request_decode_tps": 386.3063419460455,
+        "per_request_prefill_tps": 22205.049306172292,
+        "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+        "observed_decode_batch": 3.891891891891892
+      },
+      "prefill_gain_pct": 0.9066590028909749,
+      "decode_gain_pct": 3.7375217524410864,
+      "end_to_end_gain_pct": 1.0730994405520944,
+      "exact_output_agreement": true
+    },
+    {
+      "fixture": "en_contract",
+      "concurrency": 4,
+      "baseline": {
+        "burst_ms": 789.7932234999985,
+        "end_to_end_total_tps": 577.3663490849788,
+        "per_request_decode_tps": 372.56728079744704,
+        "per_request_prefill_tps": 21900.79541722138,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "observed_decode_batch": 3.85
+      },
+      "optimized": {
+        "burst_ms": 769.3499690000749,
+        "end_to_end_total_tps": 592.9800915366449,
+        "per_request_decode_tps": 381.8241423209346,
+        "per_request_prefill_tps": 22489.011076023646,
+        "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+        "observed_decode_batch": 3.891891891891892
+      },
+      "prefill_gain_pct": 2.6858187001725486,
+      "decode_gain_pct": 2.4846147261439855,
+      "end_to_end_gain_pct": 2.7043042041523746,
+      "exact_output_agreement": true
+    }
+  ],
+  "quality": {
+    "single_exact_agreement": "3/3",
+    "weighted_character_difference_rate": 0.0,
+    "gold_characters": 478,
+    "evaluated_outputs": 600,
+    "batch_outputs_consistent": true,
+    "paired_evaluated_outputs": 300,
+    "paired_exact_output_agreement": true
+  },
+  "numerical": {
+    "new_and_retained_cases": 155,
+    "attention_rope_convolution_cases": 10,
+    "all_pass": true,
+    "maximum_nrms": 0.0032233
+  },
+  "binary_sha256": {
+    "baseline": "b38d9b5d03462ccd0aff0f359c971be1d4e432a2abfc88c2da230d8e4e721beb",
+    "optimized": "156bee60f3b651a56a4c678c92e52c83bde6da72c3c827dc590ecab6928543a4"
+  },
+  "mixed_four_request_check": {
+    "context_per_request": 32768,
+    "shared_kv": 131072,
+    "concurrency": 4,
+    "inputs": [
+      "zh_legal",
+      "en_contract",
+      "mixed_numbers",
+      "formula"
+    ],
+    "complete_pages": true,
+    "all_match_sequential_and_baseline": true,
+    "optimized_observed_peak_interval_average_decode_batch": 3.3840579710144927
+  },
+  "paired_verification": [
+    {
+      "lanes": 1,
+      "context_per_request": 4096,
+      "weights": "bf16",
+      "kv": "bf16",
+      "method": "Both real servers stay resident; two warmups per input and engine; five short A-B-B-A cycles per fixture, ten measured bursts per engine",
+      "binary_sha256": {
+        "baseline": "b38d9b5d03462ccd0aff0f359c971be1d4e432a2abfc88c2da230d8e4e721beb",
+        "optimized": "156bee60f3b651a56a4c678c92e52c83bde6da72c3c827dc590ecab6928543a4"
+      },
+      "formal_output_count": 60,
+      "summary": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 426.9773841312749,
+            "prefill_tps": 22011.626392125352,
+            "total_tps": 265.24615769178376,
+            "burst_ms": 426.05723949999685,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+          },
+          "optimized": {
+            "decode_tps": 428.73312429019745,
+            "prefill_tps": 22199.309074783756,
+            "total_tps": 267.7339647296585,
+            "burst_ms": 422.0623319999959,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+          },
+          "paired_cycle_decode_gain_pct": [
+            3.776408663099984,
+            0.7939416593150339,
+            -1.2731808534102163,
+            1.3420244320665908,
+            1.5593647414480882
+          ],
+          "decode_tps_gain_pct": 0.4112021442294278,
+          "prefill_tps_gain_pct": 0.8526524997060081,
+          "total_tps_gain_pct": 0.9379238740059526
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 415.9432083843656,
+            "prefill_tps": 21827.515148309998,
+            "total_tps": 262.1075862827404,
+            "burst_ms": 434.93977400000006,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
+          },
+          "optimized": {
+            "decode_tps": 420.20264907454714,
+            "prefill_tps": 21540.460672592493,
+            "total_tps": 258.5999584065379,
+            "burst_ms": 440.97405649999996,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
+          },
+          "paired_cycle_decode_gain_pct": [
+            -2.961882131109317,
+            0.9754273277481573,
+            1.2276863557254547,
+            -0.5530852536777431,
+            1.155114237956334
+          ],
+          "decode_tps_gain_pct": 1.0240438127902873,
+          "prefill_tps_gain_pct": -1.3151037750613104,
+          "total_tps_gain_pct": -1.3382397380969913
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 408.6205931770079,
+            "prefill_tps": 19959.144341078834,
+            "total_tps": 302.6471502109823,
+            "burst_ms": 845.8856779999983,
+            "output_sha256": "306349f8fbfa9c9ac8d09185e66b86d057569aeff879a868ca4edc5205c64f35"
+          },
+          "optimized": {
+            "decode_tps": 412.81105375418934,
+            "prefill_tps": 20014.17493105813,
+            "total_tps": 304.65692030034484,
+            "burst_ms": 840.2907040000009,
+            "output_sha256": "306349f8fbfa9c9ac8d09185e66b86d057569aeff879a868ca4edc5205c64f35"
+          },
+          "paired_cycle_decode_gain_pct": [
+            1.365735695365733,
+            1.8041058721071535,
+            -0.7597292025573799,
+            1.0538657993386602,
+            1.1122825677046144
+          ],
+          "decode_tps_gain_pct": 1.0255138011035614,
+          "prefill_tps_gain_pct": 0.2757161782032558,
+          "total_tps_gain_pct": 0.6640637745841893
+        }
+      ],
+      "sampling": {
+        "frequency_penalty": 0.0,
+        "min_p": 0.0,
+        "presence_penalty": 1.5,
+        "temperature": 0.0,
+        "top_k": 20,
+        "top_p": 0.800000011920929
+      },
+      "seed_policy": "Server default random seed; deterministic temperature-zero decoding"
+    },
+    {
+      "lanes": 2,
+      "context_per_request": 4096,
+      "weights": "bf16",
+      "kv": "bf16",
+      "method": "Both real servers stay resident; two warmups per input and engine; five short A-B-B-A cycles per fixture, ten measured bursts per engine",
+      "binary_sha256": {
+        "baseline": "b38d9b5d03462ccd0aff0f359c971be1d4e432a2abfc88c2da230d8e4e721beb",
+        "optimized": "156bee60f3b651a56a4c678c92e52c83bde6da72c3c827dc590ecab6928543a4"
+      },
+      "formal_output_count": 80,
+      "summary": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 400.6824903846498,
+            "prefill_tps": 21670.532660016368,
+            "total_tps": 401.3112130764634,
+            "burst_ms": 563.1547220000002,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+          },
+          "optimized": {
+            "decode_tps": 404.21467131275904,
+            "prefill_tps": 21751.67178150157,
+            "total_tps": 403.6232353407272,
+            "burst_ms": 559.9281454999954,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+          },
+          "paired_cycle_decode_gain_pct": [
+            0.7107859563369567,
+            0.7092834940271242,
+            0.905392563724039,
+            1.168543220736895,
+            1.0679245009042715
+          ],
+          "decode_tps_gain_pct": 0.8815411236758663,
+          "prefill_tps_gain_pct": 0.37442144481711903,
+          "total_tps_gain_pct": 0.5761170355893519
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 400.57073302546064,
+            "prefill_tps": 21809.93894828794,
+            "total_tps": 406.9494139738263,
+            "burst_ms": 560.2729455000031,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
+          },
+          "optimized": {
+            "decode_tps": 404.07119290559723,
+            "prefill_tps": 21816.330694162843,
+            "total_tps": 408.09395872717073,
+            "burst_ms": 558.6961049999957,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
+          },
+          "paired_cycle_decode_gain_pct": [
+            0.863650606012234,
+            0.8177697884102164,
+            1.102930403380764,
+            0.5626293158071283,
+            0.41366257426798114
+          ],
+          "decode_tps_gain_pct": 0.873868106563358,
+          "prefill_tps_gain_pct": 0.029306573897591726,
+          "total_tps_gain_pct": 0.28124988365705317
+        }
+      ],
+      "sampling": {
+        "frequency_penalty": 0.0,
+        "min_p": 0.0,
+        "presence_penalty": 1.5,
+        "temperature": 0.0,
+        "top_k": 20,
+        "top_p": 0.800000011920929
+      },
+      "seed_policy": "Server default random seed; deterministic temperature-zero decoding"
+    },
+    {
+      "lanes": 4,
+      "context_per_request": 4096,
+      "weights": "bf16",
+      "kv": "bf16",
+      "method": "Both real servers stay resident; two warmups per input and engine; five short A-B-B-A cycles per fixture, ten measured bursts per engine",
+      "binary_sha256": {
+        "baseline": "b38d9b5d03462ccd0aff0f359c971be1d4e432a2abfc88c2da230d8e4e721beb",
+        "optimized": "156bee60f3b651a56a4c678c92e52c83bde6da72c3c827dc590ecab6928543a4"
+      },
+      "formal_output_count": 160,
+      "summary": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 372.9830723901178,
+            "prefill_tps": 21944.752035533445,
+            "total_tps": 574.1182182151102,
+            "burst_ms": 787.3225225000056,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+          },
+          "optimized": {
+            "decode_tps": 377.87858191756413,
+            "prefill_tps": 22019.908172578867,
+            "total_tps": 585.9590059674863,
+            "burst_ms": 771.3971550000025,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+          },
+          "paired_cycle_decode_gain_pct": [
+            2.3698514677875204,
+            0.9605892609176658,
+            5.2806260178713815,
+            0.8044944450477542,
+            1.2172678596650943
+          ],
+          "decode_tps_gain_pct": 1.3125286078200071,
+          "prefill_tps_gain_pct": 0.34247886202463107,
+          "total_tps_gain_pct": 2.0624302411423434
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 372.51709336709854,
+            "prefill_tps": 21846.87351013459,
+            "total_tps": 580.1442732281059,
+            "burst_ms": 786.0156590000145,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
+          },
+          "optimized": {
+            "decode_tps": 375.26915815230734,
+            "prefill_tps": 21898.86921708762,
+            "total_tps": 577.9861684113555,
+            "burst_ms": 788.9636909999922,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
+          },
+          "paired_cycle_decode_gain_pct": [
+            0.9329985797238427,
+            -1.4530687492564476,
+            0.410889166242856,
+            0.808355265964722,
+            0.8933925760892025
+          ],
+          "decode_tps_gain_pct": 0.7387754372110811,
+          "prefill_tps_gain_pct": 0.23800067743748876,
+          "total_tps_gain_pct": -0.371994504874118
+        }
+      ],
+      "sampling": {
+        "frequency_penalty": 0.0,
+        "min_p": 0.0,
+        "presence_penalty": 1.5,
+        "temperature": 0.0,
+        "top_k": 20,
+        "top_p": 0.800000011920929
+      },
+      "seed_policy": "Server default random seed; deterministic temperature-zero decoding"
+    }
+  ],
+  "performance_table_source": "paired_verification: short adjacent A-B-B-A requests",
+  "block_verification_quality": {
+    "single_exact_agreement": "3/3",
+    "weighted_character_difference_rate": 0.0,
+    "gold_characters": 478,
+    "evaluated_outputs": 300,
+    "batch_outputs_consistent": true
+  },
+  "verification_notes": [
+    "The original long-phase A-B-B-A single-request baseline changed by about 10% between phases; short paired runs are the primary performance comparison.",
+    "Paired runs and original multi-request runs use model defaults with temperature zero and presence penalty 1.5. Original single-request runs set presence penalty zero.",
+    "Output agreement is checked within each matched configuration. The two complete text pages agree across both sampling profiles; the formula prefix differs between profiles, with exact baseline/optimized agreement in each."
+  ],
+  "optimization": {
+    "operator": "gdn_norm_gating_proj",
+    "input_rows": 1024,
+    "heads": 16,
+    "fused_tokens": [
+      1,
+      8
+    ],
+    "threads_per_token": 512,
+    "normalized_output": "BF16, identical to composed RMSNorm output",
+    "controls": "computed from the represented normalized BF16 values with existing projection rounding",
+    "workspace_bytes": 0,
+    "weights": "unchanged BF16",
+    "decode_cuda_graphs": true
+  },
+  "operator_microbenchmark": [
+    {
+      "kind": "timing",
+      "t": 1,
+      "variant": 0,
+      "us": 4.21285
+    },
+    {
+      "kind": "timing",
+      "t": 1,
+      "variant": 2,
+      "us": 3.02737
+    },
+    {
+      "kind": "timing",
+      "t": 2,
+      "variant": 0,
+      "us": 4.19139
+    },
+    {
+      "kind": "timing",
+      "t": 2,
+      "variant": 2,
+      "us": 3.00657
+    },
+    {
+      "kind": "timing",
+      "t": 3,
+      "variant": 0,
+      "us": 4.15227
+    },
+    {
+      "kind": "timing",
+      "t": 3,
+      "variant": 2,
+      "us": 2.99862
+    },
+    {
+      "kind": "timing",
+      "t": 4,
+      "variant": 0,
+      "us": 4.13415
+    },
+    {
+      "kind": "timing",
+      "t": 4,
+      "variant": 2,
+      "us": 2.99427
+    },
+    {
+      "kind": "timing",
+      "t": 5,
+      "variant": 0,
+      "us": 4.13613
+    },
+    {
+      "kind": "timing",
+      "t": 5,
+      "variant": 2,
+      "us": 2.97625
+    },
+    {
+      "kind": "timing",
+      "t": 7,
+      "variant": 0,
+      "us": 4.15029
+    },
+    {
+      "kind": "timing",
+      "t": 7,
+      "variant": 2,
+      "us": 2.96977
+    },
+    {
+      "kind": "timing",
+      "t": 8,
+      "variant": 0,
+      "us": 4.15369
+    },
+    {
+      "kind": "timing",
+      "t": 8,
+      "variant": 2,
+      "us": 2.96513
+    }
+  ],
+  "operator_microbenchmark_method": "Matched CUDA Graph sequences, 128 MiB rotating control-weight pool, alternating variant order; independent FP64 checks precede timing"
+}

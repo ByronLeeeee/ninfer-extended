@@ -89,7 +89,11 @@ void gdn_norm_gating_proj(const Tensor& x, const Tensor& norm_weight, float eps,
                           const Tensor& dt_bias, WorkspaceArena& ws, Tensor& h, Tensor& g,
                           Tensor& beta, DeviceExecutionView execution);
 
-/** The Qwen3.8-27B and Qwen3.6-35B-A3B contiguous-parent storage forms described above. */
+/**
+ * The registered contiguous-parent storage forms described above, including BF16 [32,1024].
+ * The 16-head, 1024-input profile fuses normalization and controls for T=1..8 while retaining
+ * the represented BF16 h boundary for the control dots. Larger positive T uses composition.
+ */
 void gdn_norm_gating_proj(const Tensor& x, const Tensor& norm_weight, float eps,
                           const Weight& ab_weight, const Tensor& A_log, const Tensor& dt_bias,
                           WorkspaceArena& ws, Tensor& h, Tensor& g, Tensor& beta,
