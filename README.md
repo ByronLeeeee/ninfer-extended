@@ -1,37 +1,17 @@
 # NInfer with Qwen3.5-0.8B Support
 
-This fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) extends the general
-C++/CUDA inference engine with **Qwen3.5-0.8B architecture and BF16/A16 kernel
-support**. The added path has been validated with
-[Xiaomi-OCR-0](https://huggingface.co/SeerRay-Lab/Xiaomi-OCR-0), an OCR vision-language
-model trained from **Qwen3.5-0.8B-Base**, on RTX 5070 Ti and RTX 6000D.
-Standalone Qwen3.5-0.8B-Base weights have not been separately benchmarked here.
+This fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) adds **Qwen3.5-0.8B support** to the C++/CUDA inference engine. It has been tested with [Xiaomi-OCR-0](https://huggingface.co/SeerRay-Lab/Xiaomi-OCR-0), an OCR model based on **Qwen3.5-0.8B-Base**, on RTX 5070 Ti and RTX 6000D.
 
-## Additions in this fork
+## What's added
 
-- BF16/A16 Gated DeltaNet, attention, linear-add and SwiGLU projection paths for
-  the 1,024-wide Qwen3.5-0.8B configuration.
-- Text attention with D256/H8/KV2 and segmented vision attention with D64/H12.
-- Vision position ordering, two-axis RoPE, 6,144-channel causal convolution,
-  Unicode pre-tokenization and original added-token metadata handling.
-- A BF16 v3 conversion recipe with embedded tokenizer/processor resources;
-  complete CMake builds include the new kernels and PCRE2 linkage.
-- Optional Transformers reference tools compile both language prefill and vision
-  GPU computation with `fullgraph=True`. Cache storage is initialized outside
-  Dynamo to preserve decode CUDA Graphs. Actual cache capacity and compiled
-  execution counters are checked. These Python tools optimize the comparison
-  baseline; NInfer itself uses native C++/CUDA execution.
+- BF16/A16 Gated DeltaNet, attention, linear-add, and SwiGLU kernels for the 1,024-wide Qwen3.5-0.8B configuration.
+- Text attention with 256-dimensional heads (8 query heads, 2 KV heads) and segmented vision attention with 64-dimensional heads (12 heads).
+- Vision position ordering, two-axis RoPE, and 6,144-channel causal convolution for prefill and decode.
+- Unicode tokenization through PCRE2 and export of the original added-token metadata.
+- A BF16 v3 conversion recipe that embeds tokenizer and image/video processor resources in the model file.
+- Transformers comparison tools with compiled vision encoding, language prefill, and decode. Cache storage is initialized outside compilation to preserve decode CUDA Graphs.
 
-[Build, conversion and validation](docs/xiaomi-ocr.md) ·
-[Performance and accuracy scope](docs/xiaomi-ocr-performance.md) ·
-[Validated Xiaomi-OCR-0 BF16 artifact](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer)
-
-The validated native target is `sm_120a`. Tests cover RTX 5070 Ti 16 GB (WSL2) and
-RTX 6000D (Linux); they do not qualify every Blackwell architecture.
-The small-model extension does not establish new validation results for other
-upstream checkpoints.
-
-## Build this fork
+## Build
 
 ```bash
 git clone https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b.git
@@ -40,26 +20,24 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-Use Linux, a CUDA toolkit supporting `sm_120a`, C++20, CMake >=3.28, Ninja,
-FFmpeg development libraries, libcurl >=7.85, pkg-config and **libpcre2-dev**.
-The complete source was clean-built with CUDA 13.2/GCC 15.2 and executed on both
-validated GPUs. Model artifacts are distributed on Hugging Face.
+Dependencies: 64-bit Linux, CUDA supporting `sm_120a`, C++20, CMake ≥3.28, Ninja, FFmpeg development libraries, libcurl ≥7.85, pkg-config, and **libpcre2-dev**. The tested build used CUDA 13.2 and GCC 15.2 and ran on **RTX 5070 Ti 16 GB (WSL2)** and **RTX 6000D (Linux)**.
 
-## Xiaomi-OCR-0 validation summary
+[Build and conversion guide](docs/xiaomi-ocr.md) · [Test report](docs/xiaomi-ocr-performance.md)
 
-BF16 weights/KV, 4K capacity, one active request, warmed execution:
+Xiaomi-OCR-0 BF16 model: [Hugging Face](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) · [ModelScope](https://modelscope.cn/models/ByronLeeee/Xiaomi-OCR-0-Ninfer)
+
+## Xiaomi-OCR-0 performance
+
+Both engines use BF16 weights and KV cache, a 4K context, and one active request. Prefill includes vision encoding and language processing. The Transformers baseline uses compiled vision, prefill, and decode with fused kernels and decode CUDA Graphs.
 
 | GPU | Transformers prefill tok/s | NInfer prefill tok/s | Transformers decode tok/s | NInfer decode tok/s |
 |---|---:|---:|---:|---:|
 | RTX 5070 Ti | 22,197–23,060 | 19,859–21,924 | 169.4–173.7 | 427.1–438.7 |
 | RTX 6000D | 35,990–36,193 | 33,031–35,306 | 232.2–235.1 | 511.0–514.4 |
 
-Prefill includes both vision encoding and language processing. The Transformers
-baseline uses compiled prefill/vision and compiled decode with fused kernels.
-Two synthetic text pages have CER 0% on both engines; three compared outputs
-match exactly on both GPUs, including a truncated formula prefix. These results
-do not establish general OCR accuracy. See the linked report for full-output
-historical differences and measurement details.
+NInfer decode is **2.46–2.59×** faster on the 5070 Ti and **2.17–2.22×** faster on the 6000D; compiled Transformers prefill is slightly faster on these inputs.
+
+Both engines scored CER 0% on two synthetic text pages with 478 annotated characters. All three compared outputs matched exactly on both GPUs: two complete text pages and the first 256 tokens of a formula page. The [test report](docs/xiaomi-ocr-performance.md) includes the scoring method, memory usage, and an earlier 11-page comparison.
 
 ---
 
