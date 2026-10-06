@@ -15,5 +15,6 @@ struct CausalAttentionGeometry : AttentionHeadMapping<QHeadsValue, KVHeadsValue>
 using CausalD256H24Kv4 = CausalAttentionGeometry<24, 4, 1>;
 using CausalD256H16Kv2 = CausalAttentionGeometry<16, 2, 2>;
 using CausalD256H8Kv2 = CausalAttentionGeometry<8, 2, 2>;
+using CausalD256H8Kv2Compact = CausalAttentionGeometry<8, 2, 1>;
 
 } // namespace ninfer::ops

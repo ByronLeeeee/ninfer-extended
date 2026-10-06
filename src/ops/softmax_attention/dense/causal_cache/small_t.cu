@@ -92,6 +92,17 @@ std::int32_t causal_small_t_launch_capacity(CausalAttentionExecutionEnvelope env
     return capacity;
 }
 
+// Group-four BF16 rows need fewer split CTAs than the group-eight profile. Keep the
+// measured two-warp/128-output decomposition within its qualified token/envelope interval;
+// short single-column, single-row calls retain the lower-latency original decomposition.
+bool compact_group_four_bf16(std::int32_t q_heads, std::int32_t width,
+                            KvCacheStorage storage, CausalAttentionExecutionEnvelope envelope,
+                            std::int32_t batch_size) {
+    return q_heads == 8 && storage == KvCacheStorage::BFloat16 && width <= 4 &&
+           envelope.max_visible_keys <= 8192 &&
+           (batch_size > 1 || width > 1 || envelope.max_visible_keys > 2048);
+}
+
 template <typename Geometry, int TokenTile, int WarpsPerCta, bool MultiBatch, bool Masked,
           typename CacheInput>
 void launch_tc_partial_bf16(const Tensor& q, CacheInput input, const Tensor& pos, float scale,
@@ -248,7 +259,12 @@ std::int32_t causal_attention_split_capacity(std::int32_t q_heads, std::int32_t 
     if (q_heads == CausalD256H16Kv2::QHeads) {
         return causal_small_t_launch_capacity<CausalD256H16Kv2>(envelope, tokens, cache_storage);
     }
-    if(q_heads==8) return causal_small_t_launch_capacity<CausalD256H8Kv2>(envelope,tokens,cache_storage);
+    if (q_heads == CausalD256H8Kv2::QHeads) {
+        if (compact_group_four_bf16(q_heads, tokens, cache_storage, envelope, batch_size))
+            return causal_small_t_launch_capacity<CausalD256H8Kv2Compact>(envelope, tokens,
+                                                                          cache_storage);
+        return causal_small_t_launch_capacity<CausalD256H8Kv2>(envelope, tokens, cache_storage);
+    }
     throw std::invalid_argument(
         "causal_softmax_attention split capacity: unsupported head geometry");
 }
@@ -271,7 +287,9 @@ void causal_attention_small_t_launch_for(const Tensor& q, CacheInput input, cons
     do {                                                                                           \
         const auto launch_profile = [&]<bool MultiBatch, bool Masked>() {                          \
             if constexpr (Geometry::QHeads == 8) {                                           \
-                launch_tc_partial_bf16<Geometry, (TOKENS), (WARPS), MultiBatch, Masked>(             \
+                constexpr int Bf16Warps = Geometry::SmallTSplitScale == 1 && (TOKENS) <= 4          \
+                    ? 2 : (WARPS);                                                                \
+                launch_tc_partial_bf16<Geometry, (TOKENS), Bf16Warps, MultiBatch, Masked>(            \
                     q, input, pos, scale, cache, invocation, logical_capacity, splits,             \
                     partial_acc, partial_m, partial_l, stream);                                    \
             } else if (cache.storage == KvCacheStorage::Int8Group64) {                          \
@@ -335,7 +353,8 @@ void causal_attention_small_t_launch_for(const Tensor& q, CacheInput input, cons
 #undef NINFER_CAUSAL_SMALL_T_DISPATCH
 
     constexpr int kReduceBlock = 256;
-    constexpr int kDChunk      = Geometry::QHeads == 24 ? 256 : 64;
+    constexpr int kDChunk = Geometry::QHeads == 24 ? 256
+        : Geometry::QHeads == 8 && Geometry::SmallTSplitScale == 1 ? 128 : 64;
     const auto launch_reduce   = [&]<bool Int8, bool MultiBatch, bool Masked, bool Offset>() {
         const dim3 grid(Geometry::QHeads, div_up(kCausalHeadDim, kDChunk),
                           invocation.width * invocation.batch_size);
@@ -412,6 +431,12 @@ void causal_attention_small_t_launch(
                                                               partial_m, partial_l, out, stream);
         return;
     }
+    if (compact_group_four_bf16(q.ne[1], invocation.width, cache.storage, envelope,
+                               invocation.batch_size)) {
+        causal_attention_small_t_launch_for<CausalD256H8Kv2Compact>(q, input, pos, scale, cache,
+            invocation, envelope, partial_acc, partial_m, partial_l, out, stream);
+        return;
+    }
     if(q.ne[1]==8){causal_attention_small_t_launch_for<CausalD256H8Kv2>(q, input, pos, scale, cache, invocation,
                                                           envelope, partial_acc, partial_m,
                                                           partial_l, out, stream);return;}
@@ -454,6 +479,12 @@ void causal_attention_cached_small_t_launch(const Tensor& q, const Tensor& pos, 
         causal_attention_small_t_launch_for<CausalD256H24Kv4>(q, input, pos, scale, batch_cache,
                                                               invocation, envelope, partial_acc,
                                                               partial_m, partial_l, out, stream);
+        return;
+    }
+    if (compact_group_four_bf16(q.ne[1], invocation.width, batch_cache.storage, envelope,
+                               invocation.batch_size)) {
+        causal_attention_small_t_launch_for<CausalD256H8Kv2Compact>(q, input, pos, scale, batch_cache,
+            invocation, envelope, partial_acc, partial_m, partial_l, out, stream);
         return;
     }
     if(q.ne[1]==8){causal_attention_small_t_launch_for<CausalD256H8Kv2>(q, input, pos, scale, batch_cache,

@@ -1,5 +1,91 @@
 # Xiaomi-OCR-0 test results
 
+## RTX 5070 Ti grouped-query decode attention
+
+Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14,
+CUDA 13.3.33 and GCC 13.3.0. The baseline is `6e97374a`, which includes the
+normalized-control fusion below. Weights and KV are BF16 in both versions.
+
+The public causal-attention Op selects a compact split profile for 256-dimensional
+heads, 8 query heads and 2 KV heads, at query width 1–4 and execution envelopes up
+to 8,192 visible keys. It uses two warps per partial CTA, halves the split scale,
+and merges output in 128-dimensional tiles. Selection uses geometry, dtype, query
+width, batch size and the execution envelope. The capacity query follows the same
+profile, reducing transient attention workspace by about 50% on these routes.
+Single-row, single-column calls with envelopes up to 2,048 keys keep the original
+profile: the initial complete public-Op measurement found that profile faster.
+Wider queries and larger envelopes use the existing profiles.
+
+Eight complete kernel candidates passed 72 independent FP64 checks before timing.
+The selected public route then passed qualification independently. The public-Op
+comparison calls both complete public-Op implementations in one CUDA process,
+using the same input and KV addresses. Baseline host symbols are renamed to keep
+the two archives distinct; their device computation is unchanged. Both versions
+pass 32 FP64 checks in this process before timing.
+Timings include cache append, attention and split-output reduction,
+captured in CUDA Graphs with at least 64 calls per graph and a rotating KV pool of
+at least 128 MiB. Each version warms for at least 200 ms of GPU execution at each
+point, then runs six A-B-B-A cycles targeting 20 ms per sample. The table uses the
+median of all twelve samples per version.
+
+| Visible keys | Rows | Baseline attention µs | Updated attention µs | Latency reduction |
+|---:|---:|---:|---:|---:|
+| 1,807 | 2 | 24.07 | 19.69 | 18.2% |
+| 1,807 | 4 | 39.00 | 33.42 | 14.3% |
+| 4,096 | 1 | 27.79 | 21.88 | 21.3% |
+| 4,096 | 2 | 45.59 | 37.21 | 18.4% |
+| 4,096 | 4 | 70.38 | 60.25 | 14.4% |
+| 8,192 | 1 | 39.07 | 34.08 | 12.8% |
+| 8,192 | 2 | 63.93 | 60.25 | 5.8% |
+| 8,192 | 4 | 114.56 | 102.78 | 10.3% |
+
+Whole-model measurements use 4K context per request, a 1,024-token prefill chunk,
+decode CUDA Graphs, and a 256-token output cap. Prefix reuse and media caching are
+disabled. Both versions explicitly use temperature 0, presence/frequency penalties
+0, top-p 1, top-k 0, min-p 0 and seed 123.
+Both real servers stay resident; only one engine's burst executes at a time.
+Each input has two warmups and five short A-B-B-A cycles, giving ten formal bursts
+per input and version. Tables show medians. Prefill includes vision and language
+GPU processing; concurrent decode is per request. Total throughput includes
+client wall time, prefill and scheduling.
+
+| Lanes | Input | Baseline prefill tok/s | Updated prefill tok/s | Baseline decode tok/s/request | Updated decode tok/s/request | Decode change |
+|---:|---|---:|---:|---:|---:|---:|
+| 1 | zh_legal | 22,491 | 22,307 | 430.6 | 431.3 | +0.2% |
+| 1 | en_contract | 22,286 | 22,419 | 429.5 | 430.4 | +0.2% |
+| 1 | dense-equations | 20,674 | 20,729 | 421.0 | 428.8 | +1.8% |
+| 2 | zh_legal | 22,651 | 22,084 | 416.8 | 420.2 | +0.8% |
+| 2 | en_contract | 22,345 | 22,242 | 419.6 | 419.8 | +0.0% |
+| 4 | zh_legal | 21,821 | 21,841 | 375.0 | 378.8 | +1.0% |
+| 4 | en_contract | 21,749 | 21,345 | 375.4 | 379.3 | +1.0% |
+
+| Lanes | Input | Baseline total tok/s | Updated total tok/s | Total change |
+|---:|---|---:|---:|---:|
+| 2 | zh_legal | 418.1 | 418.4 | +0.1% |
+| 2 | en_contract | 422.2 | 426.3 | +1.0% |
+| 4 | zh_legal | 573.0 | 573.8 | +0.1% |
+| 4 | en_contract | 572.0 | 581.8 | +1.7% |
+
+The attention latency reduction is **5.8–21.3%** on the measured compact
+routes. Whole-model changes are much smaller; the paired results above give the
+prefill, decode and total throughput changes separately.
+
+All **300 formal OCR outputs** match their baseline exactly, with 100% agreement
+and 0% normalized character difference. Both versions score CER 0% on the two
+complete text pages with 478 annotated characters. The dense-equations comparison
+uses the first 256 generated tokens. A separate 32K/four-request check completes
+Chinese text, English text, mixed numbers and a formula page; every output matches
+sequential execution and baseline.
+
+All **197 independent FP64 checks** pass: 165 retained checks and 32 new causal
+attention checks. New coverage includes reordered physical pages and table rows,
+masked tails and empty rows, exact cache writes, read-only cached attention,
+query widths 1–16, batch sizes up to 8, and 2K/8K/32K route boundaries. The FP64
+oracle uses represented BF16 inputs and the BF16-key/FP16-value cache boundary;
+the existing NRMS < 0.006 and peak-error/reference-RMS < 0.045 criteria are retained.
+
+[Grouped-query attention measurements](xiaomi-ocr-5070ti-causal-attention.json)
+
 ## RTX 5070 Ti fused normalization and GDN controls
 
 Measured on 2026-10-06 on RTX 5070 Ti 16 GB under Ubuntu WSL2, driver 617.14,

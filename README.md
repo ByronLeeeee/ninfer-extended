@@ -9,6 +9,7 @@ This fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) adds **Qwen3.5-
 - Vision position ordering, two-axis RoPE, and 6,144-channel causal convolution for prefill and decode.
 - Compact D64 vision attention, small-batch BF16 projections, and fused residual, output splitting, and SwiGLU kernels, measured on RTX 5070 Ti. These kernels are selected by matrix shape and token count through the public Ops.
 - Fused offset RMSNorm and GDN controls for small BF16 token batches, with the original normalization and projection rounding.
+- Compact grouped-query BF16 decode attention for 8 query heads and 2 KV heads, with fewer splits and about half the transient workspace on selected small-query routes.
 - Unicode tokenization through PCRE2 and export of the original added-token metadata.
 - A BF16 v3 conversion recipe that embeds tokenizer and image/video processor resources in the model file.
 - Transformers comparison tools with compiled vision encoding, language prefill, and decode. Cache storage is initialized outside compilation to preserve decode CUDA Graphs.
@@ -49,11 +50,17 @@ The shared BF16 small-batch operator update improves **two-/four-request decode 
 All outputs match, and all **145 FP64 checks** pass. See the
 [small-batch operator results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-small-batch-bf16-operators).
 
-The latest normalized-control update combines RMSNorm and GDN gate projections
+The normalized-control update combines RMSNorm and GDN gate projections
 in one kernel for T=1–8, reducing that segment from about 4.2 µs to 3.0 µs on
 RTX 5070 Ti. Paired whole-model decode improves by **0.4–1.3%**; prefill changes
 are small and mixed. All 600 formal OCR outputs match their baseline, and all
 **165 FP64 checks** pass. See the [complete model measurements](docs/xiaomi-ocr-performance.md#rtx-5070-ti-fused-normalization-and-gdn-controls).
+
+
+The grouped-query attention update reduces complete attention-Op latency by
+**5.8–21.3%** on the measured compact routes and cuts its transient
+workspace by about 50%. All 300 formal OCR outputs match their baseline, and all
+**197 FP64 checks** pass. See the [paired prefill, decode and total-throughput results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-grouped-query-decode-attention).
 
 ---
 
