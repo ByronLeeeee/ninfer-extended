@@ -30,7 +30,32 @@ Dependencies: 64-bit Linux, CUDA supporting `sm_120a`, C++20, CMake ≥3.28, Nin
 
 Xiaomi-OCR-0 BF16 model: [Hugging Face](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) · [ModelScope](https://modelscope.cn/models/ByronLeeee/Xiaomi-OCR-0-Ninfer)
 
-## Xiaomi-OCR-0 performance
+## Latest GPU measurements
+
+The current Xiaomi-OCR-0 BF16 build was measured on RTX 5070 Ti and RTX 6000D
+with 4K context per request and one, two or four requests. Combined
+vision/language prefill and per-request decode are reported separately from
+aggregate request throughput.
+
+| GPU | Requests | Vision+language prefill tok/s | Decode tok/s/request |
+|---|---:|---:|---:|
+| RTX 5070 Ti | 1 | 20,443–22,358 | 418.7–421.9 |
+| RTX 5070 Ti | 2 | 22,291–22,362 | 409.8–410.3 |
+| RTX 5070 Ti | 4 | 21,957–22,072 | 377.1–379.9 |
+| RTX 6000D | 1 | 35,475–37,912 | 538.3–541.9 |
+| RTX 6000D | 2 | 37,896–37,991 | 526.7–527.3 |
+| RTX 6000D | 4 | 37,876–38,342 | 487.1–487.4 |
+
+On RTX 6000D, the existing-server comparison shows **7.1–8.5% combined prefill**
+and **42.7–48.0% two-/four-request decode** gains. Qwen3.8-27B remains within
+±0.21% in the controlled tasks. The 5070 Ti and 6000D comparisons have
+**100% output agreement** across 340 and 300 formal OCR responses respectively;
+both pass 225 independent FP64 checks.
+
+[Latest results and timing breakdown](docs/xiaomi-ocr-performance.md#rtx-5070-ti-and-rtx-6000d-latest-results)
+· [GPU measurement data](docs/xiaomi-ocr-gpu-results.json)
+
+## Initial Transformers comparison
 
 Both engines use BF16 weights and KV cache, a 4K context, and one active request. Prefill includes vision encoding and language processing. The Transformers baseline uses compiled vision, prefill, and decode with fused kernels and decode CUDA Graphs.
 
