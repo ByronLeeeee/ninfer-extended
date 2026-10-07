@@ -14,10 +14,25 @@ namespace ninfer::ops {
 // Inputs are 16-byte-aligned represented BF16; output is contiguous BF16
 // [tokens,Q_heads*128] and does not alias inputs. FP32 online softmax and MMA
 // accumulation use a BF16 probability fragment plus its BF16 residual to retain
-// probability precision. No device allocation or scratch.
+// probability precision. No device allocation or scratch. The optional physical
+// SM count selects launch geometry only; zero selects conservative geometry.
 void causal_bf16_attention(const void* q, const void* k, const void* v, void* out,
     int tokens, int query_heads, int kv_heads, int q_stride, int kv_stride,
-    cudaStream_t stream);
+    cudaStream_t stream, std::int32_t multiprocessor_count = 0);
+
+// The same causal formula over independently packed sequences. The device I32
+// metadata is four-byte-aligned and contains a begin offset and positive length per sequence; lengths
+// must be <= max_sequence_tokens and ranges must be disjoint valid token spans.
+// Every query attends only its own sequence's preceding keys including itself.
+// Input/output layouts, numerical behavior and alias rules match the single-
+// sequence entry above. Only valid spans are written; inputs/metadata are read-only.
+// No allocation or workspace. sequences is in [1,65535]. The physical SM count
+// has the same resource-only meaning as in the single-sequence entry.
+void packed_causal_bf16_attention(const void* q, const void* k, const void* v, void* out,
+    int sequences, int max_sequence_tokens, int query_heads, int kv_heads,
+    int q_stride, int kv_stride, const std::int32_t* sequence_begin,
+    const std::int32_t* sequence_length, cudaStream_t stream,
+    std::int32_t multiprocessor_count = 0);
 
 // Stable FP32 online-softmax over represented BF16 Q/K/V; D is 64 or 128.
 // Input storage is token-major with explicit token strides. Every head h

@@ -38,6 +38,12 @@ Artifact 必须提供 Text；Vision、MTP、DFlash 和 DFlash2 的私有权重�
 checkpoint 或 cache replica，也不进入 Scheduler/ResourceManager。Generation 与 CausalScoring
 不在运行期切换，评分专用 staging 只在 CausalScoring 启动时分配。
 
+扩展版还提供启动时固定的 `SpeechRecognition` 与 `TextEmbedding` purpose，分别通过
+`Engine::transcribe_features()` 和 `Engine::embed_tokens()` 进入原生 BF16 Qwen3 执行。
+Models 拥有音频／语言／向量池化的固定数学组合、权重绑定、工作缓冲及 CUDA Graph；共享计算
+属于 Ops。音频特征提取和文本分词由 CPU 工具完成。Embedding 只执行前向和最后有效 token
+的向量池化，没有 decode 循环或常驻 KV；多条文本的 causal 范围相互独立。
+
 `max_concurrency` 限制同时激活的请求数，不把共享 KV 容量平均切分给 lane。请求只有在 Program
 证明其完整执行资源已经得到保障后才会进入 Active；进入 Active 后，它不会因为另一个请求或
 inactive cache 的保留而丢失完成能力。

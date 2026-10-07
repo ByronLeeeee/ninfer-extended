@@ -80,6 +80,15 @@ EngineOptions normalize_engine_options(EngineOptions options) {
         options.enable_vision = false;
         options.context_cache = ContextCacheOptions{.enabled = false};
         break;
+    case EnginePurpose::TextEmbedding:
+        if (options.max_context == 0 || options.max_context > 32768) {
+            throw std::invalid_argument("Embedding max_context must be in [1,32768]");
+        }
+        options.speculative = {};
+        options.enable_vision = false;
+        options.context_cache = ContextCacheOptions{.enabled = false};
+        options.kv_capacity = KvCapacityPolicy::explicit_capacity(1);
+        break;
     case EnginePurpose::CausalScoring:
         options.max_concurrency      = 1;
         options.max_pending_requests = 1;

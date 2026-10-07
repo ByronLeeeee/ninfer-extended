@@ -1,15 +1,16 @@
 # NInfer Extended
 
-An extension of [Neroued/ninfer](https://github.com/Neroued/ninfer) with **Qwen3.5-0.8B multimodal support**, **native Qwen3-ASR-1.7B**, and shared BF16 CUDA operators measured on **RTX 5070 Ti** and **RTX 6000D**. Qwen3.5-0.8B support has been validated with **Xiaomi-OCR-0**, based on **Qwen3.5-0.8B-Base**. The fork builds on upstream `594930e7b609efa4bcea3ae4f24cd9d66b5f224f` and keeps the v3 artifact/Engine execution path.
+An extension of [Neroued/ninfer](https://github.com/Neroued/ninfer) with **Qwen3.5-0.8B multimodal support**, **native Qwen3-ASR-1.7B**, **native Qwen3-Embedding-0.6B**, and shared BF16 CUDA operators measured on **RTX 5070 Ti** and **RTX 6000D**. Qwen3.5-0.8B support has been validated with **Xiaomi-OCR-0**, based on **Qwen3.5-0.8B-Base**. The fork builds on upstream `594930e7b609efa4bcea3ae4f24cd9d66b5f224f` and keeps the v3 artifact/Engine execution path.
 
 ## Changes from upstream NInfer
 
 - **Qwen3.5-0.8B:** BF16/A16 projection, Gated DeltaNet, linear-add and SwiGLU routes for a 1,024-wide decoder; D256 text attention with Q8/KV2; D64/H12 segmented vision attention; 6,144-channel causal convolution; corrected vision position ordering and two-axis RoPE.
 - **Qwen3-ASR-1.7B:** a native audio encoder and Qwen3 language decoder, the `SpeechRecognition` Engine purpose, `transcribe_features()` API, and `ninfer-asr` CLI. BF16 cuDNN convolution and audio projections feed shared language Ops. Audio encoding, language prefill and decode all use CUDA Graphs.
-- **Small-batch BF16 operators:** compact GEMV/SIMT projections, fused residual and split-output projections, fused SwiGLU, and offset RMSNorm plus GDN controls. Matrix shape, dtype, strides and token extent select the implementations.
-- **Attention:** compact D64 segmented attention; fewer split-KV partitions and roughly half the temporary workspace on selected Q8/KV2 decode routes; D128 causal GQA prefill and partitioned Q16/KV8 decode. The default ASR prefill reuses K/V across four queries in registers while preserving FP32 softmax/probability arithmetic. An optional compensated Tensor Core prefill is also available.
-- **Prefill projections:** wider MMA tiles for selected matrix/column extents, narrower tiles for short input rows, and FP32 gate/up staging through SiLU and multiplication for the `[12288,2048]` SwiGLU projection.
-- **Conversion and tokenization:** BF16 v3 recipes for both models, embedded tokenizer/processor/chat-template resources, original added-token metadata, and PCRE2 Unicode pre-tokenization. ASR row concatenation preserves all 707 source parameters byte for byte.
+- **Qwen3-Embedding-0.6B:** a BF16 Qwen3 decoder, the `TextEmbedding` Engine purpose, `embed_tokens()` API, and `ninfer-embed` CLI. Packed sequences use independent causal ranges and positions, with one Tensor Core attention invocation per layer for the batch. Last-token pooling, dimensional truncation and stable FP32 L2 normalization produce vectors directly on CUDA. The CPU frontend uses the original tokenizer and retrieval instruction format.
+- **Small-batch BF16 operators:** compact GEMV/SIMT projections, fused residual and split-output projections, fused SwiGLU, and offset RMSNorm plus GDN controls. Matrix shape, dtype, strides, token extent and supplied physical SM count select the implementations.
+- **Attention:** compact D64 segmented attention; fewer split-KV partitions and roughly half the temporary workspace on selected Q8/KV2 decode routes; D128 causal GQA prefill and partitioned Q16/KV8 decode. Long-input Tensor Core attention can stage wider K/V tiles while retaining 32-column softmax groups and probability compensation; workload geometry and physical SM count choose the schedule. The default ASR prefill reuses K/V across four queries in registers while preserving FP32 softmax/probability arithmetic. An optional compensated Tensor Core prefill is also available.
+- **Prefill projections:** wider MMA tiles for selected matrix/column extents, narrower tiles for short input rows, register-fused gate/up and SwiGLU for `[6144,1024]`, and FP32 gate/up staging through SiLU and multiplication for `[12288,2048]`. The register-fused profile writes the BF16 activation directly and needs no projection scratch.
+- **Conversion and tokenization:** BF16 v3 recipes for OCR, ASR and embedding, embedded tokenizer/processor/chat-template resources, original added-token metadata, and PCRE2 Unicode pre-tokenization. Row concatenation preserves all 707 ASR and 310 embedding source parameters byte for byte.
 - **Qualification and reference tools:** independent FP64 and exact-transform checks, complete-model benchmarks, and audited compiled Transformers comparisons. Operator dispatch uses explicit tensor geometry rather than model/GPU names.
 
 ## Build and models
@@ -28,6 +29,7 @@ Dependencies: 64-bit Linux (WSL2 on Windows), CUDA supporting `sm_120a`, C++20, 
 |---|---|---|---|
 | Xiaomi-OCR-0 BF16 | [OCR setup/conversion](docs/xiaomi-ocr.md) | [Model](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Xiaomi-OCR-0-Ninfer) |
 | Qwen3-ASR-1.7B-hf BF16 | [ASR setup/conversion](docs/qwen3-asr.md) | [Model](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
+| Qwen3-Embedding-0.6B BF16 | [Embedding setup/conversion](docs/qwen3-embedding.md) | [Model](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) |
 
 ## Upstream compatibility and performance
 
@@ -35,11 +37,12 @@ Dependencies: 64-bit Linux (WSL2 on Windows), CUDA supporting `sm_120a`, C++20, 
 |---|---|---|
 | Xiaomi-OCR-0 / Qwen3.5-0.8B | Missing the required small-model BF16/vision routes | Native vision, language prefill and decode on both tested GPUs |
 | Qwen3-ASR-1.7B | No ASR architecture/frontend | Native audio encoding, language prefill and decode on both tested GPUs |
+| Qwen3-Embedding-0.6B | No Qwen3 embedding architecture/frontend | Native BF16 vector inference on RTX 5070 Ti and RTX 6000D |
 | Existing Qwen3.8-27B artifact | Supported | Existing large-model routes retained; 6000D control below |
 
 ### Xiaomi OCR: upstream-derived compatibility baseline vs optimized operators
 
-Unmodified upstream cannot execute the two added models. This table uses the **initial working BF16 OCR adaptation before operator optimization** as the baseline, with the same artifact and matched toolchain; it is not an unmodified-upstream speed claim. Measurements use the complete Chinese document, 4K context, BF16 KV, 1,024-token prefill chunks and greedy decoding. Each version has two warmups and ten formal bursts in adjacent A-B-B-A cycles. Prefill includes vision and language GPU time; decode is tok/s per request.
+Unmodified upstream cannot execute the added OCR, ASR or embedding architectures. This table uses the **initial working BF16 OCR adaptation before operator optimization** as the baseline, with the same artifact and matched toolchain; it is not an unmodified-upstream speed claim. Measurements use the complete Chinese document, 4K context, BF16 KV, 1,024-token prefill chunks and greedy decoding. Each version has two warmups and ten formal bursts in adjacent A-B-B-A cycles. Prefill includes vision and language GPU time; decode is tok/s per request.
 
 | GPU | Requests | Baseline prefill tok/s | Extended prefill tok/s | Prefill change | Baseline decode tok/s | Extended decode tok/s | Decode change |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -65,7 +68,21 @@ The existing pre-rollout NInfer executable and extended executable read the same
 
 Changes stay within ±0.21%, with all 120 formal outputs matching. Open-ended single-request writing reaches 116–131 decode tok/s at 26.1% draft acceptance. These operator extensions do not establish a 27B speed gain. This 27B control was measured on 6000D; no 5070 Ti 27B result is claimed.
 
-The model repositories report **Transformers vs NInfer Extended** prefill/decode, accuracy and output agreement. The ASR cards also include warm latency and measured inference time/throughput for 60-second audio.
+### Qwen3 Embedding: optimizations after native BF16 support
+
+The native embedding route uses packed causal attention and register-fused SwiGLU. A 4×128 forward needs 228 kernel launches, including 28 attention invocations and no separate SwiGLU activation; the initial supported route needed 340 launches and 112 attention invocations. These are measurements of the supported extension, since upstream has no embedding frontend.
+
+| GPU | Input | Earlier supported NInfer ms | Optimized NInfer ms | Whole-model throughput change |
+|---|---|---:|---:|---:|
+| RTX 5070 Ti | 4×33 tokens | 3.563 | 3.316 | +7.45% |
+| RTX 5070 Ti | 8×17 tokens | 3.489 | 3.236 | +7.82% |
+| RTX 6000D | 1×2048 tokens | 23.000 | 21.298 | +7.99% |
+
+Short packed batches reduce unused projection tile work. Long-input attention can stage 64 K/V columns while retaining the original 32-column softmax and compensated value accumulation. Resource-based dispatch selects the wider schedule on 6000D for the measured 2K input; 5070 Ti retains the original narrow GPU instructions. The wider kernel is compiled in a separate non-RDC CUDA module. It adds no global scratch allocation.
+
+Measurements use separate A-B-B-A process windows, 25 warmups and 15 measured forwards per process, for 30 measurements per version. Both GPUs pass 164 embedding and 117 ASR FP64 checks; all 249 tested embedding vectors match the preceding version exactly, and the tested ASR outputs remain token-identical. [Embedding guide](docs/qwen3-embedding.md).
+
+The model repositories report **Transformers vs NInfer Extended** speed and result agreement. OCR and ASR include complete prefill/decode; the ASR cards also report warm latency and inference time/throughput for 60-second audio. Embedding reports complete forward/pooling throughput, vector similarity, retrieval ranking agreement and semantic scores.
 
 ---
 

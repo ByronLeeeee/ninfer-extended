@@ -291,7 +291,7 @@ public:
             if(!decoding){ck+=static_cast<std::size_t>(lane)*r.capacity*kw;cv+=static_cast<std::size_t>(lane)*r.capacity*kw;}
             ops::append_contiguous_kv(r.key.p,r.value.p,ck,cv,tokens,kw,r.capacity,positions,decoding,device.stream);
             if(decoding)ops::dense_bf16_decode_attention(r.query.p,ck,cv,r.attention.p,r.batch,r.capacity,head_dim,query_heads,kv_heads,positions,workspace,device.stream);
-            else if(execution.causal_tensorcore_prefill)ops::causal_bf16_attention(r.query.p,ck,cv,r.attention.p,tokens,query_heads,kv_heads,qw,kw,device.stream);
+            else if(execution.causal_tensorcore_prefill)ops::causal_bf16_attention(r.query.p,ck,cv,r.attention.p,tokens,query_heads,kv_heads,qw,kw,device.stream,device.multiprocessor_count());
             else ops::dense_bf16_attention(r.query.p,ck,cv,r.attention.p,tokens,tokens,head_dim,query_heads,kv_heads,qw,kw,static_cast<int*>(r.prefill_begin.p),static_cast<int*>(r.prefill_end.p),positions,true,device.stream);
             project_residual(r.attention.p,tokens,prefix+".self_attn.o_proj",r.hidden.p,execution);
             norm(r.hidden.p,prefix+".post_attention_layernorm",r.norm.p,tokens,hidden_size,true);

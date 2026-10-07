@@ -9,6 +9,7 @@ run the CLI or HTTP server.
 |---|---|
 | [Xiaomi OCR](xiaomi-ocr.md) | Qwen3.5-0.8B BF16 conversion, native OCR serving and tested Blackwell GPUs |
 | [Qwen3 ASR](qwen3-asr.md) | native BF16 speech recognition, audio frontend, conversion, performance and accuracy |
+| [Qwen3 Embedding](qwen3-embedding.md) | native BF16 text vectors, batching, retrieval instructions, conversion and measured quality/performance |
 | [CLI](cli.md) | text, chat-history, image/video input, output streams, sampling, MTP, and common runtime options |
 | [HTTP serving](serving.md) | OpenAI Responses/Chat Completions, Anthropic Messages, state, streaming, token counting, authentication, and tool calls |
 | [Performance](performance.md) | RTX 5090 measurement coverage, per-model serving results, methodology, and publication rules |
@@ -24,6 +25,7 @@ The executable `--help` output is the exact source for command-line option spell
 |---|---|---|---|
 | Xiaomi-OCR-0 | `bf16` | [Hugging Face](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) | [model card](../model-cards/Xiaomi-OCR-0-BF16-NInfer/README.md) |
 | Qwen3-ASR-1.7B-hf | `bf16` | [Hugging Face](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [model card](../model-cards/Qwen3-ASR-1.7B-hf-NInfer/README.md) |
+| Qwen3-Embedding-0.6B | `bf16` | [Hugging Face](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) | [model card](../model-cards/Qwen3-Embedding-0.6B-NInfer/README.md) |
 | Qwen3.6-27B | `groupwise-int` | [Hugging Face](https://huggingface.co/neroued/Qwen3.6-27B-NInfer) | [model card](../model-cards/Qwen3.6-27B-NInfer/README.md) |
 | Qwen3.6-27B | `nvfp4` | [Hugging Face](https://huggingface.co/neroued/Qwen3.6-27B-nvfp4-NInfer) | [model card](../model-cards/Qwen3.6-27B-nvfp4-NInfer/README.md) |
 | Qwen3.8-27B | `groupwise-int` | [Hugging Face](https://huggingface.co/neroued/Qwen3.8-27B-NInfer) | [model card](../model-cards/Qwen3.8-27B-NInfer/README.md) |

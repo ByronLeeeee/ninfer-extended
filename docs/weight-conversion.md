@@ -7,6 +7,11 @@ logical bindings and frontend resources.
 
 Run the commands below from the repository root.
 
+For the extension's BF16 models, use the dedicated conversion guides:
+[Xiaomi OCR](xiaomi-ocr.md), [Qwen3 ASR](qwen3-asr.md), and
+[Qwen3 Embedding](qwen3-embedding.md). Their native artifacts include the source
+tokenizer and frontend resources.
+
 ## Upgrade an existing v2 artifact
 
 The offline upgrade tool supports the official Qwen3.6/3.8-27B groupwise-int and NVFP4 artifacts,

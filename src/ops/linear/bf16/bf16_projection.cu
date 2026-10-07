@@ -20,6 +20,14 @@ using WideMma = Bf16MmaSchedule<64, 128, 64, 32, 64, 2, 1, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 using NarrowRowsMma = Bf16MmaSchedule<32, 64, 64, 16, 32, 2, 2, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
+using CompactMma = Bf16MmaSchedule<32, 32, 64, 16, 16, 2, 2, Cache::cg, Cache::cg,
+    Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
+using ShortColumnsMma = Bf16MmaSchedule<64, 32, 64, 32, 16, 2, 2, Cache::cg, Cache::cg,
+    Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
+using PairedCompactMma = Bf16MmaSchedule<32, 32, 64, 32, 16, 2, 2, Cache::cg, Cache::cg,
+    Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
+using PairedTailMma = Bf16MmaSchedule<128, 32, 64, 64, 16, 2, 1, Cache::cg, Cache::cg,
+    Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 
 struct ContiguousOutput {
     __nv_bfloat16* data;
@@ -101,6 +109,21 @@ void mma_projection_variant(const Tensor& x, const Weight& w, Output output, cud
 template <class Geometry, class Output>
 void mma_projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
     constexpr int n = Geometry::kOutputRows, k = Geometry::kInputRows;
+    if constexpr(n==1024&&(k==2048||k==3072)) {
+        if(x.ne[1]<=128){mma_projection_variant<Geometry,CompactMma>(x,w,output,stream);return;}
+        if constexpr(k==3072) if(x.ne[1]<=256){mma_projection_variant<Geometry,NarrowRowsMma>(x,w,output,stream);return;}
+        const int tail=x.ne[1]%128;
+        if(x.ne[1]>=1024&&(tail==0||tail>64)){mma_projection_variant<Geometry,WideMma>(x,w,output,stream);return;}
+    } else if constexpr(n==4096&&k==1024) {
+        const int short_tail=x.ne[1]%64,wide_tail=x.ne[1]%128;
+        if(x.ne[1]<=128&&short_tail>0&&short_tail<=32){mma_projection_variant<Geometry,ShortColumnsMma>(x,w,output,stream);return;}
+        if(x.ne[1]>=256&&(wide_tail==0||wide_tail>64)){mma_projection_variant<Geometry,WideMma>(x,w,output,stream);return;}
+    } else if constexpr(n==6144&&k==1024) {
+        if(x.ne[1]<=16){mma_projection_variant<Geometry,CompactMma>(x,w,output,stream);return;}
+        if(x.ne[1]<=64){mma_projection_variant<Geometry,ShortColumnsMma>(x,w,output,stream);return;}
+        const int tail=x.ne[1]%128;
+        if(x.ne[1]>=1024&&(tail==0||tail>64)){mma_projection_variant<Geometry,WideMma>(x,w,output,stream);return;}
+    }
     if constexpr (n==2048&&(k==2048||k==6144)) {
         // Short column extents need more row CTAs to cover the SMs. Keep the
         // established tile once longer extents provide sufficient parallelism.
@@ -166,7 +189,7 @@ void projection(const Tensor& x, const Weight& w, Output output, cudaStream_t st
 template <class Output>
 void dispatch_projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
 #define SHAPE(N, K) if (w.n == N && w.k == K) { projection<N, K>(x, w, output, stream); return; }
-    SHAPE(8192, 1024) SHAPE(5120, 1024) SHAPE(7168, 1024) SHAPE(248320, 1024)
+    SHAPE(8192, 1024) SHAPE(5120, 1024) SHAPE(7168, 1024) SHAPE(6144, 1024) SHAPE(248320, 1024)
     SHAPE(1024, 2048) SHAPE(1024, 3584) SHAPE(1024, 3072)
     SHAPE(768, 1536) SHAPE(768, 768) SHAPE(768, 3072)
     SHAPE(2304, 768) SHAPE(3072, 768) SHAPE(3072, 3072)
@@ -212,16 +235,17 @@ __global__ void float_projection_swiglu_kernel(const float* x, __nv_bfloat16* y,
 template <int N, int K, int Capacity>
 void small_swiglu(const Tensor& x, const Weight& w, Tensor& out, cudaStream_t stream) {
     using Geometry = Bf16Geometry<N, K>;
-    bf16_swiglu_simt_kernel<Geometry, Capacity, SmallT>
+    bf16_swiglu_simt_kernel<Geometry, Capacity, SmallT, !(N == 6144 && K == 1024)>
         <<<N / (SmallT::kRowsPerWarp * SmallT::kWarpsPerCta), SmallT::kThreads, 0, stream>>>(
             static_cast<const __nv_bfloat16*>(x.data),
             static_cast<const __nv_bfloat16*>(w.qdata), static_cast<__nv_bfloat16*>(out.data), x.ne[1]);
 }
 
 template <int N, int K>
-void swiglu(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& ws, cudaStream_t stream) {
+void swiglu(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& ws, cudaStream_t stream,
+             std::int32_t multiprocessor_count) {
     using Geometry = Bf16Geometry<N, K>;
-    if (x.ne[1] == 1) bf16_swiglu_gemv_kernel<Geometry, SwiGluGemv>
+    if (x.ne[1] == 1) bf16_swiglu_gemv_kernel<Geometry, SwiGluGemv, !(N == 6144 && K == 1024)>
         <<<N / (SwiGluGemv::kRowsPerWarp * SwiGluGemv::kWarpsPerCta), SwiGluGemv::kThreads, 0, stream>>>(
             static_cast<const __nv_bfloat16*>(x.data),
             static_cast<const __nv_bfloat16*>(w.qdata), static_cast<__nv_bfloat16*>(out.data));
@@ -229,6 +253,35 @@ void swiglu(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& ws, c
     else if (x.ne[1] == 3) small_swiglu<N, K, 3>(x, w, out, stream);
     else if (x.ne[1] == 4) small_swiglu<N, K, 4>(x, w, out, stream);
     else if (x.ne[1] <= bf16_swiglu_small_max_tokens(N, K)) small_swiglu<N, K, 8>(x, w, out, stream);
+    else if constexpr (N == 6144 && K == 1024) {
+        // Gate/up projection and activation share the accumulator registers.
+        // No gate/up intermediate is observable or materialized in global memory.
+        auto launch = [&]<class Schedule>() {
+            const int blocks = N / Schedule::kBlockRows * div_up(x.ne[1], Schedule::kBlockCols);
+            const ContiguousOutput output{static_cast<__nv_bfloat16*>(out.data), N / 2};
+            if (x.ne[1] % Schedule::kBlockCols == 0)
+                bf16_gemm_mma_kernel<Geometry, Schedule, true, ContiguousOutput, true>
+                    <<<blocks, Schedule::kThreads, Schedule::kSharedBytes, stream>>>(
+                        static_cast<const __nv_bfloat16*>(x.data),
+                        static_cast<const __nv_bfloat16*>(w.qdata), output, x.ne[1]);
+            else bf16_gemm_mma_kernel<Geometry, Schedule, false, ContiguousOutput, true>
+                    <<<blocks, Schedule::kThreads, Schedule::kSharedBytes, stream>>>(
+                        static_cast<const __nv_bfloat16*>(x.data),
+                        static_cast<const __nv_bfloat16*>(w.qdata), output, x.ne[1]);
+        };
+        if (x.ne[1] < 32) launch.template operator()<PairedCompactMma>();
+        else if (x.ne[1] <= 64) launch.template operator()<ShortColumnsMma>();
+        // Narrow columns avoid unused tail MMA work, but the wider row tile needs
+        // enough CTA waves to amortize its register pressure. Device facts come
+        // from the caller; stream-only callers retain the established schedule.
+        else if (x.ne[1] > 2 * Mma::kBlockCols &&
+                 x.ne[1] <= 2 * Mma::kBlockCols + PairedTailMma::kBlockCols &&
+                 multiprocessor_count > 0 &&
+                 N / PairedTailMma::kBlockRows * div_up(x.ne[1], PairedTailMma::kBlockCols) >=
+                     std::int64_t(multiprocessor_count) * 3)
+            launch.template operator()<PairedTailMma>();
+        else launch.template operator()<Mma>();
+    }
     else {
         auto scope = ws.scope();
         if constexpr (N == 12288 && K == 2048) {
@@ -277,7 +330,7 @@ __global__ void gating_kernel(const __nv_bfloat16* x, const __nv_bfloat16* w,
 } // namespace
 
 bool bf16_projection_shape(int n, int k) {
-    return (k == 1024 && (n == 8192 || n == 5120 || n == 7168 || n == 248320)) ||
+    return (k == 1024 && (n == 8192 || n == 5120 || n == 7168 || n == 6144 || n == 248320)) ||
         (n == 1024 && (k == 2048 || k == 3584 || k == 3072)) ||
         (n == 768 && (k == 1536 || k == 768 || k == 3072)) ||
         (n == 2304 && k == 768) || (n == 3072 && (k == 768 || k == 3072)) ||
@@ -288,7 +341,7 @@ bool bf16_projection_shape(int n, int k) {
 }
 
 bool bf16_swiglu_shape(int n, int k) {
-    return (n == 7168 && k == 1024) || (n == 14336 && k == 5120) || (n == 12288 && k == 2048);
+    return ((n == 7168 || n == 6144) && k == 1024) || (n == 14336 && k == 5120) || (n == 12288 && k == 2048);
 }
 
 int bf16_swiglu_small_max_tokens(int n, int k) {
@@ -307,11 +360,13 @@ void bf16_projection_add(const Tensor& x, const Weight& w, Tensor& out,
 }
 
 void bf16_projection_swiglu(const Tensor& x, const Weight& w, Tensor& out,
-                            WorkspaceArena& ws, cudaStream_t stream) {
+                            WorkspaceArena& ws, cudaStream_t stream,
+                            std::int32_t multiprocessor_count) {
     require_input(x, w); require_output(x, out, w.n / 2);
-    if (w.n == 7168 && w.k == 1024) swiglu<7168, 1024>(x, w, out, ws, stream);
-    else if (w.n == 14336 && w.k == 5120) swiglu<14336, 5120>(x, w, out, ws, stream);
-    else if (w.n == 12288 && w.k == 2048) swiglu<12288, 2048>(x, w, out, ws, stream);
+    if (w.n == 7168 && w.k == 1024) swiglu<7168, 1024>(x, w, out, ws, stream, multiprocessor_count);
+    else if (w.n == 6144 && w.k == 1024) swiglu<6144, 1024>(x, w, out, ws, stream, multiprocessor_count);
+    else if (w.n == 14336 && w.k == 5120) swiglu<14336, 5120>(x, w, out, ws, stream, multiprocessor_count);
+    else if (w.n == 12288 && w.k == 2048) swiglu<12288, 2048>(x, w, out, ws, stream, multiprocessor_count);
     else throw std::invalid_argument("BF16 SwiGLU: unregistered matrix shape");
 }
 

@@ -130,7 +130,7 @@ bf16_mma_tile_coordinates(std::int32_t linear, std::int32_t tiles_m, std::int32_
     }
 }
 
-template <class Geometry, class Schedule, bool FullTokens, class Output>
+template <class Geometry, class Schedule, bool FullTokens, class Output, bool FusedSwiGlu = false>
 __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) void bf16_gemm_mma_kernel(
     const __nv_bfloat16* __restrict__ x, const __nv_bfloat16* __restrict__ weight, Output output,
     std::int32_t tokens) {
@@ -150,6 +150,7 @@ __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) void bf16
     static_assert(M % BM == 0);
     static_assert(K % BK == 0);
     static_assert(K / BK >= S);
+    static_assert(!FusedSwiGlu || (WM % 32 == 0 && M % 32 == 0));
 
     extern __shared__ __align__(16) unsigned char shared_raw[];
     auto* As = reinterpret_cast<__nv_bfloat16*>(shared_raw);
@@ -192,9 +193,17 @@ __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) void bf16
             const int row = item / (BK / 8);
             const int k8  = item - row * (BK / 8);
             const int kk  = k8 * 8;
+            // A gate fragment and its corresponding up fragment share one warp's
+            // accumulator registers. The represented weight stays in its original
+            // contiguous [gate;up] layout; only private load coordinates change.
+            const int logical_row = m0 + row;
+            const int weight_row = FusedSwiGlu
+                ? (logical_row / 32) * 16 + logical_row % 16 +
+                      ((logical_row % 32 >= 16) ? M / 2 : 0)
+                : logical_row;
             cp_async<16, Schedule::kWeightCache>(
                 &a_stage[row * BK + bf16_mma_shared_col<Schedule>(row, kk)],
-                &weight[static_cast<std::int64_t>(m0 + row) * K + k0 + kk]);
+                &weight[static_cast<std::int64_t>(weight_row) * K + k0 + kk]);
         }
 
 #pragma unroll 1
@@ -303,6 +312,29 @@ __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) void bf16
         }
     }
 
+    if constexpr (FusedSwiGlu) {
+#pragma unroll
+        for (int mi = 0; mi < MT; mi += 2) {
+            const int logical_row = m0 + wm * WM + mi * 16 + gid;
+            const int row0 = (logical_row / 32) * 16 + logical_row % 16;
+            const int row1 = row0 + 8;
+#pragma unroll
+            for (int ni = 0; ni < NT; ++ni) {
+                const int token0 = n0 + wn * WN + ni * 8 + 2 * lid;
+                const int token1 = token0 + 1;
+                const float* gate = accum[mi][ni];
+                const float* up = accum[mi + 1][ni];
+                if (FullTokens || token0 < tokens) {
+                    output_tile.store(row0, token0, (gate[0] / (1.f + expf(-gate[0]))) * up[0]);
+                    output_tile.store(row1, token0, (gate[2] / (1.f + expf(-gate[2]))) * up[2]);
+                }
+                if (FullTokens || token1 < tokens) {
+                    output_tile.store(row0, token1, (gate[1] / (1.f + expf(-gate[1]))) * up[1]);
+                    output_tile.store(row1, token1, (gate[3] / (1.f + expf(-gate[3]))) * up[3]);
+                }
+            }
+        }
+    } else {
 #pragma unroll
     for (int mi = 0; mi < MT; ++mi) {
         const int row0 = m0 + wm * WM + mi * 16 + gid;
@@ -328,6 +360,7 @@ __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) void bf16
                 }
             }
         }
+    }
     }
 }
 

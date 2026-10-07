@@ -20,7 +20,13 @@ __device__ __forceinline__ __nv_bfloat16 bf16_swiglu_value(float gate, float up)
     return __float2bfloat16_rn(activation * up);
 }
 
-template <class Geometry, class Schedule>
+template <bool RoundIntermediate>
+__device__ __forceinline__ __nv_bfloat16 swiglu_epilogue(float gate, float up) {
+    if constexpr (RoundIntermediate) return bf16_swiglu_value(gate, up);
+    else return __float2bfloat16_rn((gate / (1.f + expf(-gate))) * up);
+}
+
+template <class Geometry, class Schedule, bool RoundIntermediate = true>
 __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm)
 void bf16_swiglu_gemv_kernel(const __nv_bfloat16* __restrict__ x,
                             const __nv_bfloat16* __restrict__ weight,
@@ -49,11 +55,11 @@ void bf16_swiglu_gemv_kernel(const __nv_bfloat16* __restrict__ x,
     if (lane == 0) {
 #pragma unroll
         for (int row = 0; row < RowsPerBranch; ++row)
-            out[row0 + row] = bf16_swiglu_value(totals[row], totals[row + RowsPerBranch]);
+            out[row0 + row] = swiglu_epilogue<RoundIntermediate>(totals[row], totals[row + RowsPerBranch]);
     }
 }
 
-template <class Geometry, int ActiveTokens, class Schedule>
+template <class Geometry, int ActiveTokens, class Schedule, bool RoundIntermediate = true>
 __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm)
 void bf16_swiglu_simt_kernel(const __nv_bfloat16* __restrict__ x,
                             const __nv_bfloat16* __restrict__ weight,
@@ -83,7 +89,7 @@ void bf16_swiglu_simt_kernel(const __nv_bfloat16* __restrict__ x,
             up = warp_reduce_sum(up);
             if (lane == 0 && token < live_tokens)
                 out[static_cast<std::int64_t>(token) * OutputRows + row0 + row] =
-                    bf16_swiglu_value(gate, up);
+                    swiglu_epilogue<RoundIntermediate>(gate, up);
         }
     }
 }

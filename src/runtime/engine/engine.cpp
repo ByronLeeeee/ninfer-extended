@@ -9,6 +9,7 @@
 #include "runtime/engine/engine_core.h"
 #include "runtime/engine/model_instance.h"
 #include "models/qwen3_asr/program.h"
+#include "models/qwen3/embedding_program.h"
 
 #include <algorithm>
 #include <limits>
@@ -161,6 +162,11 @@ public:
             load = speech->load_summary();
             return;
         }
+        if (options.purpose == EnginePurpose::TextEmbedding) {
+            embedding = std::make_unique<models::qwen3::EmbeddingProgram>(options, device);
+            load = embedding->load_summary();
+            return;
+        }
         auto constructed  = runtime::construct_model(options, device);
         active            = std::move(constructed.instance);
         load              = std::move(constructed.load);
@@ -187,6 +193,7 @@ public:
     DeviceContext device;
     std::unique_ptr<runtime::ModelInstance> active;
     std::unique_ptr<models::qwen3_asr::Program> speech;
+    std::unique_ptr<models::qwen3::EmbeddingProgram> embedding;
     LoadSummary load;
     ModelSamplingDefaults sampling_defaults;
     Core core;
@@ -207,6 +214,7 @@ PreparedPrompt Engine::prepare(PromptInput input, const PreparationControl& cont
     nvtx::ScopedRange prepare_range(nvtx::Name::FrontendPrepare, nvtx::Category::Runtime);
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
     if (impl_->speech) { throw std::logic_error("ASR Engine requires transcribe_features"); }
+    if (impl_->embedding) { throw std::logic_error("Embedding Engine requires embed_tokens"); }
     auto prepared      = impl_->active->frontend.prepare(std::move(input), control);
     PromptSummary info = prepared.summary();
     const SamplingMode sampling_mode =
@@ -225,6 +233,7 @@ PreparedPrompt Engine::prepare_tokens(std::vector<TokenId> token_ids,
                                     static_cast<std::uint64_t>(token_ids.size()));
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
     if (impl_->speech) { throw std::logic_error("ASR Engine requires transcribe_features"); }
+    if (impl_->embedding) { throw std::logic_error("Embedding Engine requires embed_tokens"); }
     if (token_ids.size() > impl_->active->capacity) {
         throw RequestError(RequestErrorKind::ContextLengthExceeded,
                            context_capacity_error(token_ids.size(), impl_->active->capacity));
@@ -243,6 +252,7 @@ PreparedPrompt Engine::prepare_tokens(std::vector<TokenId> token_ids,
 std::vector<TokenId> Engine::tokenize_text(std::string_view text) const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
     if (impl_->speech) { throw std::logic_error("ASR tokenization belongs to the speech frontend"); }
+    if (impl_->embedding) { throw std::logic_error("Embedding tokenization belongs to the text frontend"); }
     return impl_->active->frontend.tokenize_text(text);
 }
 
@@ -280,12 +290,14 @@ std::vector<float> Engine::score_tokens(std::vector<TokenId> tokens, std::uint32
 std::uint32_t Engine::count_tokens(PromptInput input, const PreparationControl& control) const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
     if (impl_->speech) { throw std::logic_error("ASR Engine requires transcribe_features"); }
+    if (impl_->embedding) { throw std::logic_error("Embedding Engine requires embed_tokens"); }
     return impl_->active->frontend.count_tokens(std::move(input), control);
 }
 
 ModelSamplingDefaults Engine::sampling_defaults() const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
     if (impl_->speech) { throw std::logic_error("ASR uses greedy transcription"); }
+    if (impl_->embedding) { throw std::logic_error("Embedding does not sample tokens"); }
     return impl_->sampling_defaults;
 }
 
@@ -380,6 +392,7 @@ LoadSummary Engine::load_summary() const {
 MemorySummary Engine::memory_summary() const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
     if (impl_->speech) { return impl_->speech->memory_summary(); }
+    if (impl_->embedding) { return impl_->embedding->memory_summary(); }
     return std::visit(
         [](const auto& core) -> MemorySummary {
             using CoreState = std::remove_cvref_t<decltype(core)>;
@@ -394,13 +407,13 @@ MemorySummary Engine::memory_summary() const {
 
 MediaCacheSummary Engine::media_cache_summary() const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
-    if (impl_->speech) { return {}; }
+    if (impl_->speech || impl_->embedding) { return {}; }
     return impl_->active->frontend.media_cache_summary();
 }
 
 RuntimeStats Engine::runtime_stats() const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
-    if (impl_->speech) { return {}; }
+    if (impl_->speech || impl_->embedding) { return {}; }
     return std::visit(
         [](const auto& core) -> RuntimeStats {
             using CoreState = std::remove_cvref_t<decltype(core)>;
@@ -415,7 +428,7 @@ RuntimeStats Engine::runtime_stats() const {
 
 bool Engine::is_available() const {
     if (impl_ == nullptr) { return false; }
-    if (impl_->speech) { return true; }
+    if (impl_->speech || impl_->embedding) { return true; }
     return std::visit(
         [](const auto& core) {
             using CoreState = std::remove_cvref_t<decltype(core)>;
@@ -445,6 +458,13 @@ SpeechResult Engine::transcribe_features(std::vector<SpeechFeatures> samples,
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
     if (!impl_->speech) { throw std::logic_error("transcribe_features requires a SpeechRecognition Engine"); }
     return impl_->speech->transcribe(std::move(samples), options);
+}
+
+EmbeddingResult Engine::embed_tokens(const std::vector<std::vector<TokenId>>& sequences,
+                                    const EmbeddingRunOptions& options) {
+    if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (!impl_->embedding) { throw std::logic_error("embed_tokens requires a TextEmbedding Engine"); }
+    return impl_->embedding->embed(sequences, options);
 }
 
 } // namespace ninfer

@@ -74,14 +74,16 @@ causal_attention_stage_kv(__nv_bfloat16* dst, const __nv_bfloat16* src, int key0
     }
 }
 
-template <int Br, int Bc>
+template <int Br, int Bc, bool Packed = false>
 __launch_bounds__(Br * 2, 128 / Br) __global__ void causal_attention_flash_kernel(
     const __nv_bfloat16* __restrict__ q, const __nv_bfloat16* __restrict__ k,
     const __nv_bfloat16* __restrict__ v, std::int32_t tokens, std::int32_t heads,
     std::int32_t kv_heads, __nv_bfloat16* __restrict__ out,
     std::int64_t q_stride_d, std::int64_t q_stride_h, std::int64_t q_stride_t,
     std::int64_t k_stride_d, std::int64_t k_stride_h, std::int64_t k_stride_t,
-    std::int64_t v_stride_d, std::int64_t v_stride_h, std::int64_t v_stride_t) {
+    std::int64_t v_stride_d, std::int64_t v_stride_h, std::int64_t v_stride_t,
+    const std::int32_t* sequence_begin = nullptr,
+    const std::int32_t* sequence_length = nullptr) {
     static_assert(Br == 16 || Br == 32 || Br == 64);
     static_assert(Bc == 16 || Bc == 32 || Bc == 64);
     constexpr int D             = kCausalAttentionHeadDim;
@@ -95,8 +97,14 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void causal_attention_flash_kerne
     constexpr float ScaleLog2E  = 0.0883883476483184406f * 1.4426950408889634074f;
     constexpr unsigned FullMask = 0xffffffffu;
 
-    const int query_begin=static_cast<int>(blockIdx.x)*Br;
-    const CausalAttentionTile tile{query_begin,0,min(tokens,query_begin+Br),0};
+    int begin = 0, end = tokens;
+    if constexpr (Packed) {
+        begin = sequence_begin[blockIdx.z];
+        end = begin + sequence_length[blockIdx.z];
+    }
+    const int query_begin = begin + static_cast<int>(blockIdx.x) * Br;
+    if (query_begin >= end) return;
+    const CausalAttentionTile tile{query_begin, begin, min(end, query_begin + Br), 0};
     const int head = static_cast<int>(blockIdx.y);
     const int kv_head=head/(heads/kv_heads);
     const int tid  = static_cast<int>(threadIdx.x);

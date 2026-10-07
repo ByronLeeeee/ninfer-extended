@@ -47,6 +47,7 @@ linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gate_up_rows,
  * Logical shapes / supported domain:
  *   T may be any positive value. The registered profiles are:
  *   - BF16 Contiguous weight [7168,1024], x [1024,T], out [3584,T];
+ *   - BF16 Contiguous weight [6144,1024], x [1024,T], out [3072,T];
  *   - BF16 Contiguous weight [14336,5120], x [5120,T], out [7168,T];
  *   - BF16 Contiguous weight [12288,2048], x [2048,T], out [6144,T];
  *   - Q4_G64_FP16 weight [34816,5120], x [5120,T], out [17408,T];
@@ -73,12 +74,17 @@ linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gate_up_rows,
  * Workspace:
  *   Caller-owned transient storage reported by linear_swiglu_workspace_capacity_bytes(),
  *   including private FP32 or BF16 storage when the selected route materializes gate/up.
- *   scoped to the call. Q8, NVFP4 A16, and row-scaled FP8 A16 require zero bytes; A4/A8 routes use
+ *   scoped to the call. BF16 [6144,1024], Q8, NVFP4 A16, and row-scaled FP8 A16 require zero bytes; A4/A8 routes use
  *   caller-owned activation storage and may use private projection storage. There is no persistent
  *   state side effect.
+ *
+ * Execution resources:
+ *   multiprocessor_count is the physical SM count from DeviceContext, or zero
+ *   when the caller supplies only a stream. It selects private launch geometry;
+ *   zero keeps the established schedule without querying or caching device state.
  */
 void linear_swiglu(const Tensor& x, const Weight& gate_up_weight, Tensor& out, LinearPolicy policy,
-                   WorkspaceArena& ws, cudaStream_t stream);
+                   WorkspaceArena& ws, cudaStream_t stream, std::int32_t multiprocessor_count = 0);
 
 /**
  * A16-only convenience form. Q4/Q8 and row-scaled FP8 retain their complete positive-T domain.

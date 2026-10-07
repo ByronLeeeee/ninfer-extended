@@ -47,7 +47,7 @@ bool attention(DeviceContext& device,int d,int qh,int kh,int count,bool causal,b
     int window=causal?count:104;for(int start=0;start<count;start+=window){int stop=std::min(count,start+window);cu.push_back(stop);for(int i=start;i<stop;++i){starts[i]=start;ends[i]=stop;pos[i]=i;}}
     if(ranged)for(int i=0;i<count;++i){starts[i]=std::max(0,i-(i%47+1));ends[i]=std::min(count,i+7);}
     auto sb=upload(starts),eb=upload(ends),pb=upload(pos),cb=upload(cu);auto* base=static_cast<BF*>(xb.p);
-    if(tensorcore){ops::causal_bf16_attention(base,base+qw,base+qw+kw,out.p,count,qh,kh,stride,stride,device.stream);device.synchronize();}
+    if(tensorcore){ops::causal_bf16_attention(base,base+qw,base+qw+kw,out.p,count,qh,kh,stride,stride,device.stream,device.multiprocessor_count());device.synchronize();}
     else if(flash){Tensor q(base,DType::BF16,{d,qh,count}),k(base+qw,DType::BF16,{d,kh,count}),v(base+qw+kw,DType::BF16,{d,kh,count}),o(out.p,DType::BF16,{d,qh,count});q.nb[2]=k.nb[2]=v.nb[2]=stride*2;
         Tensor c(cb.p,DType::I32,{static_cast<int>(cu.size())});WorkspaceArena ws(std::max<std::size_t>(256,ops::packed_softmax_attention_workspace_capacity_bytes({d,qh,kh},count,count,cu.size()-1,cu.size()-1)));ops::packed_softmax_attention(q,k,v,{d,qh,kh},1/std::sqrt(float(d)),c,ws,o,device.stream);device.synchronize();}
     else{ops::dense_bf16_attention(base,base+qw,base+qw+kw,out.p,count,count,d,qh,kh,stride,stride,static_cast<int*>(sb.p),static_cast<int*>(eb.p),static_cast<int*>(pb.p),causal,device.stream);device.synchronize();}
@@ -246,10 +246,10 @@ int main(int argc,char** argv){try{DeviceContext device;bool pass=true;bool proj
         for(auto heads:std::vector<std::pair<int,int>>{{8,8},{16,16},{16,4}})
             for(int t:{193,211,805})pass&=attention(device,128,heads.first,heads.second,t,true,false);
         for(int t:{193,211,407,805})pass&=attention(device,128,16,8,t,true,false,false,true);
-        for(int t:{1,13,31,32,33,63,64,65,70,104,128,129,197,211,256,257,407,805,1024})
+        for(int t:{1,13,31,32,33,63,64,65,70,104,128,129,197,211,256,257,407,805,1024,1535,1536,1537,2049,4097})
             pass&=attention(device,128,16,8,t,true,false,true);
         for(auto heads:std::vector<std::pair<int,int>>{{8,8},{16,16},{16,4}})
-            for(int t:{1,13,65,211})pass&=attention(device,128,heads.first,heads.second,t,true,false,true);
+            for(int t:{1,13,65,211,1535,1536,1537,2049})pass&=attention(device,128,heads.first,heads.second,t,true,false,true);
         for(int b0:{1,2,3,4})for(int cap:{1,37,127,128,211,2048,4096})pass&=decode(device,b0,cap);
         pass&=norm_rope(device);for(int width:{128,1024,2048})pass&=rmsnorm(device,width);
     }
