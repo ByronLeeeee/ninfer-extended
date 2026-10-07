@@ -1,12 +1,13 @@
 {
   "base_model": "SeerRay-Lab/Xiaomi-OCR-0",
   "base_revision": "e4d1c4a6804bd9ef342b93d705a73af003e2ef4e",
-  "runtime_repository": "https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b",
-  "runtime_revision": "c2e791db",
+  "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
+  "runtime_revision": "79f4f1f37fdcc04a0a44dcba68124fad9d099409",
   "artifact_format": "ninfer-v3",
   "file": "xiaomi-ocr-0-bf16.ninfer",
   "bytes": 1726110464,
   "sha256": "1db6a88a5947ba06e88210feff0c44f8eeee6d7b506b4744cbf9f94a0e61cb9d",
   "projection_format": "BF16/A16Only",
-  "validated_gpu_architecture": "sm_120a"
+  "validated_gpu_architecture": "sm_120a",
+  "runtime_branch": "main"
 }
