@@ -91,6 +91,6 @@ Tracked GPU weight storage is about 1.110 GiB, with no KV cache. Explicit runtim
 
 SHA256: `3229813fdae278ab6871f712e8a943fc4c8949d5580567e89f27f2f18d4e6ae6`
 
-[Measurements](gpu-results.json) · [Artifact manifest](artifact-manifest.json) · [Conversion record](conversion.json)
+[Measurements](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer/blob/main/gpu-results.json) · [Artifact manifest](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer/blob/main/artifact-manifest.json) · [Conversion record](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer/blob/main/conversion.json)
 
 [Qwen3-Embedding](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) · [STS-B](https://huggingface.co/datasets/sentence-transformers/stsb)
