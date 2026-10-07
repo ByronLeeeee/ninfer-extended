@@ -1,0 +1,14 @@
+{
+  "model": "ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer",
+  "source": "Qwen/Qwen3-ASR-1.7B-hf",
+  "artifact": "qwen3-asr-1.7b-bf16.ninfer",
+  "bytes": 4087720481,
+  "sha256": "50d9d8c2ed690b80f5acbf94c66b344ee7fd12cf79dfe670ad10e96b5b411eea",
+  "weights": "bf16",
+  "kv": "bf16",
+  "source_tensors": 707,
+  "source_weight_bytes_preserved": true,
+  "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
+  "runtime_branch": "main",
+  "license": "apache-2.0"
+}

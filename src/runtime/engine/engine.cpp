@@ -8,6 +8,7 @@
 #include "runtime/engine/causal_score_core.h"
 #include "runtime/engine/engine_core.h"
 #include "runtime/engine/model_instance.h"
+#include "models/qwen3_asr/program.h"
 
 #include <algorithm>
 #include <limits>
@@ -155,6 +156,11 @@ public:
         : options(runtime::normalize_engine_options(std::move(engine_options))),
           device(initialize_device(options)) {
         nvtx::ScopedRange load_range(nvtx::Name::EngineLoad, nvtx::Category::Runtime);
+        if (options.purpose == EnginePurpose::SpeechRecognition) {
+            speech = std::make_unique<models::qwen3_asr::Program>(options, device);
+            load = speech->load_summary();
+            return;
+        }
         auto constructed  = runtime::construct_model(options, device);
         active            = std::move(constructed.instance);
         load              = std::move(constructed.load);
@@ -180,6 +186,7 @@ public:
     EngineOptions options;
     DeviceContext device;
     std::unique_ptr<runtime::ModelInstance> active;
+    std::unique_ptr<models::qwen3_asr::Program> speech;
     LoadSummary load;
     ModelSamplingDefaults sampling_defaults;
     Core core;
@@ -199,6 +206,7 @@ Engine& Engine::operator=(Engine&&) noexcept = default;
 PreparedPrompt Engine::prepare(PromptInput input, const PreparationControl& control) const {
     nvtx::ScopedRange prepare_range(nvtx::Name::FrontendPrepare, nvtx::Category::Runtime);
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (impl_->speech) { throw std::logic_error("ASR Engine requires transcribe_features"); }
     auto prepared      = impl_->active->frontend.prepare(std::move(input), control);
     PromptSummary info = prepared.summary();
     const SamplingMode sampling_mode =
@@ -216,6 +224,7 @@ PreparedPrompt Engine::prepare_tokens(std::vector<TokenId> token_ids,
     nvtx::ScopedRange prepare_range(nvtx::Name::FrontendPrepare, nvtx::Category::Runtime,
                                     static_cast<std::uint64_t>(token_ids.size()));
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (impl_->speech) { throw std::logic_error("ASR Engine requires transcribe_features"); }
     if (token_ids.size() > impl_->active->capacity) {
         throw RequestError(RequestErrorKind::ContextLengthExceeded,
                            context_capacity_error(token_ids.size(), impl_->active->capacity));
@@ -233,6 +242,7 @@ PreparedPrompt Engine::prepare_tokens(std::vector<TokenId> token_ids,
 
 std::vector<TokenId> Engine::tokenize_text(std::string_view text) const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (impl_->speech) { throw std::logic_error("ASR tokenization belongs to the speech frontend"); }
     return impl_->active->frontend.tokenize_text(text);
 }
 
@@ -269,11 +279,13 @@ std::vector<float> Engine::score_tokens(std::vector<TokenId> tokens, std::uint32
 
 std::uint32_t Engine::count_tokens(PromptInput input, const PreparationControl& control) const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (impl_->speech) { throw std::logic_error("ASR Engine requires transcribe_features"); }
     return impl_->active->frontend.count_tokens(std::move(input), control);
 }
 
 ModelSamplingDefaults Engine::sampling_defaults() const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (impl_->speech) { throw std::logic_error("ASR uses greedy transcription"); }
     return impl_->sampling_defaults;
 }
 
@@ -367,6 +379,7 @@ LoadSummary Engine::load_summary() const {
 
 MemorySummary Engine::memory_summary() const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (impl_->speech) { return impl_->speech->memory_summary(); }
     return std::visit(
         [](const auto& core) -> MemorySummary {
             using CoreState = std::remove_cvref_t<decltype(core)>;
@@ -381,11 +394,13 @@ MemorySummary Engine::memory_summary() const {
 
 MediaCacheSummary Engine::media_cache_summary() const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (impl_->speech) { return {}; }
     return impl_->active->frontend.media_cache_summary();
 }
 
 RuntimeStats Engine::runtime_stats() const {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (impl_->speech) { return {}; }
     return std::visit(
         [](const auto& core) -> RuntimeStats {
             using CoreState = std::remove_cvref_t<decltype(core)>;
@@ -400,6 +415,7 @@ RuntimeStats Engine::runtime_stats() const {
 
 bool Engine::is_available() const {
     if (impl_ == nullptr) { return false; }
+    if (impl_->speech) { return true; }
     return std::visit(
         [](const auto& core) {
             using CoreState = std::remove_cvref_t<decltype(core)>;
@@ -422,6 +438,13 @@ void Engine::reset_memory_peaks() noexcept {
             }
         },
         impl_->core);
+}
+
+SpeechResult Engine::transcribe_features(std::vector<SpeechFeatures> samples,
+                                       const SpeechRunOptions& options) {
+    if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (!impl_->speech) { throw std::logic_error("transcribe_features requires a SpeechRecognition Engine"); }
+    return impl_->speech->transcribe(std::move(samples), options);
 }
 
 } // namespace ninfer

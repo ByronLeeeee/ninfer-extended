@@ -1,0 +1,293 @@
+{
+  "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
+  "date": "2026-10-07",
+  "weights": "bf16",
+  "kv": "bf16",
+  "context": 4096,
+  "lanes": 1,
+  "output_cap": 256,
+  "prefill_chunk": 1024,
+  "prefill": "vision encoding + language prefill GPU time",
+  "decode": "after first token; tokens per second per request",
+  "comparison": "audited compiled Transformers baseline and current shared-operator build, same hardware and settings; separate measurement rounds",
+  "hosts": {
+    "RTX 5070 Ti": {
+      "measurements": [
+        {
+          "input": "zh_legal",
+          "transformers": {
+            "fixture": "zh_legal",
+            "prompt_tokens": 1807,
+            "completion_tokens": 113,
+            "client_e2e_ms": 839.6487290000039,
+            "vision_ms": 43.42633099999205,
+            "text_prefill_ms": 34.932940000004464,
+            "prefill_ms": 78.35927099999651,
+            "prefill_tps": 23060.449350021143,
+            "decode_ms": 644.6837800000083,
+            "decode_tps": 173.72858364762732
+          },
+          "ninfer_extended": {
+            "prompt_tokens": 1807,
+            "completion_tokens": 113,
+            "prefill_tps": 22489.977781780814,
+            "decode_tps": 423.92393154915055,
+            "vision_ms": 42.04227256774902,
+            "language_prefill_ms": 38.41017599694824,
+            "prefill_ms": 80.45244856469726,
+            "client_e2e_ms": 416.9206119999558
+          },
+          "prefill_speed_ratio": 0.9752619058032447,
+          "decode_speed_ratio": 2.4401507377104563
+        },
+        {
+          "input": "en_contract",
+          "transformers": {
+            "fixture": "en_contract",
+            "prompt_tokens": 1807,
+            "completion_tokens": 114,
+            "client_e2e_ms": 829.488696999988,
+            "vision_ms": 43.81348500000115,
+            "text_prefill_ms": 32.04762299999686,
+            "prefill_ms": 79.79451500000323,
+            "prefill_tps": 22645.666810556177,
+            "decode_ms": 667.2399349999978,
+            "decode_tps": 169.3543717523448
+          },
+          "ninfer_extended": {
+            "prompt_tokens": 1807,
+            "completion_tokens": 114,
+            "prefill_tps": 21926.56409653715,
+            "decode_tps": 422.06170093441096,
+            "vision_ms": 42.08502388000488,
+            "language_prefill_ms": 40.43039633740234,
+            "prefill_ms": 82.51542021740723,
+            "client_e2e_ms": 413.59147949998487
+          },
+          "prefill_speed_ratio": 0.9682454608188521,
+          "decode_speed_ratio": 2.4921807247563263
+        },
+        {
+          "input": "dense-equations",
+          "transformers": {
+            "fixture": "dense-equations",
+            "prompt_tokens": 2368,
+            "completion_tokens": 256,
+            "client_e2e_ms": 1726.0353399999815,
+            "vision_ms": 64.371991999991,
+            "text_prefill_ms": 42.3092920000272,
+            "prefill_ms": 106.6812840000182,
+            "prefill_tps": 22196.958184339026,
+            "decode_ms": 1490.371261000007,
+            "decode_tps": 171.0983072961971
+          },
+          "ninfer_extended": {
+            "prompt_tokens": 2368,
+            "completion_tokens": 256,
+            "prefill_tps": 20640.290213744018,
+            "decode_tps": 420.62286935259954,
+            "vision_ms": 63.230751037597656,
+            "language_prefill_ms": 51.56130039892578,
+            "prefill_ms": 114.79205143652344,
+            "client_e2e_ms": 808.235248999992
+          },
+          "prefill_speed_ratio": 0.9298702120503471,
+          "decode_speed_ratio": 2.458369553735196
+        }
+      ],
+      "transformers_comparison_date": "2026-10-06",
+      "current_ninfer_date": "2026-10-07",
+      "quality": {
+        "fixtures": 3,
+        "raw_exact": 3,
+        "normalized_character_difference": 0.0,
+        "difference_is_not_ground_truth_error_rate": true,
+        "rows": [
+          {
+            "fixture": "zh_legal",
+            "raw_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "hf_completion_tokens": 113,
+            "ninfer_completion_tokens": 113,
+            "hf_finish_reason": "stop",
+            "ninfer_finish_reason": "stop"
+          },
+          {
+            "fixture": "en_contract",
+            "raw_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 325,
+            "hf_completion_tokens": 114,
+            "ninfer_completion_tokens": 114,
+            "hf_finish_reason": "stop",
+            "ninfer_finish_reason": "stop"
+          },
+          {
+            "fixture": "dense-equations",
+            "raw_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 550,
+            "hf_completion_tokens": 256,
+            "ninfer_completion_tokens": 256,
+            "hf_finish_reason": "length",
+            "ninfer_finish_reason": "length"
+          }
+        ]
+      },
+      "synthetic_text_cer": {
+        "hf": {
+          "synthetic_text_fixtures": 2,
+          "edits": 0,
+          "gold_chars": 478,
+          "weighted_cer": 0.0
+        },
+        "ninfer": {
+          "synthetic_text_fixtures": 2,
+          "edits": 0,
+          "gold_chars": 478,
+          "weighted_cer": 0.0
+        }
+      }
+    },
+    "RTX 6000D": {
+      "measurements": [
+        {
+          "input": "zh_legal",
+          "transformers": {
+            "fixture": "zh_legal",
+            "prompt_tokens": 1807,
+            "completion_tokens": 113,
+            "client_e2e_ms": 579.0905699832365,
+            "vision_ms": 29.407739057205617,
+            "text_prefill_ms": 20.48295713029802,
+            "prefill_ms": 49.926753039471805,
+            "prefill_tps": 36193.020574989045,
+            "decode_ms": 479.18761894106865,
+            "decode_tps": 233.7289102909271
+          },
+          "ninfer_extended": {
+            "prompt_tokens": 1807,
+            "completion_tokens": 113,
+            "prefill_tps": 37717.683815650285,
+            "decode_tps": 542.9869473433307,
+            "vision_ms": 24.67643165588379,
+            "language_prefill_ms": 23.27712499005127,
+            "prefill_ms": 47.95355664593506,
+            "client_e2e_ms": 293.52351295528933
+          },
+          "prefill_speed_ratio": 1.0421258910264828,
+          "decode_speed_ratio": 2.3231484144065186
+        },
+        {
+          "input": "en_contract",
+          "transformers": {
+            "fixture": "en_contract",
+            "prompt_tokens": 1807,
+            "completion_tokens": 114,
+            "client_e2e_ms": 584.704132983461,
+            "vision_ms": 29.326283955015242,
+            "text_prefill_ms": 20.562828052788973,
+            "prefill_ms": 49.980003968812525,
+            "prefill_tps": 36154.458913760114,
+            "decode_ms": 486.64822499267757,
+            "decode_tps": 232.20057979601236
+          },
+          "ninfer_extended": {
+            "prompt_tokens": 1807,
+            "completion_tokens": 114,
+            "prefill_tps": 38482.8904793129,
+            "decode_tps": 541.4225468246736,
+            "vision_ms": 24.668831825256348,
+            "language_prefill_ms": 22.25168163861084,
+            "prefill_ms": 46.92051346386719,
+            "client_e2e_ms": 293.40877500362694
+          },
+          "prefill_speed_ratio": 1.0644023347467828,
+          "decode_speed_ratio": 2.331701959143737
+        },
+        {
+          "input": "dense-equations",
+          "transformers": {
+            "fixture": "dense-equations",
+            "prompt_tokens": 2368,
+            "completion_tokens": 256,
+            "client_e2e_ms": 1206.7218950251117,
+            "vision_ms": 40.50346603617072,
+            "text_prefill_ms": 25.233773980289698,
+            "prefill_ms": 65.79673395026475,
+            "prefill_tps": 35989.62832699193,
+            "decode_ms": 1084.7488389117643,
+            "decode_tps": 235.0774583504691
+          },
+          "ninfer_extended": {
+            "prompt_tokens": 2368,
+            "completion_tokens": 256,
+            "prefill_tps": 35428.14170839246,
+            "decode_tps": 537.7736859236953,
+            "vision_ms": 37.89863967895508,
+            "language_prefill_ms": 28.79572914379883,
+            "prefill_ms": 66.69436882275392,
+            "client_e2e_ms": 580.0727305468172
+          },
+          "prefill_speed_ratio": 0.9843986547041288,
+          "decode_speed_ratio": 2.2876446329530524
+        }
+      ],
+      "transformers_comparison_date": "2026-10-06",
+      "current_ninfer_date": "2026-10-07",
+      "quality": {
+        "fixtures": 3,
+        "raw_exact": 3,
+        "normalized_character_difference": 0.0,
+        "difference_is_not_ground_truth_error_rate": true,
+        "rows": [
+          {
+            "fixture": "zh_legal",
+            "raw_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "hf_completion_tokens": 113,
+            "ninfer_completion_tokens": 113,
+            "hf_finish_reason": "stop",
+            "ninfer_finish_reason": "stop"
+          },
+          {
+            "fixture": "en_contract",
+            "raw_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 325,
+            "hf_completion_tokens": 114,
+            "ninfer_completion_tokens": 114,
+            "hf_finish_reason": "stop",
+            "ninfer_finish_reason": "stop"
+          },
+          {
+            "fixture": "dense-equations",
+            "raw_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 550,
+            "hf_completion_tokens": 256,
+            "ninfer_completion_tokens": 256,
+            "hf_finish_reason": "length",
+            "ninfer_finish_reason": "length"
+          }
+        ]
+      },
+      "synthetic_text_cer": {
+        "hf": {
+          "synthetic_text_fixtures": 2,
+          "edits": 0,
+          "gold_chars": 478,
+          "weighted_cer": 0.0
+        },
+        "ninfer": {
+          "synthetic_text_fixtures": 2,
+          "edits": 0,
+          "gold_chars": 478,
+          "weighted_cer": 0.0
+        }
+      }
+    }
+  }
+}

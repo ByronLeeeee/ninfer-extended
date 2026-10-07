@@ -72,6 +72,14 @@ EngineOptions normalize_engine_options(EngineOptions options) {
     switch (options.purpose) {
     case EnginePurpose::Generation:
         break;
+    case EnginePurpose::SpeechRecognition:
+        if (options.max_context == 0 || options.max_context > 65536) {
+            throw std::invalid_argument("ASR max_context must be in [1,65536]");
+        }
+        options.speculative = {};
+        options.enable_vision = false;
+        options.context_cache = ContextCacheOptions{.enabled = false};
+        break;
     case EnginePurpose::CausalScoring:
         options.max_concurrency      = 1;
         options.max_pending_requests = 1;

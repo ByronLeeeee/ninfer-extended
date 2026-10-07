@@ -9,72 +9,48 @@
 
 #include <cstdint>
 
-namespace ninfer::ops {
+namespace ninfer::ops::detail {
 
-inline constexpr int kXiaomiPackedAttentionHeadDim = 64;
-inline constexpr int kXiaomiPackedAttentionBr      = 64;
-inline constexpr int kXiaomiPackedAttentionBc      = 64;
-inline constexpr int kXiaomiPackedAttentionPaddedD = kXiaomiPackedAttentionHeadDim;
+inline constexpr int kCausalAttentionHeadDim = 128;
+inline constexpr int kCausalAttentionPaddedD = kCausalAttentionHeadDim;
 
-struct alignas(16) XiaomiPackedAttentionTile {
+struct alignas(16) CausalAttentionTile {
     std::int32_t q0;
     std::int32_t begin;
     std::int32_t end;
     std::int32_t reserved;
 };
 
-static_assert(sizeof(XiaomiPackedAttentionTile) == 16);
+static_assert(sizeof(CausalAttentionTile) == 16);
 
 __device__ __forceinline__ const __nv_bfloat16*
-xiaomi_packed_attention_ptr(const __nv_bfloat16* data, std::int64_t stride_d, std::int64_t stride_h,
+causal_attention_ptr(const __nv_bfloat16* data, std::int64_t stride_d, std::int64_t stride_h,
                      std::int64_t stride_t, int d, int h, int t) {
     return data + static_cast<std::int64_t>(d) * stride_d +
            static_cast<std::int64_t>(h) * stride_h + static_cast<std::int64_t>(t) * stride_t;
 }
 
-__device__ __forceinline__ int xiaomi_packed_attention_swz(int row, int col) {
+__device__ __forceinline__ int causal_attention_swz(int row, int col) {
     return (((col >> 3) ^ (row & 7)) << 3) | (col & 7);
 }
 
-__device__ __forceinline__ unsigned xiaomi_packed_attention_swz_addr(unsigned lane_base, unsigned ck,
+__device__ __forceinline__ unsigned causal_attention_swz_addr(unsigned lane_base, unsigned ck,
                                                               unsigned as, unsigned r) {
     return lane_base + ((ck | as) ^ r);
 }
 
-__global__ void xiaomi_packed_attention_prepare_tiles_kernel(const std::int32_t* cu_seqlens,
-                                                      std::int32_t segments,
-                                                      XiaomiPackedAttentionTile* tiles,
-                                                      std::int32_t max_tiles, std::int32_t tokens) {
-    for (int tile = static_cast<int>(threadIdx.x); tile < max_tiles;
-         tile += static_cast<int>(blockDim.x)) {
-        tiles[tile] = {-1, 0, 0, 0};
-    }
-    __syncthreads();
-    if (threadIdx.x != 0) { return; }
-
-    int next = 0;
-    for (int segment = 0; segment < segments; ++segment) {
-        const int begin = cu_seqlens[segment];
-        const int end   = cu_seqlens[segment + 1];
-        if (begin < 0 || end <= begin || end > tokens) { continue; }
-        for (int q0 = begin; q0 < end && next < max_tiles; q0 += kXiaomiPackedAttentionBr) {
-            tiles[next++] = {q0, begin, end, 0};
-        }
-    }
-}
-
 template <int Br, int Threads>
 __device__ __forceinline__ void
-xiaomi_packed_attention_stage_q(__nv_bfloat16* dst, const __nv_bfloat16* q, int q0, int end, int head,
+causal_attention_stage_q(__nv_bfloat16* dst, const __nv_bfloat16* q, int q0, int end, int head,
                          int tid, std::int64_t stride_d, std::int64_t stride_h,
                          std::int64_t stride_t) {
-    constexpr int VecsPerRow = kXiaomiPackedAttentionPaddedD / 8;
+    constexpr int VecsPerRow = kCausalAttentionPaddedD / 8;
     for (int chunk = tid; chunk < Br * VecsPerRow; chunk += Threads) {
         const int row       = chunk / VecsPerRow;
         const int d         = (chunk % VecsPerRow) * 8;
-        const bool in_range = q0 + row < end && d < kXiaomiPackedAttentionHeadDim;
-        __nv_bfloat16* smem = &dst[row * kXiaomiPackedAttentionPaddedD + xiaomi_packed_attention_swz(row, d)];
-        const __nv_bfloat16* global = xiaomi_packed_attention_ptr(
+        const bool in_range = q0 + row < end && d < kCausalAttentionHeadDim;
+        __nv_bfloat16* smem = &dst[row * kCausalAttentionPaddedD + causal_attention_swz(row, d)];
+        const __nv_bfloat16* global = causal_attention_ptr(
             q, stride_d, stride_h, stride_t, in_range ? d : 0, head, in_range ? q0 + row : q0);
         cp_async_zfill<16, Cache::cg>(smem, global, in_range ? 16 : 0);
     }
@@ -82,57 +58,47 @@ xiaomi_packed_attention_stage_q(__nv_bfloat16* dst, const __nv_bfloat16* q, int 
 
 template <int Bc, int Threads>
 __device__ __forceinline__ void
-xiaomi_packed_attention_stage_kv(__nv_bfloat16* dst, const __nv_bfloat16* src, int key0, int end, int head,
+causal_attention_stage_kv(__nv_bfloat16* dst, const __nv_bfloat16* src, int key0, int end, int head,
                           int tid, std::int64_t stride_d, std::int64_t stride_h,
                           std::int64_t stride_t) {
-    constexpr int VecsPerRow = kXiaomiPackedAttentionPaddedD / 8;
+    constexpr int VecsPerRow = kCausalAttentionPaddedD / 8;
     for (int chunk = tid; chunk < Bc * VecsPerRow; chunk += Threads) {
         const int row       = chunk / VecsPerRow;
         const int d         = (chunk % VecsPerRow) * 8;
-        const bool in_range = key0 + row < end && d < kXiaomiPackedAttentionHeadDim;
-        __nv_bfloat16* smem = &dst[row * kXiaomiPackedAttentionPaddedD + xiaomi_packed_attention_swz(row, d)];
+        const bool in_range = key0 + row < end && d < kCausalAttentionHeadDim;
+        __nv_bfloat16* smem = &dst[row * kCausalAttentionPaddedD + causal_attention_swz(row, d)];
         const __nv_bfloat16* global =
-            xiaomi_packed_attention_ptr(src, stride_d, stride_h, stride_t, in_range ? d : 0, head,
+            causal_attention_ptr(src, stride_d, stride_h, stride_t, in_range ? d : 0, head,
                                  in_range ? key0 + row : key0);
         cp_async_zfill<16, Cache::cg>(smem, global, in_range ? 16 : 0);
     }
 }
 
 template <int Br, int Bc>
-__launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flash_kernel(
+__launch_bounds__(Br * 2, 128 / Br) __global__ void causal_attention_flash_kernel(
     const __nv_bfloat16* __restrict__ q, const __nv_bfloat16* __restrict__ k,
-    const __nv_bfloat16* __restrict__ v, const XiaomiPackedAttentionTile* __restrict__ tiles,
-    std::int32_t tokens, std::int32_t heads, std::int32_t uniform_segment_length, __nv_bfloat16* __restrict__ out,
+    const __nv_bfloat16* __restrict__ v, std::int32_t tokens, std::int32_t heads,
+    std::int32_t kv_heads, __nv_bfloat16* __restrict__ out,
     std::int64_t q_stride_d, std::int64_t q_stride_h, std::int64_t q_stride_t,
     std::int64_t k_stride_d, std::int64_t k_stride_h, std::int64_t k_stride_t,
     std::int64_t v_stride_d, std::int64_t v_stride_h, std::int64_t v_stride_t) {
     static_assert(Br == 16 || Br == 32 || Br == 64);
     static_assert(Bc == 16 || Bc == 32 || Bc == 64);
-    constexpr int D             = kXiaomiPackedAttentionHeadDim;
-    constexpr int Dp            = kXiaomiPackedAttentionPaddedD;
+    constexpr int D             = kCausalAttentionHeadDim;
+    constexpr int Dp            = kCausalAttentionPaddedD;
     constexpr int Threads       = Br * 2;
     constexpr int QKNt          = Bc / 8;
     constexpr int QKKs          = D / 16;
     constexpr int PVNt          = D / 8;
     constexpr int PVKs          = Bc / 16;
     constexpr int RowBytes      = Dp * static_cast<int>(sizeof(__nv_bfloat16));
-    constexpr float ScaleLog2E  = 0.125f * 1.4426950408889634074f;
+    constexpr float ScaleLog2E  = 0.0883883476483184406f * 1.4426950408889634074f;
     constexpr unsigned FullMask = 0xffffffffu;
 
-    XiaomiPackedAttentionTile tile;
-    if (tiles != nullptr) {
-        tile = tiles[blockIdx.x];
-    } else if (uniform_segment_length > 0) {
-        const int tiles_per_segment = (uniform_segment_length + Br - 1) / Br;
-        const int segment           = static_cast<int>(blockIdx.x) / tiles_per_segment;
-        const int tile_in_segment   = static_cast<int>(blockIdx.x) - segment * tiles_per_segment;
-        const int begin             = segment * uniform_segment_length;
-        tile = {begin + tile_in_segment * Br, begin, begin + uniform_segment_length, 0};
-    } else {
-        tile = {static_cast<std::int32_t>(blockIdx.x) * Br, 0, tokens, 0};
-    }
-    if (tile.q0 < 0) { return; }
+    const int query_begin=static_cast<int>(blockIdx.x)*Br;
+    const CausalAttentionTile tile{query_begin,0,min(tokens,query_begin+Br),0};
     const int head = static_cast<int>(blockIdx.y);
+    const int kv_head=head/(heads/kv_heads);
     const int tid  = static_cast<int>(threadIdx.x);
     const int warp = tid >> 5;
     const int lane = tid & 31;
@@ -166,7 +132,7 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
     const unsigned v_as = static_cast<unsigned>((lane >> 4) << 4);
     const unsigned v_r  = static_cast<unsigned>(b_rin << 4);
 
-    xiaomi_packed_attention_stage_q<Br, Threads>(q_s, q, tile.q0, tile.end, head, tid, q_stride_d,
+    causal_attention_stage_q<Br, Threads>(q_s, q, tile.q0, tile.end, head, tid, q_stride_d,
                                           q_stride_h, q_stride_t);
 
     float acc[PVNt][4];
@@ -181,7 +147,7 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
     float l1 = 0.0f;
 
     cp_commit();
-    xiaomi_packed_attention_stage_kv<Bc, Threads>(k_s, k, tile.begin, tile.end, head, tid, k_stride_d,
+    causal_attention_stage_kv<Bc, Threads>(k_s, k, tile.begin, tile.end, kv_head, tid, k_stride_d,
                                            k_stride_h, k_stride_t);
     cp_commit();
 
@@ -191,7 +157,7 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
         cp_wait<0>();
         __syncthreads();
 
-        xiaomi_packed_attention_stage_kv<Bc, Threads>(v_s, v, key0, tile.end, head, tid, v_stride_d,
+        causal_attention_stage_kv<Bc, Threads>(v_s, v, key0, tile.end, kv_head, tid, v_stride_d,
                                                v_stride_h, v_stride_t);
         cp_commit();
 
@@ -203,12 +169,12 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
         unsigned af[2][4];
         unsigned bf[2][QKNt][2];
         ldmatrix_x4(af[0][0], af[0][1], af[0][2], af[0][3],
-                    xiaomi_packed_attention_swz_addr(q_lane_base, 0u, q_as, q_r));
+                    causal_attention_swz_addr(q_lane_base, 0u, q_as, q_r));
 #pragma unroll
         for (int nt2 = 0; nt2 < QKNt; nt2 += 2) {
             ldmatrix_x4(
                 bf[0][nt2][0], bf[0][nt2][1], bf[0][nt2 + 1][0], bf[0][nt2 + 1][1],
-                xiaomi_packed_attention_swz_addr(k_lane_base + static_cast<unsigned>(nt2 * 8 * RowBytes),
+                causal_attention_swz_addr(k_lane_base + static_cast<unsigned>(nt2 * 8 * RowBytes),
                                           0u, k_as, k_r));
         }
 #pragma unroll
@@ -218,12 +184,12 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
             if (ks + 1 < QKKs) {
                 const unsigned ck = static_cast<unsigned>((ks + 1) << 5);
                 ldmatrix_x4(af[nxt][0], af[nxt][1], af[nxt][2], af[nxt][3],
-                            xiaomi_packed_attention_swz_addr(q_lane_base, ck, q_as, q_r));
+                            causal_attention_swz_addr(q_lane_base, ck, q_as, q_r));
 #pragma unroll
                 for (int nt2 = 0; nt2 < QKNt; nt2 += 2) {
                     ldmatrix_x4(bf[nxt][nt2][0], bf[nxt][nt2][1], bf[nxt][nt2 + 1][0],
                                 bf[nxt][nt2 + 1][1],
-                                xiaomi_packed_attention_swz_addr(
+                                causal_attention_swz_addr(
                                     k_lane_base + static_cast<unsigned>(nt2 * 8 * RowBytes), ck,
                                     k_as, k_r));
                 }
@@ -239,27 +205,16 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
         const int row1       = row0 + 8;
         const int query0     = tile.q0 + row0;
         const int query1     = tile.q0 + row1;
-        const bool full_tile = tile.q0 + Br <= tile.end && key0 + Bc <= tile.end;
-        float block_max0     = -CUDART_INF_F;
-        float block_max1     = -CUDART_INF_F;
-        if (full_tile) {
+        float block_max0=-CUDART_INF_F,block_max1=-CUDART_INF_F;
 #pragma unroll
-            for (int nt = 0; nt < QKNt; ++nt) {
-                block_max0 = fmaxf(block_max0, fmaxf(score[nt][0], score[nt][1]));
-                block_max1 = fmaxf(block_max1, fmaxf(score[nt][2], score[nt][3]));
-            }
-        } else {
-#pragma unroll
-            for (int nt = 0; nt < QKNt; ++nt) {
-                const int key_a = key0 + nt * 8 + 2 * lid;
-                const int key_b = key_a + 1;
-                score[nt][0] = query0 < tile.end && key_a < tile.end ? score[nt][0] : -CUDART_INF_F;
-                score[nt][1] = query0 < tile.end && key_b < tile.end ? score[nt][1] : -CUDART_INF_F;
-                score[nt][2] = query1 < tile.end && key_a < tile.end ? score[nt][2] : -CUDART_INF_F;
-                score[nt][3] = query1 < tile.end && key_b < tile.end ? score[nt][3] : -CUDART_INF_F;
-                block_max0   = fmaxf(block_max0, fmaxf(score[nt][0], score[nt][1]));
-                block_max1   = fmaxf(block_max1, fmaxf(score[nt][2], score[nt][3]));
-            }
+        for(int nt=0;nt<QKNt;++nt){
+            const int key_a=key0+nt*8+2*lid,key_b=key_a+1;
+            score[nt][0]=query0<tile.end&&key_a<=query0&&key_a<tile.end?score[nt][0]:-CUDART_INF_F;
+            score[nt][1]=query0<tile.end&&key_b<=query0&&key_b<tile.end?score[nt][1]:-CUDART_INF_F;
+            score[nt][2]=query1<tile.end&&key_a<=query1&&key_a<tile.end?score[nt][2]:-CUDART_INF_F;
+            score[nt][3]=query1<tile.end&&key_b<=query1&&key_b<tile.end?score[nt][3]:-CUDART_INF_F;
+            block_max0=fmaxf(block_max0,fmaxf(score[nt][0],score[nt][1]));
+            block_max1=fmaxf(block_max1,fmaxf(score[nt][2],score[nt][3]));
         }
         block_max0 = warp_max<4>(block_max0, FullMask);
         block_max1 = warp_max<4>(block_max1, FullMask);
@@ -274,6 +229,7 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
         float block_sum0 = 0.0f;
         float block_sum1 = 0.0f;
         unsigned p_frag[PVKs][4];
+        unsigned p_residual[PVKs][4];
 #pragma unroll
         for (int nt = 0; nt < QKNt; ++nt) {
             const float p00 = score[nt][0] > -CUDART_INF_F
@@ -290,13 +246,23 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
                                   : 0.0f;
             block_sum0 += p00 + p01;
             block_sum1 += p10 + p11;
+            // Recover the probability bits lost by a single BF16 MMA operand.
+            // Both products accumulate in FP32 and use the same represented V.
+            const float r00=p00-__bfloat162float(__float2bfloat16_rn(p00));
+            const float r01=p01-__bfloat162float(__float2bfloat16_rn(p01));
+            const float r10=p10-__bfloat162float(__float2bfloat16_rn(p10));
+            const float r11=p11-__bfloat162float(__float2bfloat16_rn(p11));
             const int pk = nt >> 1;
             if ((nt & 1) == 0) {
                 p_frag[pk][0] = pack_bf16x2(p00, p01);
                 p_frag[pk][1] = pack_bf16x2(p10, p11);
+                p_residual[pk][0] = pack_bf16x2(r00, r01);
+                p_residual[pk][1] = pack_bf16x2(r10, r11);
             } else {
                 p_frag[pk][2] = pack_bf16x2(p00, p01);
                 p_frag[pk][3] = pack_bf16x2(p10, p11);
+                p_residual[pk][2] = pack_bf16x2(r00, r01);
+                p_residual[pk][3] = pack_bf16x2(r10, r11);
             }
         }
 
@@ -315,7 +281,7 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
         cp_wait<0>();
         __syncthreads();
         if (kb + 1 < key_blocks) {
-            xiaomi_packed_attention_stage_kv<Bc, Threads>(k_s, k, key0 + Bc, tile.end, head, tid,
+            causal_attention_stage_kv<Bc, Threads>(k_s, k, key0 + Bc, tile.end, kv_head, tid,
                                                    k_stride_d, k_stride_h, k_stride_t);
             cp_commit();
         }
@@ -324,7 +290,7 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
         constexpr int PVLoads     = PVKs * PVTilePairs;
         unsigned vf[2][4];
         ldmatrix_x4_t(vf[0][0], vf[0][1], vf[0][2], vf[0][3],
-                      xiaomi_packed_attention_swz_addr(v_lane_base, 0u, v_as, v_r));
+                      causal_attention_swz_addr(v_lane_base, 0u, v_as, v_r));
 #pragma unroll
         for (int load = 0; load < PVLoads; ++load) {
             const int pk   = load / PVTilePairs;
@@ -335,16 +301,22 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
                 const int next_pk = (load + 1) / PVTilePairs;
                 const int next_n2 = ((load + 1) % PVTilePairs) * 2;
                 ldmatrix_x4_t(vf[next][0], vf[next][1], vf[next][2], vf[next][3],
-                              xiaomi_packed_attention_swz_addr(
+                              causal_attention_swz_addr(
                                   v_lane_base + static_cast<unsigned>(next_pk * 16 * RowBytes),
                                   static_cast<unsigned>(next_n2 << 4), v_as, v_r));
             }
             mma_bf16(acc[n2][0], acc[n2][1], acc[n2][2], acc[n2][3], p_frag[pk][0], p_frag[pk][1],
                      p_frag[pk][2], p_frag[pk][3], vf[cur][0], vf[cur][1]);
+            mma_bf16(acc[n2][0], acc[n2][1], acc[n2][2], acc[n2][3],
+                     p_residual[pk][0], p_residual[pk][1], p_residual[pk][2], p_residual[pk][3],
+                     vf[cur][0], vf[cur][1]);
             if (n2 + 1 < PVNt) {
                 mma_bf16(acc[n2 + 1][0], acc[n2 + 1][1], acc[n2 + 1][2], acc[n2 + 1][3],
                          p_frag[pk][0], p_frag[pk][1], p_frag[pk][2], p_frag[pk][3], vf[cur][2],
                          vf[cur][3]);
+                mma_bf16(acc[n2 + 1][0], acc[n2 + 1][1], acc[n2 + 1][2], acc[n2 + 1][3],
+                         p_residual[pk][0], p_residual[pk][1], p_residual[pk][2], p_residual[pk][3],
+                         vf[cur][2], vf[cur][3]);
             }
         }
     }
@@ -371,4 +343,4 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
     }
 }
 
-} // namespace ninfer::ops
+} // namespace ninfer::ops::detail

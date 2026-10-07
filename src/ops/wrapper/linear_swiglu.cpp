@@ -39,9 +39,12 @@ std::size_t linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gat
     if (min_tokens <= 0 || max_tokens < min_tokens || (gate_up_rows % 2) != 0) {
         throw std::invalid_argument("linear_swiglu workspace: invalid profile or token interval");
     }
-    if (qtype == QType::BF16 && detail::bf16_swiglu_shape(gate_up_rows, input_rows))
+    if (qtype == QType::BF16 && detail::bf16_swiglu_shape(gate_up_rows, input_rows)) {
+        const std::size_t staging_element_bytes = gate_up_rows == 12288 && input_rows == 2048
+            ? sizeof(float) : sizeof(std::uint16_t);
         return max_tokens <= detail::bf16_swiglu_small_max_tokens(gate_up_rows, input_rows)
-            ? 0 : std::size_t(gate_up_rows) * max_tokens * sizeof(std::uint16_t);
+            ? 0 : std::size_t(gate_up_rows) * max_tokens * staging_element_bytes;
+    }
     if (qtype == QType::Q8_G32_FP16) {
         (void)detail::q8_linear_swiglu_resolve_plan(
             {gate_up_rows, gate_up_rows / 2, input_rows, input_rows, min_tokens});

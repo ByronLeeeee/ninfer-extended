@@ -1,99 +1,71 @@
-# NInfer with Qwen3.5-0.8B Support
+# NInfer Extended
 
-This fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) adds **Qwen3.5-0.8B support** to the C++/CUDA inference engine. It has been tested with [Xiaomi-OCR-0](https://huggingface.co/SeerRay-Lab/Xiaomi-OCR-0), an OCR model based on **Qwen3.5-0.8B-Base**, on RTX 5070 Ti and RTX 6000D.
+An extension of [Neroued/ninfer](https://github.com/Neroued/ninfer) with **Qwen3.5-0.8B multimodal support**, **native Qwen3-ASR-1.7B**, and shared BF16 CUDA operators measured on **RTX 5070 Ti** and **RTX 6000D**. Qwen3.5-0.8B support has been validated with **Xiaomi-OCR-0**, based on **Qwen3.5-0.8B-Base**. The fork builds on upstream `594930e7b609efa4bcea3ae4f24cd9d66b5f224f` and keeps the v3 artifact/Engine execution path.
 
-## What's added
+## Changes from upstream NInfer
 
-- BF16/A16 Gated DeltaNet, attention, linear-add, and SwiGLU kernels for the 1,024-wide Qwen3.5-0.8B configuration.
-- Text attention with 256-dimensional heads (8 query heads, 2 KV heads) and segmented vision attention with 64-dimensional heads (12 heads).
-- Vision position ordering, two-axis RoPE, and 6,144-channel causal convolution for prefill and decode.
-- Compact D64 vision attention, small-batch BF16 projections, and fused residual, output splitting, and SwiGLU kernels, measured on RTX 5070 Ti. These kernels are selected by matrix shape and token count through the public Ops.
-- Fused offset RMSNorm and GDN controls for small BF16 token batches, with the original normalization and projection rounding.
-- Compact grouped-query BF16 decode attention for 8 query heads and 2 KV heads, with fewer splits and about half the transient workspace on selected small-query routes.
-- Wider BF16 prefill MMA tiles with matrix-geometry and column-tail selection, measured through complete linear and GDN projection Ops on RTX 5070 Ti.
-- Unicode tokenization through PCRE2 and export of the original added-token metadata.
-- A BF16 v3 conversion recipe that embeds tokenizer and image/video processor resources in the model file.
-- Transformers comparison tools with compiled vision encoding, language prefill, and decode. Cache storage is initialized outside compilation to preserve decode CUDA Graphs.
+- **Qwen3.5-0.8B:** BF16/A16 projection, Gated DeltaNet, linear-add and SwiGLU routes for a 1,024-wide decoder; D256 text attention with Q8/KV2; D64/H12 segmented vision attention; 6,144-channel causal convolution; corrected vision position ordering and two-axis RoPE.
+- **Qwen3-ASR-1.7B:** a native audio encoder and Qwen3 language decoder, the `SpeechRecognition` Engine purpose, `transcribe_features()` API, and `ninfer-asr` CLI. BF16 cuDNN convolution and audio projections feed shared language Ops. Audio encoding, language prefill and decode all use CUDA Graphs.
+- **Small-batch BF16 operators:** compact GEMV/SIMT projections, fused residual and split-output projections, fused SwiGLU, and offset RMSNorm plus GDN controls. Matrix shape, dtype, strides and token extent select the implementations.
+- **Attention:** compact D64 segmented attention; fewer split-KV partitions and roughly half the temporary workspace on selected Q8/KV2 decode routes; D128 causal GQA prefill and partitioned Q16/KV8 decode. The default ASR prefill reuses K/V across four queries in registers while preserving FP32 softmax/probability arithmetic. An optional compensated Tensor Core prefill is also available.
+- **Prefill projections:** wider MMA tiles for selected matrix/column extents, narrower tiles for short input rows, and FP32 gate/up staging through SiLU and multiplication for the `[12288,2048]` SwiGLU projection.
+- **Conversion and tokenization:** BF16 v3 recipes for both models, embedded tokenizer/processor/chat-template resources, original added-token metadata, and PCRE2 Unicode pre-tokenization. ASR row concatenation preserves all 707 source parameters byte for byte.
+- **Qualification and reference tools:** independent FP64 and exact-transform checks, complete-model benchmarks, and audited compiled Transformers comparisons. Operator dispatch uses explicit tensor geometry rather than model/GPU names.
 
-## Build
+## Build and models
 
 ```bash
-git clone https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b.git
-cd ninfer-qwen3.5-0.8b
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+git clone https://github.com/ByronLeeeee/ninfer-extended.git
+cd ninfer-extended
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCUDNN_ROOT=/path/to/cudnn -DCUBLAS_ROOT=/path/to/cublas
 cmake --build build -j
 ```
 
-Dependencies: 64-bit Linux, CUDA supporting `sm_120a`, C++20, CMake ≥3.28, Ninja, FFmpeg development libraries, libcurl ≥7.85, pkg-config, and **libpcre2-dev**. The initial build used CUDA 13.2 and GCC 15.2 and ran on **RTX 5070 Ti 16 GB (WSL2)** and **RTX 6000D (Linux)**. The local 5070 Ti optimization build uses CUDA 13.3 and GCC 13.3.
+Dependencies: 64-bit Linux (WSL2 on Windows), CUDA supporting `sm_120a`, C++20, CMake ≥3.28, Ninja, FFmpeg development libraries, libcurl ≥7.85, pkg-config, PCRE2, cuDNN 9 and cuBLAS. Omit `CUBLAS_ROOT` when CUDA provides cuBLAS. Tested toolchains are CUDA 13.3/GCC 13.3 on RTX 5070 Ti 16 GB and CUDA 13.2/GCC 15.2 on RTX 6000D. Both tested GPUs are Blackwell compute capability 12.0; other architectures are outside this build target.
 
-[Build and conversion guide](docs/xiaomi-ocr.md) · [Test report](docs/xiaomi-ocr-performance.md)
+| Model | Guide | Hugging Face | ModelScope |
+|---|---|---|---|
+| Xiaomi-OCR-0 BF16 | [OCR setup/conversion](docs/xiaomi-ocr.md) | [Model](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Xiaomi-OCR-0-Ninfer) |
+| Qwen3-ASR-1.7B-hf BF16 | [ASR setup/conversion](docs/qwen3-asr.md) | [Model](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
 
-Xiaomi-OCR-0 BF16 model: [Hugging Face](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) · [ModelScope](https://modelscope.cn/models/ByronLeeee/Xiaomi-OCR-0-Ninfer)
+## Upstream compatibility and performance
 
-## Latest GPU measurements
+| Workload | Unmodified upstream NInfer | NInfer Extended |
+|---|---|---|
+| Xiaomi-OCR-0 / Qwen3.5-0.8B | Missing the required small-model BF16/vision routes | Native vision, language prefill and decode on both tested GPUs |
+| Qwen3-ASR-1.7B | No ASR architecture/frontend | Native audio encoding, language prefill and decode on both tested GPUs |
+| Existing Qwen3.8-27B artifact | Supported | Existing large-model routes retained; 6000D control below |
 
-The current Xiaomi-OCR-0 BF16 build was measured on RTX 5070 Ti and RTX 6000D
-with 4K context per request and one, two or four requests. Combined
-vision/language prefill and per-request decode are reported separately from
-aggregate request throughput.
+### Xiaomi OCR: upstream-derived compatibility baseline vs optimized operators
 
-| GPU | Requests | Vision+language prefill tok/s | Decode tok/s/request |
-|---|---:|---:|---:|
-| RTX 5070 Ti | 1 | 20,443–22,358 | 418.7–421.9 |
-| RTX 5070 Ti | 2 | 22,291–22,362 | 409.8–410.3 |
-| RTX 5070 Ti | 4 | 21,957–22,072 | 377.1–379.9 |
-| RTX 6000D | 1 | 35,475–37,912 | 538.3–541.9 |
-| RTX 6000D | 2 | 37,896–37,991 | 526.7–527.3 |
-| RTX 6000D | 4 | 37,876–38,342 | 487.1–487.4 |
+Unmodified upstream cannot execute the two added models. This table uses the **initial working BF16 OCR adaptation before operator optimization** as the baseline, with the same artifact and matched toolchain; it is not an unmodified-upstream speed claim. Measurements use the complete Chinese document, 4K context, BF16 KV, 1,024-token prefill chunks and greedy decoding. Each version has two warmups and ten formal bursts in adjacent A-B-B-A cycles. Prefill includes vision and language GPU time; decode is tok/s per request.
 
-On RTX 6000D, the existing-server comparison shows **7.1–8.5% combined prefill**
-and **42.7–48.0% two-/four-request decode** gains. Qwen3.8-27B remains within
-±0.21% in the controlled tasks. The 5070 Ti and 6000D comparisons have
-**100% output agreement** across 340 and 300 formal OCR responses respectively;
-both pass 225 independent FP64 checks.
+| GPU | Requests | Baseline prefill tok/s | Extended prefill tok/s | Prefill change | Baseline decode tok/s | Extended decode tok/s | Decode change |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| RTX 5070 Ti | 1 | 20,016 | 22,082 | +10.3% | 406.4 | 418.6 | +3.0% |
+| RTX 5070 Ti | 2 | 19,573 | 21,602 | +10.4% | 282.6 | 403.2 | +42.7% |
+| RTX 5070 Ti | 4 | 19,480 | 21,538 | +10.6% | 268.9 | 370.8 | +37.9% |
+| RTX 6000D | 1 | 35,238 | 37,911 | +7.6% | 514.2 | 541.9 | +5.4% |
+| RTX 6000D | 2 | 35,254 | 37,896 | +7.5% | 356.3 | 527.3 | +48.0% |
+| RTX 6000D | 4 | 35,349 | 37,876 | +7.1% | 341.2 | 487.1 | +42.7% |
 
-[Latest results and timing breakdown](docs/xiaomi-ocr-performance.md#rtx-5070-ti-and-rtx-6000d-latest-results)
-· [GPU measurement data](docs/xiaomi-ocr-gpu-results.json)
+The measured complete-model gains retain exact outputs. Both GPUs pass 225 independent FP64 OCR checks; the subsequent ASR operator iterations also preserve OCR outputs in the 4K/32K, one-/two-/four-request regression tests. [Detailed OCR measurements](docs/xiaomi-ocr-performance.md).
 
-## Initial Transformers comparison
+### Qwen3.8-27B: existing NInfer server vs extension on RTX 6000D
 
-Both engines use BF16 weights and KV cache, a 4K context, and one active request. Prefill includes vision encoding and language processing. The Transformers baseline uses compiled vision, prefill, and decode with fused kernels and decode CUDA Graphs.
+The existing pre-rollout NInfer executable and extended executable read the same mixed NVFP4/FP8/BF16/integer artifact, FP8 KV, 16K context and DFlash2 K7. A-B-B-A uses two warmups and six formal bursts per version. The copy workload produces 128 tokens; its draft acceptance is 100%.
 
-| GPU | Transformers prefill tok/s | NInfer prefill tok/s | Transformers decode tok/s | NInfer decode tok/s |
-|---|---:|---:|---:|---:|
-| RTX 5070 Ti | 22,197–23,060 | 19,859–21,924 | 169.4–173.7 | 427.1–438.7 |
-| RTX 6000D | 35,990–36,193 | 33,031–35,306 | 232.2–235.1 | 511.0–514.4 |
+| Requests | Prompt tokens | Existing prefill tok/s | Extended prefill tok/s | Existing decode tok/s | Extended decode tok/s |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 2504 | 6,480 | 6,493 | 352.5 | 352.6 |
+| 1 | 10256 | 6,415 | 6,416 | 347.2 | 346.9 |
+| 4 | 2504 | 6,498 | 6,505 | 295.5 | 295.5 |
+| 4 | 10256 | 6,440 | 6,437 | 283.0 | 282.8 |
 
-NInfer decode is **2.46–2.59×** faster on the 5070 Ti and **2.17–2.22×** faster on the 6000D; compiled Transformers prefill is slightly faster on these inputs.
+Changes stay within ±0.21%, with all 120 formal outputs matching. Open-ended single-request writing reaches 116–131 decode tok/s at 26.1% draft acceptance. These operator extensions do not establish a 27B speed gain. This 27B control was measured on 6000D; no 5070 Ti 27B result is claimed.
 
-Both engines scored CER 0% on two synthetic text pages with 478 annotated characters. All three compared outputs matched exactly on both GPUs: two complete text pages and the first 256 tokens of a formula page. The [test report](docs/xiaomi-ocr-performance.md) includes the scoring method, memory usage, and an earlier 11-page comparison.
-
-The first local 5070 Ti operator optimization improved complete vision/language prefill throughput by **4.0–7.0%** and decode by **0.9–1.8%** in a same-toolchain A-B-B-A comparison. All outputs matched, and all **40 independent FP64 checks** passed. See the [operator optimization results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-operator-optimization).
-
-The shared BF16 small-batch operator update improves **two-/four-request decode by
-35.2–39.5%** and end-to-end total throughput by
-15.0–20.9% against the preceding optimized build.
-All outputs match, and all **145 FP64 checks** pass. See the
-[small-batch operator results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-small-batch-bf16-operators).
-
-The normalized-control update combines RMSNorm and GDN gate projections
-in one kernel for T=1–8, reducing that segment from about 4.2 µs to 3.0 µs on
-RTX 5070 Ti. Paired whole-model decode improves by **0.4–1.3%**; prefill changes
-are small and mixed. All 600 formal OCR outputs match their baseline, and all
-**165 FP64 checks** pass. See the [complete model measurements](docs/xiaomi-ocr-performance.md#rtx-5070-ti-fused-normalization-and-gdn-controls).
-
-
-The grouped-query attention update reduces complete attention-Op latency by
-**5.8–21.3%** on the measured compact routes and cuts its transient
-workspace by about 50%. All 300 formal OCR outputs match their baseline, and all
-**197 FP64 checks** pass. See the [paired prefill, decode and total-throughput results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-grouped-query-decode-attention).
-
-
-The BF16 prefill projection update reduces complete public-Op latency by
-**3–15%** on the selected measured routes. Paired full vision/language prefill
-improves by **0–2.8%**, while decode remains essentially flat. All **340 formal
-OCR outputs** match their baseline; **225 FP64 checks** and 48 additional
-same-process public-Op checks pass. See the [prefill projection results](docs/xiaomi-ocr-performance.md#rtx-5070-ti-bf16-prefill-projection).
+The model repositories report **Transformers vs NInfer Extended** prefill/decode, accuracy and output agreement. The ASR cards also include warm latency and measured inference time/throughput for 60-second audio.
 
 ---
 
@@ -137,7 +109,7 @@ Build the product binaries:
 
 ```bash
 git clone https://github.com/Neroued/ninfer.git
-cd ninfer-qwen3.5-0.8b
+cd ninfer
 
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j

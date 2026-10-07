@@ -79,7 +79,9 @@ enum class LinearPolicy : std::uint8_t {
  * registers `[5120,25600]` at every positive T. BF16 registers `[14336,5120]`,
  * `[5120,6144]`, and `[256,5120]`. Additional contiguous BF16 profiles are
  * `{[8192,1024], [5120,1024], [7168,1024], [248320,1024], [1024,2048], [1024,3584],
- * [1024,3072], [768,1536], [768,768], [768,3072], [2304,768], [3072,768], [3072,3072]}`.
+ * [1024,3072], [768,1536], [768,768], [768,3072], [2304,768], [3072,768], [3072,3072],
+ * [2048,2048], [4096,2048], [12288,2048], [2048,6144], [151936,2048],
+ * [1024,1024], [3072,1024], [4096,1024], [1024,4096], [1024,7680], [2048,1024]}`.
  * All registered BF16 profiles accept every positive T. Text and MTP packed-weight problems accept
  * every positive column extent T. Registered Vision problems accept raw-patch P in
  * `{4,8,...,131072}` or merged-token V in `[1,32768]`; a matrix column does not inherently

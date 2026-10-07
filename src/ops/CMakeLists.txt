@@ -13,6 +13,7 @@ ninfer_cuda_non_rdc_archive(ninfer_nvfp4_non_rdc)
 target_link_libraries(ninfer_nvfp4_non_rdc PRIVATE ninfer_core CUDA::cudart CUDA::cuda_driver)
 
 include(basic_sources.cmake)
+target_sources(ninfer_ops PRIVATE asr_primitives.cu softmax_attention/dense/context/causal_prefill.cu)
 include("${CMAKE_CURRENT_LIST_DIR}/attn_input_proj/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/candidate_selector/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/context_kv_materialize/sources.cmake")

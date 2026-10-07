@@ -18,6 +18,8 @@ using Mma = Bf16MmaSchedule<64, 64, 64, 32, 32, 2, 2, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 using WideMma = Bf16MmaSchedule<64, 128, 64, 32, 64, 2, 1, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
+using NarrowRowsMma = Bf16MmaSchedule<32, 64, 64, 16, 32, 2, 2, Cache::cg, Cache::cg,
+    Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 
 struct ContiguousOutput {
     __nv_bfloat16* data;
@@ -25,6 +27,15 @@ struct ContiguousOutput {
     __device__ __forceinline__ ContiguousOutput tile(int) const { return *this; }
     __device__ __forceinline__ void store(int row, int token, float projection) const {
         data[static_cast<std::int64_t>(token) * rows + row] = __float2bfloat16_rn(projection);
+    }
+};
+
+struct FloatProjectionOutput {
+    float* data;
+    int rows;
+    __device__ __forceinline__ FloatProjectionOutput tile(int) const { return *this; }
+    __device__ __forceinline__ void store(int row, int token, float projection) const {
+        data[static_cast<std::int64_t>(token) * rows + row] = projection;
     }
 };
 
@@ -90,7 +101,23 @@ void mma_projection_variant(const Tensor& x, const Weight& w, Output output, cud
 template <class Geometry, class Output>
 void mma_projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
     constexpr int n = Geometry::kOutputRows, k = Geometry::kInputRows;
-    if constexpr (n == 8192 && k == 1024) {
+    if constexpr (n==2048&&(k==2048||k==6144)) {
+        // Short column extents need more row CTAs to cover the SMs. Keep the
+        // established tile once longer extents provide sufficient parallelism.
+        if(x.ne[1]<=256){mma_projection_variant<Geometry,NarrowRowsMma>(x,w,output,stream);return;}
+    } else if constexpr(n==4096&&k==2048) {
+        if(x.ne[1]>=65&&x.ne[1]<=128){mma_projection_variant<Geometry,NarrowRowsMma>(x,w,output,stream);return;}
+        if(x.ne[1]>=193&&x.ne[1]<=256){mma_projection_variant<Geometry,WideMma>(x,w,output,stream);return;}
+    } else if constexpr(n==12288&&k==2048) {
+        if(x.ne[1]>=193&&x.ne[1]<=256){
+            using NarrowWideMma=Bf16MmaSchedule<32,128,64,16,64,2,1,
+                Cache::cg,Cache::cg,Bf16MmaFragmentPipeline::PingPong,Bf16MmaRaster::TokenFast>;
+            mma_projection_variant<Geometry,NarrowWideMma>(x,w,output,stream);return;
+        }
+        if(x.ne[1]>=65&&x.ne[1]<=128){
+            mma_projection_variant<Geometry,WideMma>(x,w,output,stream);return;
+        }
+    } else if constexpr (n == 8192 && k == 1024) {
         // These columns fill the same padded extent with half as many weight tiles.
         // Retain the narrower tile when a short final column tile would add MMA work.
         const int tail = x.ne[1] % WideMma::kBlockCols;
@@ -143,6 +170,8 @@ void dispatch_projection(const Tensor& x, const Weight& w, Output output, cudaSt
     SHAPE(1024, 2048) SHAPE(1024, 3584) SHAPE(1024, 3072)
     SHAPE(768, 1536) SHAPE(768, 768) SHAPE(768, 3072)
     SHAPE(2304, 768) SHAPE(3072, 768) SHAPE(3072, 3072)
+    SHAPE(2048, 2048) SHAPE(4096, 2048) SHAPE(12288, 2048) SHAPE(2048, 6144) SHAPE(151936, 2048)
+    SHAPE(1024, 1024) SHAPE(3072, 1024) SHAPE(4096, 1024) SHAPE(1024, 4096) SHAPE(1024, 7680) SHAPE(2048, 1024)
 #undef SHAPE
     throw std::invalid_argument("BF16 projection: unregistered matrix shape");
 }
@@ -169,6 +198,17 @@ __global__ void swiglu_kernel(const __nv_bfloat16* x, __nv_bfloat16* y, int rows
     }
 }
 
+__global__ void float_projection_swiglu_kernel(const float* x, __nv_bfloat16* y,
+                                             int rows, int tokens) {
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < rows * tokens) {
+        const int row = i % rows, t = i / rows;
+        const float gate = x[static_cast<std::int64_t>(t) * 2 * rows + row];
+        const float up = x[static_cast<std::int64_t>(t) * 2 * rows + rows + row];
+        y[i] = __float2bfloat16_rn((gate / (1.f + expf(-gate))) * up);
+    }
+}
+
 template <int N, int K, int Capacity>
 void small_swiglu(const Tensor& x, const Weight& w, Tensor& out, cudaStream_t stream) {
     using Geometry = Bf16Geometry<N, K>;
@@ -191,11 +231,20 @@ void swiglu(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& ws, c
     else if (x.ne[1] <= bf16_swiglu_small_max_tokens(N, K)) small_swiglu<N, K, 8>(x, w, out, stream);
     else {
         auto scope = ws.scope();
-        auto tmp = ws.alloc(DType::BF16, {N, x.ne[1]}, 256);
-        mma_projection<Geometry>(x, w, ContiguousOutput{static_cast<__nv_bfloat16*>(tmp.data), N}, stream);
-        swiglu_kernel<<<div_up(N / 2 * x.ne[1], 256), 256, 0, stream>>>(
-            static_cast<const __nv_bfloat16*>(tmp.data), static_cast<__nv_bfloat16*>(out.data),
-            N / 2, x.ne[1]);
+        if constexpr (N == 12288 && K == 2048) {
+            // Projection staging is private to this fused Op. Retain its FP32
+            // accumulator through SiLU/multiply and round only the public output.
+            auto tmp = ws.alloc(DType::FP32, {N, x.ne[1]}, 256);
+            mma_projection<Geometry>(x, w, FloatProjectionOutput{static_cast<float*>(tmp.data), N}, stream);
+            float_projection_swiglu_kernel<<<div_up(N / 2 * x.ne[1], 256), 256, 0, stream>>>(
+                static_cast<const float*>(tmp.data), static_cast<__nv_bfloat16*>(out.data), N / 2, x.ne[1]);
+        } else {
+            auto tmp = ws.alloc(DType::BF16, {N, x.ne[1]}, 256);
+            mma_projection<Geometry>(x, w, ContiguousOutput{static_cast<__nv_bfloat16*>(tmp.data), N}, stream);
+            swiglu_kernel<<<div_up(N / 2 * x.ne[1], 256), 256, 0, stream>>>(
+                static_cast<const __nv_bfloat16*>(tmp.data), static_cast<__nv_bfloat16*>(out.data),
+                N / 2, x.ne[1]);
+        }
     }
     CUDA_CHECK(cudaGetLastError());
 }
@@ -231,11 +280,15 @@ bool bf16_projection_shape(int n, int k) {
     return (k == 1024 && (n == 8192 || n == 5120 || n == 7168 || n == 248320)) ||
         (n == 1024 && (k == 2048 || k == 3584 || k == 3072)) ||
         (n == 768 && (k == 1536 || k == 768 || k == 3072)) ||
-        (n == 2304 && k == 768) || (n == 3072 && (k == 768 || k == 3072));
+        (n == 2304 && k == 768) || (n == 3072 && (k == 768 || k == 3072)) ||
+        (k == 2048 && (n == 2048 || n == 4096 || n == 12288 || n == 151936)) ||
+        (n == 2048 && k == 6144) ||
+        (k == 1024 && (n == 1024 || n == 3072 || n == 4096 || n == 2048)) ||
+        (n == 1024 && (k == 4096 || k == 7680));
 }
 
 bool bf16_swiglu_shape(int n, int k) {
-    return (n == 7168 && k == 1024) || (n == 14336 && k == 5120);
+    return (n == 7168 && k == 1024) || (n == 14336 && k == 5120) || (n == 12288 && k == 2048);
 }
 
 int bf16_swiglu_small_max_tokens(int n, int k) {
@@ -258,6 +311,7 @@ void bf16_projection_swiglu(const Tensor& x, const Weight& w, Tensor& out,
     require_input(x, w); require_output(x, out, w.n / 2);
     if (w.n == 7168 && w.k == 1024) swiglu<7168, 1024>(x, w, out, ws, stream);
     else if (w.n == 14336 && w.k == 5120) swiglu<14336, 5120>(x, w, out, ws, stream);
+    else if (w.n == 12288 && w.k == 2048) swiglu<12288, 2048>(x, w, out, ws, stream);
     else throw std::invalid_argument("BF16 SwiGLU: unregistered matrix shape");
 }
 

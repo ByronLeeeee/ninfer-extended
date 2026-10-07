@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ninfer/types.h"
+#include "ninfer/asr.h"
 
 #include <chrono>
 #include <memory>
@@ -102,6 +103,9 @@ public:
                               const CancellationView& cancellation = {});
 
     [[nodiscard]] const EngineOptions& options() const;
+    // CPU log-mel frontend input; all encoder and decoder math runs natively on the GPU.
+    SpeechResult transcribe_features(std::vector<SpeechFeatures> samples,
+                                    const SpeechRunOptions& options = {});
     [[nodiscard]] LoadSummary load_summary() const;
     [[nodiscard]] MemorySummary memory_summary() const;
     [[nodiscard]] RuntimeStats runtime_stats() const;

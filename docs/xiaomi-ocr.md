@@ -42,15 +42,17 @@ Tested GPUs: RTX 5070 Ti 16 GB (WSL2) and RTX 6000D (Linux), both compute capabi
 12.0. The native build targets `sm_120a`.
 
 Use Linux, CUDA supporting `sm_120a`, a C++20 compiler, CMake >=3.28, Ninja, FFmpeg
-development libraries, libcurl >=7.85, pkg-config and PCRE2 development headers/library.
+development libraries, libcurl >=7.85, pkg-config, PCRE2 development headers/library,
+cuDNN 9 and cuBLAS.
 The tested build used CUDA 13.2 and GCC 15.2. The same Linux binary ran on both
 GPUs; the WSL run used a compatible runtime library bundle. The Transformers
 baseline was compiled separately on each GPU.
 
 ```bash
-git clone https://github.com/ByronLeeeee/ninfer-qwen3.5-0.8b.git
-cd ninfer-qwen3.5-0.8b
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+git clone https://github.com/ByronLeeeee/ninfer-extended.git
+cd ninfer-extended
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCUDNN_ROOT=/path/to/cudnn -DCUBLAS_ROOT=/path/to/cublas
 cmake --build build -j
 
 hf download ByronLeeee/Xiaomi-OCR-0-Ninfer xiaomi-ocr-0-bf16.ninfer --local-dir models

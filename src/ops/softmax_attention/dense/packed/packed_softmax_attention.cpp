@@ -18,11 +18,11 @@ constexpr std::int32_t kHeads   = 16;
 constexpr float kExpectedScale  = 0.11785113019775792073f;
 
 void require_profile(AttentionHeadGeometry geometry, float scale, const char* op) {
-    if (!valid_attention_head_geometry(geometry) || !((geometry.head_dim==72&&geometry.query_heads==16&&geometry.kv_heads==16)||(geometry.head_dim==64&&geometry.query_heads==12&&geometry.kv_heads==12))) {
+    if (!valid_attention_head_geometry(geometry) || !((geometry.head_dim==72&&geometry.query_heads==16&&geometry.kv_heads==16)||(geometry.head_dim==64&&(geometry.query_heads==12||geometry.query_heads==16)&&geometry.kv_heads==geometry.query_heads))) {
         throw std::invalid_argument(std::string(op) + ": unsupported head geometry");
     }
     if (!std::isfinite(scale) || std::abs(scale - (geometry.head_dim==64?0.125f:kExpectedScale)) > 1.0e-7f) {
-        throw std::invalid_argument(std::string(op) + ": scale must be 1/sqrt(72)");
+        throw std::invalid_argument(std::string(op) + ": scale must be 1/sqrt(head_dim)");
     }
 }
 
@@ -44,7 +44,7 @@ Tensor allocate_workspace(Allocator& allocator, std::int32_t tokens, std::int32_
 }
 
 void require_qkv(const Tensor& tensor, std::int32_t tokens, const char* op, const char* name) {
-    if (tensor.dtype != DType::BF16 || !((tensor.ne[0]==72&&tensor.ne[1]==16)||(tensor.ne[0]==64&&tensor.ne[1]==12)) ||
+    if (tensor.dtype != DType::BF16 || !((tensor.ne[0]==72&&tensor.ne[1]==16)||(tensor.ne[0]==64&&(tensor.ne[1]==12||tensor.ne[1]==16))) ||
         tensor.ne[2] != tokens || tensor.ne[3] != 1) {
         throw std::invalid_argument(std::string(op) + ": invalid " + name + " shape");
     }
@@ -67,6 +67,9 @@ std::int32_t validate_qkv(const Tensor& q, const Tensor& k, const Tensor& v, con
     require_qkv(k, tokens, op, "k");
     require_qkv(v, tokens, op, "v");
     require_qkv(out, tokens, op, "out");
+    if(q.ne[0]!=geometry.head_dim||k.ne[0]!=geometry.head_dim||v.ne[0]!=geometry.head_dim||out.ne[0]!=geometry.head_dim||
+        q.ne[1]!=geometry.query_heads||out.ne[1]!=geometry.query_heads||k.ne[1]!=geometry.kv_heads||v.ne[1]!=geometry.kv_heads)
+        throw std::invalid_argument(std::string(op)+": tensors must match the declared head geometry");
     if (!out.is_contiguous()) {
         throw std::invalid_argument(std::string(op) + ": out must be contiguous");
     }
