@@ -47,10 +47,13 @@ namespace ninfer::ops {
  * value.
  *
  * This overload reads and writes the same `ssm_state`, publishing the state after all T tokens.
+ * multiprocessor_count supplies the physical SM count from DeviceContext and selects
+ * private launch geometry only. Zero retains the established stream-only schedule.
  */
 void gated_delta_net(const Tensor& q, const Tensor& k, const Tensor& v, const Tensor& g,
                      const Tensor& beta, float scale, bool normalize_qk, WorkspaceArena& ws,
-                     Tensor& ssm_state, Tensor& out, cudaStream_t stream);
+                     Tensor& ssm_state, Tensor& out, cudaStream_t stream,
+                     std::int32_t multiprocessor_count = 0);
 
 /**
  * Distinct-state form of the same recurrence. `ssm_state_out` receives the final state;
@@ -60,7 +63,7 @@ void gated_delta_net(const Tensor& q, const Tensor& k, const Tensor& v, const Te
 void gated_delta_net(const Tensor& q, const Tensor& k, const Tensor& v, const Tensor& g,
                      const Tensor& beta, float scale, bool normalize_qk, WorkspaceArena& ws,
                      const Tensor& ssm_state_in, Tensor& ssm_state_out, Tensor& out,
-                     cudaStream_t stream);
+                     cudaStream_t stream, std::int32_t multiprocessor_count = 0);
 
 /**
  * One-token update for B independent state-pool slots. q/k are contiguous BF16 [128,Hqk,1,B],

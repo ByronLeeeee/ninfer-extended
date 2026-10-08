@@ -3,6 +3,7 @@
 #include "core/device.h"
 #include "ops/linear/bf16/bf16_launch.cuh"
 #include "ops/linear_swiglu/bf16/bf16_swiglu_small.cuh"
+#include "ops/kernel/gelu.cuh"
 
 #include <stdexcept>
 
@@ -19,6 +20,8 @@ using Mma = Bf16MmaSchedule<64, 64, 64, 32, 32, 2, 2, Cache::cg, Cache::cg,
 using WideMma = Bf16MmaSchedule<64, 128, 64, 32, 64, 2, 1, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 using NarrowRowsMma = Bf16MmaSchedule<32, 64, 64, 16, 32, 2, 2, Cache::cg, Cache::cg,
+    Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
+using TripleMma = Bf16MmaSchedule<64, 64, 64, 32, 32, 3, 2, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 using CompactMma = Bf16MmaSchedule<32, 32, 64, 16, 16, 2, 2, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
@@ -55,6 +58,35 @@ struct ResidualOutput {
         auto* destination = data + static_cast<std::int64_t>(token) * rows + row;
         projection = __bfloat162float(__float2bfloat16_rn(projection));
         *destination = __float2bfloat16_rn(projection + __bfloat162float(*destination));
+    }
+};
+
+struct BiasResidualOutput {
+    __nv_bfloat16* data;
+    const __nv_bfloat16* bias;
+    int rows;
+    __device__ __forceinline__ BiasResidualOutput tile(int) const { return *this; }
+    __device__ __forceinline__ void store(int row, int token, float projection) const {
+        auto* destination = data + static_cast<std::int64_t>(token) * rows + row;
+        const float projected = __bfloat162float(__float2bfloat16_rn(projection));
+        const float biased = __bfloat162float(__float2bfloat16_rn(
+            projected + __bfloat162float(bias[row])));
+        *destination = __float2bfloat16_rn(biased + __bfloat162float(*destination));
+    }
+};
+
+template <bool TanhApprox>
+struct BiasGeluOutput {
+    __nv_bfloat16* data;
+    const __nv_bfloat16* bias;
+    int rows;
+    __device__ __forceinline__ BiasGeluOutput tile(int) const { return *this; }
+    __device__ __forceinline__ void store(int row, int token, float projection) const {
+        const float projected = __bfloat162float(__float2bfloat16_rn(projection));
+        const float biased = __bfloat162float(__float2bfloat16_rn(
+            projected + __bfloat162float(bias[row])));
+        data[static_cast<std::int64_t>(token) * rows + row] =
+            __float2bfloat16_rn(gelu_one<TanhApprox>(biased));
     }
 };
 
@@ -281,6 +313,17 @@ void swiglu(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& ws, c
         };
         if constexpr (N == 7168) {
             const int tail = x.ne[1] % WideMma::kBlockCols;
+            const auto wide_blocks = N / WideMma::kBlockRows *
+                                     div_up(x.ne[1], WideMma::kBlockCols);
+            // A deeper copy pipeline pays off for a partial column tile when
+            // the wide route would provide fewer than three CTA waves.
+            if (x.ne[1] > 256 && x.ne[1] <= 512 && tail > 0 &&
+                tail <= Mma::kBlockCols && multiprocessor_count > 0 &&
+                wide_blocks < std::int64_t(multiprocessor_count) * 3) {
+                launch.template operator()<TripleMma>();
+                CUDA_CHECK(cudaGetLastError());
+                return;
+            }
             if ((x.ne[1] >= 65 && x.ne[1] <= 128) ||
                 (x.ne[1] >= 256 && (tail == 0 || tail > 64))) {
                 launch.template operator()<WideMma>();
@@ -376,6 +419,27 @@ void bf16_projection_add(const Tensor& x, const Weight& w, Tensor& out,
                          WorkspaceArena&, cudaStream_t stream) {
     require_input(x, w); require_output(x, out, w.n);
     dispatch_projection(x, w, ResidualOutput{static_cast<__nv_bfloat16*>(out.data), w.n}, stream);
+}
+
+void bf16_projection_bias_add(const Tensor& x, const Weight& w, const Tensor& bias,
+                              Tensor& out, cudaStream_t stream) {
+    const BiasResidualOutput output{static_cast<__nv_bfloat16*>(out.data),
+        static_cast<const __nv_bfloat16*>(bias.data), w.n};
+    if (w.k == 768) projection<768, 768>(x, w, output, stream);
+    else if (w.k == 1536) projection<768, 1536>(x, w, output, stream);
+    else projection<768, 3072>(x, w, output, stream);
+}
+
+void bf16_projection_bias_gelu(const Tensor& x, const Weight& w, const Tensor& bias,
+                               GeluMode mode, Tensor& out, cudaStream_t stream) {
+    const auto launch = [&]<bool TanhApprox>() {
+        const BiasGeluOutput<TanhApprox> output{static_cast<__nv_bfloat16*>(out.data),
+            static_cast<const __nv_bfloat16*>(bias.data), w.n};
+        if (w.k == 768) projection<3072, 768>(x, w, output, stream);
+        else projection<3072, 3072>(x, w, output, stream);
+    };
+    if (mode == GeluMode::Tanh) launch.template operator()<true>();
+    else launch.template operator()<false>();
 }
 
 void bf16_projection_swiglu(const Tensor& x, const Weight& w, Tensor& out,

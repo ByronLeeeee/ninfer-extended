@@ -53,6 +53,7 @@ std::size_t chunked_workspace_bytes(std::int32_t value_heads, std::int32_t token
 void launch_chunked(const Tensor& q, const Tensor& k, const Tensor& v, const Tensor& g,
                     const Tensor& beta, float scale, const Tensor& ssm_state_in,
                     Tensor& ssm_state_out, Tensor& out, void* workspace,
-                    std::size_t workspace_bytes, cudaStream_t stream);
+                    std::size_t workspace_bytes, cudaStream_t stream,
+                    std::int32_t multiprocessor_count);
 
 } // namespace ninfer::ops::detail::gated_delta_net

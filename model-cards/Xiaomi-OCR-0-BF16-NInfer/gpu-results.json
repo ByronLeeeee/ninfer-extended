@@ -6,7 +6,10 @@
   "lanes": 1,
   "output_cap": 256,
   "prefill_chunk": {
-    "ninfer_extended": 1024,
+    "ninfer_extended": {
+      "RTX 5070 Ti": 1024,
+      "RTX 6000D": 2048
+    },
     "transformers": "complete prompt"
   },
   "prefill": "Prompt tokens / (vision encoding + language prefill); CPU preprocessing excluded",
@@ -20,84 +23,84 @@
           "transformers": {
             "prompt_tokens": 1807,
             "completion_tokens": 113,
-            "prefill_tps": 19990.799826118087,
-            "decode_tps": 140.66337854790058,
-            "vision_ms": 51.26904700000523,
-            "language_prefill_ms": 36.925651999979436,
-            "prefill_ms": 90.3961549999508,
-            "client_e2e_ms": 1006.0363619999748,
+            "prefill_tps": 20983.02776105397,
+            "decode_tps": 148.62021120352935,
+            "vision_ms": 46.65165450001041,
+            "language_prefill_ms": 38.91506150003465,
+            "prefill_ms": 86.13015099999188,
+            "client_e2e_ms": 956.7240089999984,
             "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
           },
           "ninfer_extended": {
             "prompt_tokens": 1807,
             "completion_tokens": 113,
-            "prefill_tps": 22240.167818126407,
-            "decode_tps": 413.30269874815565,
-            "vision_ms": 41.60847854614258,
-            "language_prefill_ms": 38.61798357849122,
-            "prefill_ms": 81.2502285,
-            "client_e2e_ms": 437.3662374999867,
+            "prefill_tps": 24125.43774129318,
+            "decode_tps": 438.5938006831128,
+            "vision_ms": 40.96428871154785,
+            "language_prefill_ms": 34.040138710571284,
+            "prefill_ms": 74.9009385,
+            "client_e2e_ms": 412.83924949999573,
             "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
           },
-          "prefill_speed_ratio": 1.112520159852209,
-          "decode_speed_ratio": 2.938239526270246,
-          "request_speed_ratio": 2.300214958865007
+          "prefill_speed_ratio": 1.149759606479278,
+          "decode_speed_ratio": 2.9511046790431243,
+          "request_speed_ratio": 2.317425027195745
         },
         {
           "input": "en_contract",
           "transformers": {
             "prompt_tokens": 1807,
             "completion_tokens": 114,
-            "prefill_tps": 19792.976831059987,
-            "decode_tps": 138.60188160857524,
-            "vision_ms": 49.861188500017306,
-            "language_prefill_ms": 40.19543550003846,
-            "prefill_ms": 91.29522850003013,
-            "client_e2e_ms": 1004.9038665000012,
+            "prefill_tps": 21401.763271227836,
+            "decode_tps": 143.5999138272386,
+            "vision_ms": 47.506332500006465,
+            "language_prefill_ms": 38.28981899999917,
+            "prefill_ms": 84.43232549998925,
+            "client_e2e_ms": 980.5160944999898,
             "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
           },
           "ninfer_extended": {
             "prompt_tokens": 1807,
             "completion_tokens": 114,
-            "prefill_tps": 22338.285184676814,
-            "decode_tps": 414.7140421756369,
-            "vision_ms": 42.0634880065918,
-            "language_prefill_ms": 38.160568265991216,
-            "prefill_ms": 80.89253450000001,
-            "client_e2e_ms": 446.0415935000128,
+            "prefill_tps": 23830.368056326,
+            "decode_tps": 439.535137871438,
+            "vision_ms": 41.05734443664551,
+            "language_prefill_ms": 34.868434244750986,
+            "prefill_ms": 75.82769900000001,
+            "client_e2e_ms": 432.6990389999992,
             "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
           },
-          "prefill_speed_ratio": 1.1285965408509255,
-          "decode_speed_ratio": 2.992124185924318,
-          "request_speed_ratio": 2.2529375761006745
+          "prefill_speed_ratio": 1.1134768548890146,
+          "decode_speed_ratio": 3.060831487686208,
+          "request_speed_ratio": 2.266046388191751
         },
         {
           "input": "dense-equations",
           "transformers": {
             "prompt_tokens": 2368,
             "completion_tokens": 256,
-            "prefill_tps": 20559.841954657757,
-            "decode_tps": 145.0267042375852,
-            "vision_ms": 70.37698450005792,
-            "language_prefill_ms": 44.16376900002206,
-            "prefill_ms": 115.17760200001703,
-            "client_e2e_ms": 2009.75080850003,
+            "prefill_tps": 20970.505522103995,
+            "decode_tps": 147.71784985125447,
+            "vision_ms": 68.28822700001069,
+            "language_prefill_ms": 44.313854999984414,
+            "prefill_ms": 112.92089699998087,
+            "client_e2e_ms": 1981.8397729999901,
             "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517"
           },
           "ninfer_extended": {
             "prompt_tokens": 2368,
             "completion_tokens": 256,
-            "prefill_tps": 20734.05113966751,
-            "decode_tps": 410.66499688635037,
-            "vision_ms": 63.8068962097168,
-            "language_prefill_ms": 50.20264802185059,
-            "prefill_ms": 114.209546,
-            "client_e2e_ms": 834.7152780000329,
+            "prefill_tps": 22710.0776097945,
+            "decode_tps": 435.83143038710625,
+            "vision_ms": 61.129953384399414,
+            "language_prefill_ms": 42.76125503625488,
+            "prefill_ms": 104.2708935,
+            "client_e2e_ms": 791.2501725000141,
             "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517"
           },
-          "prefill_speed_ratio": 1.0084732745219516,
-          "decode_speed_ratio": 2.8316508952281785,
-          "request_speed_ratio": 2.407708186814751
+          "prefill_speed_ratio": 1.0829532738663314,
+          "decode_speed_ratio": 2.9504317238977538,
+          "request_speed_ratio": 2.5046942697506394
         }
       ],
       "quality": {
@@ -154,7 +157,7 @@
         }
       },
       "comparison": "Paired resident Transformers and final NInfer Extended; alternating requests; median results",
-      "ninfer_binary_sha256": "5c865044d55c4b87e8ab9482126a171b5186120ddf5dc9fe0d4688642b594d4f",
+      "ninfer_binary_sha256": "958c081943750bf8cc8afd7bc7b0b6d8fc00fc8a561f340f3887a3ae8d1d73df",
       "transformers_audit": {
         "status": "ready",
         "engine": "transformers",
@@ -187,10 +190,159 @@
       },
       "additional_annotated_text_quality": {
         "backend": "ninfer_extended",
-        "fixtures": 6,
+        "edits": 0,
         "gold_characters": 1117,
+        "fixtures": 6,
         "cer": 0.0,
         "character_accuracy": 1.0
+      },
+      "complete_output_regression": {
+        "lanes": 1,
+        "context": 16384,
+        "output_cap": 4096,
+        "formal_requests": 44,
+        "full_pages": 11,
+        "output_exact_pages": 11,
+        "normalized_character_difference": 0.0,
+        "synthetic_text_accuracy": {
+          "baseline": {
+            "edits": 0,
+            "gold_characters": 1117,
+            "fixtures": 6,
+            "cer": 0.0,
+            "character_accuracy": 1.0
+          },
+          "optimized": {
+            "edits": 0,
+            "gold_characters": 1117,
+            "fixtures": 6,
+            "cer": 0.0,
+            "character_accuracy": 1.0
+          }
+        },
+        "rows": [
+          {
+            "id": "zh_legal",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "completion_tokens": {
+              "baseline": 113,
+              "optimized": 113
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "zh_legal_skew",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "completion_tokens": {
+              "baseline": 113,
+              "optimized": 113
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "zh_legal_blur",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "completion_tokens": {
+              "baseline": 114,
+              "optimized": 114
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "zh_legal_small",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "completion_tokens": {
+              "baseline": 113,
+              "optimized": 113
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "en_contract",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 325,
+            "completion_tokens": {
+              "baseline": 114,
+              "optimized": 114
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "mixed_numbers",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 180,
+            "completion_tokens": {
+              "baseline": 133,
+              "optimized": 133
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "formula",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 131,
+            "completion_tokens": {
+              "baseline": 111,
+              "optimized": 111
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "qianziwen",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 26,
+            "completion_tokens": {
+              "baseline": 25,
+              "optimized": 25
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "dense-equations",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 3696,
+            "completion_tokens": {
+              "baseline": 2021,
+              "optimized": 2021
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "handwrite-formula",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 1850,
+            "completion_tokens": {
+              "baseline": 1143,
+              "optimized": 1143
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "receipt",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 422,
+            "completion_tokens": {
+              "baseline": 298,
+              "optimized": 298
+            },
+            "finish_reason": "stop"
+          }
+        ]
       }
     },
     "RTX 6000D": {
@@ -200,84 +352,84 @@
           "transformers": {
             "prompt_tokens": 1807,
             "completion_tokens": 113,
-            "prefill_tps": 36425.66096554422,
-            "decode_tps": 231.92409842434847,
-            "vision_ms": 29.37667100923136,
-            "language_prefill_ms": 20.336957939434797,
-            "prefill_ms": 49.60789351025596,
-            "client_e2e_ms": 581.9898815243505,
+            "prefill_tps": 36262.54501182263,
+            "decode_tps": 232.16579695951313,
+            "vision_ms": 29.487874009646475,
+            "language_prefill_ms": 20.326598489191383,
+            "prefill_ms": 49.83104451093823,
+            "client_e2e_ms": 582.2087185224518,
             "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
           },
           "ninfer_extended": {
             "prompt_tokens": 1807,
             "completion_tokens": 113,
-            "prefill_tps": 37920.76324196979,
-            "decode_tps": 542.4171838660244,
-            "vision_ms": 25.338735580444336,
-            "language_prefill_ms": 22.277738432495113,
-            "prefill_ms": 47.6521685,
-            "client_e2e_ms": 297.98306291922927,
+            "prefill_tps": 40403.81982319028,
+            "decode_tps": 540.5151934577909,
+            "vision_ms": 25.36564826965332,
+            "language_prefill_ms": 19.3912194911499,
+            "prefill_ms": 44.7235085,
+            "client_e2e_ms": 295.07302900310606,
             "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
           },
-          "prefill_speed_ratio": 1.0410453025914839,
-          "decode_speed_ratio": 2.338770259542287,
-          "request_speed_ratio": 1.95309718553401
+          "prefill_speed_ratio": 1.1142025417691306,
+          "decode_speed_ratio": 2.328143079370344,
+          "request_speed_ratio": 1.9731004236118215
         },
         {
           "input": "en_contract",
           "transformers": {
             "prompt_tokens": 1807,
             "completion_tokens": 114,
-            "prefill_tps": 36439.011143949676,
-            "decode_tps": 231.77434296889345,
-            "vision_ms": 29.39496049657464,
-            "language_prefill_ms": 20.171870477497578,
-            "prefill_ms": 49.58971950691193,
-            "client_e2e_ms": 582.7217730111443,
+            "prefill_tps": 36247.332948650015,
+            "decode_tps": 231.6743127574358,
+            "vision_ms": 29.4818080146797,
+            "language_prefill_ms": 20.36780648631975,
+            "prefill_ms": 49.85194397158921,
+            "client_e2e_ms": 583.4582964889705,
             "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
           },
           "ninfer_extended": {
             "prompt_tokens": 1807,
             "completion_tokens": 114,
-            "prefill_tps": 37664.06029182094,
-            "decode_tps": 540.8357199921875,
-            "vision_ms": 25.34260845184326,
-            "language_prefill_ms": 22.636038531066895,
-            "prefill_ms": 47.976779,
-            "client_e2e_ms": 298.81159303477034,
+            "prefill_tps": 40540.911734952904,
+            "decode_tps": 540.5670146851633,
+            "vision_ms": 25.31928062438965,
+            "language_prefill_ms": 19.21184181854248,
+            "prefill_ms": 44.5722665,
+            "client_e2e_ms": 295.5993164796382,
             "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
           },
-          "prefill_speed_ratio": 1.033619165542989,
-          "decode_speed_ratio": 2.333458108712116,
-          "request_speed_ratio": 1.9501310745441445
+          "prefill_speed_ratio": 1.1184522677126456,
+          "decode_speed_ratio": 2.333305787125134,
+          "request_speed_ratio": 1.9738147687129748
         },
         {
           "input": "dense-equations",
           "transformers": {
             "prompt_tokens": 2368,
             "completion_tokens": 256,
-            "prefill_tps": 36072.107327850244,
-            "decode_tps": 234.70814846500963,
-            "vision_ms": 40.31154001131654,
-            "language_prefill_ms": 25.276560452766716,
-            "prefill_ms": 65.64628949854523,
-            "client_e2e_ms": 1203.5204619751312,
+            "prefill_tps": 36173.71510531132,
+            "decode_tps": 233.95100654155397,
+            "vision_ms": 40.407086024060845,
+            "language_prefill_ms": 24.993249971885234,
+            "prefill_ms": 65.46189798973501,
+            "client_e2e_ms": 1208.1097090267576,
             "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517"
           },
           "ninfer_extended": {
             "prompt_tokens": 2368,
             "completion_tokens": 256,
-            "prefill_tps": 35615.466228344994,
-            "decode_tps": 538.2905738682146,
-            "vision_ms": 37.81844902038574,
-            "language_prefill_ms": 28.674657470214846,
-            "prefill_ms": 66.48797449999999,
-            "client_e2e_ms": 581.1896359664388,
+            "prefill_tps": 36841.61443918593,
+            "decode_tps": 537.3563800024629,
+            "vision_ms": 37.72844886779785,
+            "language_prefill_ms": 26.51355809777833,
+            "prefill_ms": 64.275183,
+            "client_e2e_ms": 581.0554820345715,
             "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517"
           },
-          "prefill_speed_ratio": 0.9873408809927583,
-          "decode_speed_ratio": 2.293446466978811,
-          "request_speed_ratio": 2.0707878934796238
+          "prefill_speed_ratio": 1.0184636643466167,
+          "decode_speed_ratio": 2.296875691821478,
+          "request_speed_ratio": 2.0791641183670615
         }
       ],
       "quality": {
@@ -334,7 +486,7 @@
         }
       },
       "comparison": "Paired resident Transformers and final NInfer Extended; alternating requests; median results",
-      "ninfer_binary_sha256": "713ffe209f4250da40ffc89cce2a954a892578587937dd66255073758355482f",
+      "ninfer_binary_sha256": "f54a93145e7f83bae2c5042281fb488e5b14c5c981e2730185ae5c872d17321f",
       "transformers_audit": {
         "status": "ready",
         "engine": "transformers",
@@ -367,10 +519,159 @@
       },
       "additional_annotated_text_quality": {
         "backend": "ninfer_extended",
-        "fixtures": 6,
+        "edits": 0,
         "gold_characters": 1117,
+        "fixtures": 6,
         "cer": 0.0,
         "character_accuracy": 1.0
+      },
+      "complete_output_regression": {
+        "lanes": 1,
+        "context": 16384,
+        "output_cap": 4096,
+        "formal_requests": 44,
+        "full_pages": 11,
+        "output_exact_pages": 11,
+        "normalized_character_difference": 0.0,
+        "synthetic_text_accuracy": {
+          "baseline": {
+            "edits": 0,
+            "gold_characters": 1117,
+            "fixtures": 6,
+            "cer": 0.0,
+            "character_accuracy": 1.0
+          },
+          "optimized": {
+            "edits": 0,
+            "gold_characters": 1117,
+            "fixtures": 6,
+            "cer": 0.0,
+            "character_accuracy": 1.0
+          }
+        },
+        "rows": [
+          {
+            "id": "zh_legal",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "completion_tokens": {
+              "baseline": 113,
+              "optimized": 113
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "zh_legal_skew",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "completion_tokens": {
+              "baseline": 113,
+              "optimized": 113
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "zh_legal_blur",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "completion_tokens": {
+              "baseline": 114,
+              "optimized": 114
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "zh_legal_small",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 153,
+            "completion_tokens": {
+              "baseline": 113,
+              "optimized": 113
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "en_contract",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 325,
+            "completion_tokens": {
+              "baseline": 114,
+              "optimized": 114
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "mixed_numbers",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 180,
+            "completion_tokens": {
+              "baseline": 133,
+              "optimized": 133
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "formula",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 131,
+            "completion_tokens": {
+              "baseline": 111,
+              "optimized": 111
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "qianziwen",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 26,
+            "completion_tokens": {
+              "baseline": 25,
+              "optimized": 25
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "dense-equations",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 3696,
+            "completion_tokens": {
+              "baseline": 2021,
+              "optimized": 2021
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "handwrite-formula",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 1850,
+            "completion_tokens": {
+              "baseline": 1143,
+              "optimized": 1143
+            },
+            "finish_reason": "stop"
+          },
+          {
+            "id": "receipt",
+            "output_exact": true,
+            "normalized_edits": 0,
+            "normalized_denominator": 422,
+            "completion_tokens": {
+              "baseline": 298,
+              "optimized": 298
+            },
+            "finish_reason": "stop"
+          }
+        ]
       }
     }
   },

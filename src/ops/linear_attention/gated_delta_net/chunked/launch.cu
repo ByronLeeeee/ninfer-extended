@@ -17,7 +17,8 @@ std::size_t chunked_workspace_bytes(std::int32_t value_heads, std::int32_t token
 void launch_chunked(const Tensor& q, const Tensor& k, const Tensor& v, const Tensor& g,
                     const Tensor& beta, float scale, const Tensor& ssm_state_in,
                     Tensor& ssm_state_out, Tensor& out, void* workspace,
-                    std::size_t workspace_bytes, cudaStream_t stream) {
+                    std::size_t workspace_bytes, cudaStream_t stream,
+                    std::int32_t multiprocessor_count) {
     const auto layout = chunked::compute_workspace_layout(v.ne[1], q.ne[2]);
     if (workspace == nullptr || workspace_bytes < layout.total_bytes) { throw std::bad_alloc(); }
 
@@ -55,6 +56,7 @@ void launch_chunked(const Tensor& q, const Tensor& k, const Tensor& v, const Ten
     state.h_chunk   = static_cast<__nv_bfloat16*>(h_chunk.data);
     state.state_out = static_cast<float*>(ssm_state_out.data);
     state.stream    = stream;
+    state.multiprocessor_count = multiprocessor_count;
     CUDA_CHECK(chunked::launch_state_passing(state));
 
     chunked::chunk_output_config output{};

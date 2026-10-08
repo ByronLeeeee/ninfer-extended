@@ -1,5 +1,6 @@
 #include "ninfer/ops/gated_delta_net.h"
 
+#include "core/device.h"
 #include "ops/gdn_ref.h"
 #include "ops/op_tester.h"
 
@@ -23,8 +24,12 @@ namespace {
 constexpr int kStateDim = 128;
 
 constexpr ReductionCriterion gated_delta_net_output_bf16_criterion() {
+    // Chunked execution rounds private operands and the public output to BF16.
+    // Two BF16 unit roundoffs bound gross outliers; keep the tighter whole-output
+    // relative-L2 budget. This profile is shared by every case, including long
+    // normalized prompts, rather than introducing a token-dependent tolerance.
     return {/*relative_l2=*/4.1e-3, /*gross_absolute=*/5.0e-6,
-            /*gross_relative_to_max_reference=*/5.5e-3};
+            /*gross_relative_to_max_reference=*/2.0 / 256.0};
 }
 
 constexpr ReductionCriterion gated_delta_net_state_fp32_criterion() {
@@ -39,6 +44,7 @@ struct Case {
     int tokens;
     bool normalize_qk;
     bool near_zero_qk = false;
+    bool execution_resources = false;
 };
 
 void fill_uniform(std::vector<float>& values, std::mt19937& generator, float low, float high) {
@@ -184,8 +190,10 @@ int inplace_case(const Case& test_case, std::uint32_t seed) {
         test_case.tokens);
     WorkspaceArena workspace(std::max<std::size_t>(workspace_bytes, 256));
 
+    DeviceContext context;
     ops::gated_delta_net(q, k, v, g, beta, scale, test_case.normalize_qk, workspace, state_tensor,
-                         out_tensor, nullptr);
+                         out_tensor, nullptr,
+                         test_case.execution_resources ? context.multiprocessor_count() : 0);
     cuda_synchronize();
 
     const std::string label = std::string(test_case.name) + " inplace";
@@ -198,6 +206,23 @@ int inplace_case(const Case& test_case, std::uint32_t seed) {
     failures += out.verify_guards((label + " out").c_str());
     failures += verify_common_inputs_unchanged(label, in, device.q, device.k, device.v, device.g,
                                                device.beta);
+    if (test_case.execution_resources) {
+        // Supplement the independent FP64 check with exact schedule parity:
+        // resource selection may change ownership, never recurrence arithmetic.
+        const auto resource_out = from_device<std::uint16_t>(out.data(), in.v.size());
+        const auto resource_state = from_device<float>(state.data(), in.state.size());
+        state.copy_from_host(in.state.data(), state.bytes());
+        out.fill(0xff);
+        ops::gated_delta_net(q, k, v, g, beta, scale, test_case.normalize_qk, workspace,
+                             state_tensor, out_tensor, nullptr, 0);
+        cuda_synchronize();
+        failures += verify_exact(label + " schedule output parity",
+                                 from_device<std::uint16_t>(out.data(), in.v.size()), resource_out);
+        failures += verify_exact(label + " schedule state parity",
+                                 from_device<float>(state.data(), in.state.size()), resource_state);
+        failures += state.verify_guards((label + " stream-only state").c_str());
+        failures += out.verify_guards((label + " stream-only out").c_str());
+    }
     if (workspace.used() != 0 || workspace.peak_used() != workspace_bytes) {
         std::cerr << label << ": workspace query/execution high-water mismatch\n";
         ++failures;
@@ -234,8 +259,10 @@ int distinct_state_case(const Case& test_case, std::uint32_t seed) {
         test_case.tokens);
     WorkspaceArena workspace(std::max<std::size_t>(workspace_bytes, 256));
 
+    DeviceContext context;
     ops::gated_delta_net(q, k, v, g, beta, scale, test_case.normalize_qk, workspace,
-                         state_in_tensor, state_out_tensor, out_tensor, nullptr);
+                         state_in_tensor, state_out_tensor, out_tensor, nullptr,
+                         test_case.execution_resources ? context.multiprocessor_count() : 0);
     cuda_synchronize();
 
     const std::string label = std::string(test_case.name) + " distinct-state";
@@ -467,6 +494,13 @@ int main() {
     failures += distinct_state_case({"generic grouped-map chunk-tail", 3, 12, 65, true}, 12365u);
     failures += distinct_state_case({"27b two-chunk fused-qk-norm", 16, 48, 128, true}, 12128u);
     failures += inplace_case({"35b two-chunk raw-qk", 16, 32, 128, false}, 12228u);
+    for (int tokens : {63, 64, 65})
+        failures += distinct_state_case({"resource-aware chunk boundary", 4, 8, tokens,
+                                        true, false, true}, 12400u + tokens);
+    failures += inplace_case({"resource-aware normalized long prompt", 16, 16, 1024,
+                              true, false, true}, 12524u);
+    failures += distinct_state_case({"resource-aware grouped raw prompt", 8, 16, 832,
+                                     false, false, true}, 12532u);
 
     // The production decode path updates selected state-pool slots in place at width one.
     failures += batch_update_case({"27b selected-slot fused-qk-norm", 16, 48, 1, true}, {7}, {7}, 8,

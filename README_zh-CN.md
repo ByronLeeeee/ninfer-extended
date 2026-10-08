@@ -19,7 +19,7 @@ OpenAI/Anthropic 的 HTTP 服务。视觉、音频和语言推理共用 CUDA 算
   支持独立批处理和 CUDA Graph 重放。
 - **文本向量：** 在 GPU 上完成分段 causal attention、末 token 池化、维度截取
   和 FP32 L2 归一化，提供 `embed_tokens()` 和 `ninfer-embed`。
-- **通用 BF16 算子：** 小批量投影、残差和多输出融合、寄存器内 SwiGLU、
+- **通用 BF16 算子：** 小批量投影、bias/残差与 bias/GELU 融合、多输出融合、寄存器内 SwiGLU、
   Gated DeltaNet 和分段 attention，按张量形状、数据类型和设备资源选择实现。
 - **模型转换：** 提供 OCR、ASR、对齐和向量模型的 BF16 转换配方，
   保留 tokenizer、processor 和 Unicode 分词配置。
@@ -44,16 +44,16 @@ Transformers，Embedding 取 eager 和编译版中更快的结果，ForcedAligne
 ### Xiaomi-OCR-0
 
 单路、4K 上下文、BF16 KV，输出上限 256 token。Prefill 包含视觉编码和语言
-prefill，decode 从首 token 之后统计。Transformers 采用同步计时，NInfer 使用 CUDA events。
+prefill，decode 从首 token 之后统计。Transformers 采用同步计时，NInfer 使用 CUDA events。NInfer 的 chunk 在 5070 Ti 上为 1,024，在 6000D 上为 2,048。
 
 | 显卡 | 输入 | TF prefill tok/s | NInfer prefill tok/s | Prefill 变化 | TF decode tok/s | NInfer decode tok/s | Decode 倍数 |
 |---|---|---:|---:|---:|---:|---:|---:|
-| RTX 5070 Ti | 中文文书 | 19,991 | 22,240 | +11.3% | 140.7 | 413.3 | 2.94× |
-| RTX 5070 Ti | 英文合同 | 19,793 | 22,338 | +12.9% | 138.6 | 414.7 | 2.99× |
-| RTX 5070 Ti | 密集公式（256 token） | 20,560 | 20,734 | +0.8% | 145.0 | 410.7 | 2.83× |
-| RTX 6000D | 中文文书 | 36,426 | 37,921 | +4.1% | 231.9 | 542.4 | 2.34× |
-| RTX 6000D | 英文合同 | 36,439 | 37,664 | +3.4% | 231.8 | 540.8 | 2.33× |
-| RTX 6000D | 密集公式（256 token） | 36,072 | 35,615 | -1.3% | 234.7 | 538.3 | 2.29× |
+| RTX 5070 Ti | 中文文书 | 20,983 | 24,125 | +15.0% | 148.6 | 438.6 | 2.95× |
+| RTX 5070 Ti | 英文合同 | 21,402 | 23,830 | +11.3% | 143.6 | 439.5 | 3.06× |
+| RTX 5070 Ti | 密集公式（256 token） | 20,971 | 22,710 | +8.3% | 147.7 | 435.8 | 2.95× |
+| RTX 6000D | 中文文书 | 36,263 | 40,404 | +11.4% | 232.2 | 540.5 | 2.33× |
+| RTX 6000D | 英文合同 | 36,247 | 40,541 | +11.8% | 231.7 | 540.6 | 2.33× |
+| RTX 6000D | 密集公式（256 token） | 36,174 | 36,842 | +1.8% | 234.0 | 537.4 | 2.30× |
 
 两张有标注的文字页，双方均为 **100% 字符正确率（CER 0%）**。三组输出
 **100% 一致（3/3）**，包括两页完整文字和相同的公式页 256-token 输出。

@@ -50,8 +50,9 @@ std::size_t ffn_workspace_bytes(const FfnParameters& parameters, std::int32_t fi
 }
 
 void ffn(const Tensor& hidden, const FfnParameters& parameters, Tensor& residual,
-         const ops::SparseMoeHints& hints, WorkspaceArena& workspace, cudaStream_t stream,
+         const ops::SparseMoeHints& hints, WorkspaceArena& workspace, DeviceExecutionView execution,
          bool mtp) {
+    const auto stream = execution.stream;
     auto scope         = workspace.scope();
     const auto columns = hidden.ne[1];
     if (const auto* moe = std::get_if<ops::SparseMoeWeights>(&parameters)) {
@@ -82,7 +83,8 @@ void ffn(const Tensor& hidden, const FfnParameters& parameters, Tensor& residual
     Tensor activation = workspace.alloc(DType::BF16, {gu.n / 2, columns});
     {
         auto call = workspace.scope();
-        ops::linear_swiglu(hidden, gu, activation, p.gate_up.policy, workspace, stream);
+        ops::linear_swiglu(hidden, gu, activation, p.gate_up.policy, workspace, stream,
+                           execution.multiprocessor_count);
     }
     ops::linear_add(activation, down, residual, p.down.policy, workspace, stream);
 }

@@ -1,5 +1,64 @@
 # Changelog
 
+## Fused vision projection and resource-aware prefill
+
+New BF16 `linear_bias_add` and `linear_bias_gelu` Ops fuse vision projection,
+bias and residual/GELU epilogues. They preserve the original projection and
+bias-add BF16 rounding seams and remove separate intermediate reads and writes.
+Registered geometries cover residual projections to 768 channels and GELU
+projections to 3,072 channels, with exact and tanh GELU supported.
+
+Gated DeltaNet state passing uses narrow strips when the grid fits the device's
+SM count. BF16 SwiGLU uses three-stage staging for partial prompt tails when wider
+tiles underfill the GPU. Dispatch uses tensor geometry and physical resources.
+The 6000D OCR deployment uses 2,048-token chunks; 5070 Ti retains 1,024.
+Weights and KV remain BF16, with decode CUDA Graphs enabled.
+
+| GPU | Input | Requests | Previous prefill tok/s | Updated prefill tok/s | Prefill change | Previous decode tok/s | Updated decode tok/s |
+|---|---|---:|---:|---:|---:|---:|---:|
+| RTX 5070 Ti | Chinese document | 1 | 23,171 | 23,623 | +1.95% | 450.5 | 452.7 |
+| RTX 5070 Ti | English contract | 1 | 23,888 | 24,256 | +1.54% | 451.7 | 451.8 |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 1 | 22,572 | 22,968 | +1.76% | 447.9 | 448.1 |
+| RTX 5070 Ti | Chinese document | 4 | 22,585 | 22,613 | +0.13% | 373.4 | 374.1 |
+| RTX 5070 Ti | English contract | 4 | 22,177 | 22,386 | +0.94% | 372.9 | 373.0 |
+| RTX 6000D | Chinese document | 1 | 37,871 | 40,491 | +6.92% | 540.6 | 541.3 |
+| RTX 6000D | English contract | 1 | 37,775 | 40,649 | +7.61% | 541.1 | 542.6 |
+| RTX 6000D | Dense formulas (256 tokens) | 1 | 35,551 | 36,622 | +3.01% | 537.4 | 537.4 |
+| RTX 6000D | Chinese document | 4 | 38,066 | 40,564 | +6.56% | 489.5 | 488.4 |
+| RTX 6000D | English contract | 4 | 37,950 | 40,563 | +6.89% | 488.9 | 488.2 |
+
+Both GPUs return **11/11 identical complete pages in single-request tests** compared with the preceding
+Extended OCR build, with **0% normalized character difference**. Six annotated
+text images contain 1,117 scored characters and retain CER 0%. Timed OCR controls
+also match compiled Transformers exactly on all three inputs.
+
+ASR, embedding and forced-alignment controls preserve every tested token ID,
+embedding vector and timestamp class. Numerical qualification includes FP64
+recurrence output and final state, resource-based schedule parity, chunk seams,
+BF16 SwiGLU boundaries, fused bias epilogues and preserved inputs. The new fusion
+tests use an independent FP64 oracle, retain the two observable BF16 rounding
+seams, leave the final ideal output unrounded and also check exact staged parity
+and CUDA Graph replay. Long normalized recurrence fixtures
+retain the 0.41% relative-L2 budget; the shared gross-output cap accounts for two
+BF16 unit roundoffs. Alternative attention scheduling and prefill FFN graphs were
+evaluated and excluded from this update. Whole-language prefill graphs were also
+excluded because their incremental benefit was below the acceptance threshold.
+
+Paired measurements cover single and four-request OCR, with decode CUDA Graphs
+retained. Embedding and alignment are checked one fixture at a time with five
+alternating A-B-B-A/B-A-A-B cycles. Server controls use the preceding source
+rebuilt with the same compiler.
+
+Additional mixed-concurrency checks compare full Chinese, English and formula
+pages at 32K context. Fused and pre-fusion builds with the same 2,048-token chunk
+produce identical outputs on both runs. The preceding build also changes the
+handwritten formula's `P`/`p` casing between single and mixed decode batches;
+single-request agreement is reported separately from concurrency controls.
+
+[Current Transformers comparison](model-cards/Xiaomi-OCR-0-BF16-NInfer/README.md)
+· [Detailed results](docs/xiaomi-ocr-performance.md).
+
+
 ## BF16 prefill operator optimization
 
 Register-fused BF16 gate/up + SwiGLU removes **14 MiB** of projection scratch

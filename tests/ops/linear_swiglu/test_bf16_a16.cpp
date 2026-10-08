@@ -128,6 +128,7 @@ int main() {
         DeviceWeight weight(make_patterned(7168, 1024, 1607));
         for (int t : {1, 2, 3, 4, 5, 6, 7, 8, 9, 31, 32, 33, 63, 64, 65,
                       127, 128, 129, 255, 256, 257, 319, 320, 321, 383, 384, 385, 783,
+                      447, 448, 449, 511, 512, 513,
                       1023, 1024, 1025, 2047, 2048, 2049}) failures += run_case(weight, t);
         for (int t : {4, 33, 65, 256, 321, 1024}) failures += run_case(weight, t, true);
         failures += weight.verify_preserved("LinearSwiGLU BF16 7168");

@@ -39,7 +39,12 @@ cudaError_t launch_state_passing(const state_passing_config& cfg) {
 
     const auto qk_map     = head_map::of((int)cfg.H_qk, (int)cfg.H_v);
     const std::int64_t NT = cfg.L / BT;
-    if (cfg.H_v >= 48) {
+    // A narrow strip doubles the grid while halving the CTA's thread count.
+    // Use it for small head counts when every strip fits in one device wave;
+    // otherwise retain the measured wide-strip schedule.
+    const auto narrow_blocks = std::int64_t(cfg.H_v) * kernel::kernel_dims<16>::D_STRIPS;
+    if (cfg.H_v >= 48 || (cfg.multiprocessor_count > 0 &&
+                         narrow_blocks <= cfg.multiprocessor_count)) {
         NINFER_GATED_DELTA_NET_PROPAGATE(v.check_grid(
             static_cast<std::int64_t>(cfg.H_v) * kernel::kernel_dims<16>::D_STRIPS, 1));
         return launch_fixed<16>(cfg, qk_map, static_cast<int>(NT));

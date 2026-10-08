@@ -26,7 +26,8 @@ shared CUDA operators for vision, audio and language processing.
   dimensional truncation and FP32 L2 normalization on CUDA, exposed through
   `embed_tokens()` and the `ninfer-embed` CLI.
 - **Shared BF16 operators:** compact projections, fused residual and split
-  outputs, register-fused SwiGLU, Gated DeltaNet controls and segmented attention.
+  outputs, fused bias/residual and bias/GELU, register-fused SwiGLU,
+  Gated DeltaNet controls and segmented attention.
   Implementations are selected by tensor geometry, dtype and device resources.
 - **Model conversion:** BF16 recipes for OCR, ASR, forced alignment and embedding;
   embedded tokenizer/processor resources and Unicode pre-tokenization.
@@ -55,16 +56,16 @@ alignment uses the official eager Transformers reference. Tables report medians.
 
 Single request, 4K context, BF16 KV and a 256-token output cap. Prefill includes
 vision encoding and language prefill; decode starts after the first token.
-Transformers stages use synchronized timing and NInfer uses CUDA events.
+Transformers stages use synchronized timing and NInfer uses CUDA events. NInfer chunk size is 1,024 on 5070 Ti and 2,048 on 6000D.
 
 | GPU | Input | TF prefill tok/s | NInfer prefill tok/s | Prefill change | TF decode tok/s | NInfer decode tok/s | Decode speedup |
 |---|---|---:|---:|---:|---:|---:|---:|
-| RTX 5070 Ti | Chinese document | 19,991 | 22,240 | +11.3% | 140.7 | 413.3 | 2.94× |
-| RTX 5070 Ti | English contract | 19,793 | 22,338 | +12.9% | 138.6 | 414.7 | 2.99× |
-| RTX 5070 Ti | Dense formulas (256 tokens) | 20,560 | 20,734 | +0.8% | 145.0 | 410.7 | 2.83× |
-| RTX 6000D | Chinese document | 36,426 | 37,921 | +4.1% | 231.9 | 542.4 | 2.34× |
-| RTX 6000D | English contract | 36,439 | 37,664 | +3.4% | 231.8 | 540.8 | 2.33× |
-| RTX 6000D | Dense formulas (256 tokens) | 36,072 | 35,615 | -1.3% | 234.7 | 538.3 | 2.29× |
+| RTX 5070 Ti | Chinese document | 20,983 | 24,125 | +15.0% | 148.6 | 438.6 | 2.95× |
+| RTX 5070 Ti | English contract | 21,402 | 23,830 | +11.3% | 143.6 | 439.5 | 3.06× |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 20,971 | 22,710 | +8.3% | 147.7 | 435.8 | 2.95× |
+| RTX 6000D | Chinese document | 36,263 | 40,404 | +11.4% | 232.2 | 540.5 | 2.33× |
+| RTX 6000D | English contract | 36,247 | 40,541 | +11.8% | 231.7 | 540.6 | 2.33× |
+| RTX 6000D | Dense formulas (256 tokens) | 36,174 | 36,842 | +1.8% | 234.0 | 537.4 | 2.30× |
 
 Both engines score **100% character accuracy (CER 0%)** on the two annotated
 text pages. Raw output agreement is **3/3 (100%)**, covering both complete text

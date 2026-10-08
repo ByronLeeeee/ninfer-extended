@@ -211,10 +211,11 @@ std::size_t gated_delta_net_workspace_capacity_bytes(std::int32_t qk_heads,
 
 void gated_delta_net(const Tensor& q, const Tensor& k, const Tensor& v, const Tensor& g,
                      const Tensor& beta, float scale, bool normalize_qk, WorkspaceArena& ws,
-                     Tensor& ssm_state, Tensor& out, cudaStream_t stream) {
+                     Tensor& ssm_state, Tensor& out, cudaStream_t stream,
+                     std::int32_t multiprocessor_count) {
     if (q.ne[2] != 1) {
         gated_delta_net(q, k, v, g, beta, scale, normalize_qk, ws, ssm_state, ssm_state, out,
-                        stream);
+                        stream, multiprocessor_count);
         return;
     }
     validate_recurrent(q, k, v, g, beta, scale, ssm_state, out);
@@ -241,7 +242,7 @@ void gated_delta_net_batch_update(const Tensor& q, const Tensor& k, const Tensor
 void gated_delta_net(const Tensor& q, const Tensor& k, const Tensor& v, const Tensor& g,
                      const Tensor& beta, float scale, bool normalize_qk, WorkspaceArena& ws,
                      const Tensor& ssm_state_in, Tensor& ssm_state_out, Tensor& out,
-                     cudaStream_t stream) {
+                     cudaStream_t stream, std::int32_t multiprocessor_count) {
     validate_chunked(q, k, v, g, beta, scale, ssm_state_in, ssm_state_out, out);
 
     auto scratch_scope   = ws.scope();
@@ -268,7 +269,8 @@ void gated_delta_net(const Tensor& q, const Tensor& k, const Tensor& v, const Te
         Tensor out_full  = out.slice(2, 0, T_full);
         detail::gated_delta_net::launch_chunked(q_full, k_full, v_full, g_full, beta_full, scale,
                                                 ssm_state_in, ssm_state_out, out_full,
-                                                scratch.stage.data, scratch.stage.bytes, stream);
+                                                scratch.stage.data, scratch.stage.bytes, stream,
+                                                multiprocessor_count);
     }
 
     const std::int32_t tail = T - T_full;

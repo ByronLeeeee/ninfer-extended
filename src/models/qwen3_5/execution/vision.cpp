@@ -12,6 +12,7 @@
 #include "ninfer/ops/gelu.h"
 #include "ninfer/ops/layer_norm.h"
 #include "ninfer/ops/linear.h"
+#include "ninfer/ops/linear_bias.h"
 #include "ninfer/ops/residual_add.h"
 #include "ninfer/ops/rope.h"
 #include "ninfer/ops/softmax_attention.h"
@@ -393,10 +394,14 @@ void VisionContext::encode(const VisionItemView& item, Tensor& output, DeviceSpa
                                                                            config_.num_heads))),
                     control.segment_length, attended_heads, stream);
             }
-            Tensor projected = layout.projected.bind(backing);
-            project(attended, block.output, projected, layout.projection_scratch);
-            ops::add_bias(block.output_bias, projected, stream);
-            ops::residual_add(projected, x, stream);
+            if (block.output.weight.qtype == QType::BF16 && block.output.weight.n == 768) {
+                ops::linear_bias_add(attended, block.output.weight, block.output_bias, x, stream);
+            } else {
+                Tensor projected = layout.projected.bind(backing);
+                project(attended, block.output, projected, layout.projection_scratch);
+                ops::add_bias(block.output_bias, projected, stream);
+                ops::residual_add(projected, x, stream);
+            }
         }
         {
             nvtx::ScopedRange mlp_range(nvtx::Name::VisionMlp, nvtx::Category::PostMixer,
@@ -406,13 +411,24 @@ void VisionContext::encode(const VisionItemView& item, Tensor& output, DeviceSpa
             {
                 Tensor h = layout.mlp_norm.bind(backing);
                 ops::layer_norm(x, block.norm2.weight, block.norm2.bias, 1.0e-6F, h, stream);
-                project(h, block.fc1, up, layout.up_scratch);
+                if (block.fc1.weight.qtype == QType::BF16 && block.fc1.weight.n == 3072 &&
+                    block.fc1.weight.k == 768) {
+                    ops::linear_bias_gelu(h, block.fc1.weight, block.fc1_bias,
+                                         ops::GeluMode::Tanh, up, stream);
+                } else {
+                    project(h, block.fc1, up, layout.up_scratch);
+                    ops::add_bias(block.fc1_bias, up, stream);
+                    ops::gelu(up, ops::GeluMode::Tanh, stream);
+                }
             }
-            ops::add_bias(block.fc1_bias, up, stream);
-            ops::gelu(up, ops::GeluMode::Tanh, stream);
-            project(up, block.fc2, down, layout.down_scratch);
-            ops::add_bias(block.fc2_bias, down, stream);
-            ops::residual_add(down, x, stream);
+            if (block.fc2.weight.qtype == QType::BF16 && block.fc2.weight.n == 768 &&
+                block.fc2.weight.k == 3072) {
+                ops::linear_bias_add(up, block.fc2.weight, block.fc2_bias, x, stream);
+            } else {
+                project(up, block.fc2, down, layout.down_scratch);
+                ops::add_bias(block.fc2_bias, down, stream);
+                ops::residual_add(down, x, stream);
+            }
         }
         xiaomi_trace(x,"layer_"+std::to_string(layer),stream);
     }
@@ -425,9 +441,15 @@ void VisionContext::encode(const VisionItemView& item, Tensor& output, DeviceSpa
                         normalized, stream);
         Tensor merged = normalized.view({dimension(config_.merger_width()), tokens});
         Tensor hidden = layout.merger_hidden.bind(backing);
-        project(merged, parameters_.merger_fc1, hidden, layout.merger_first_scratch);
-        ops::add_bias(parameters_.merger_fc1_bias, hidden, stream);
-        ops::gelu(hidden, ops::GeluMode::Exact, stream);
+        if (parameters_.merger_fc1.weight.qtype == QType::BF16 &&
+            parameters_.merger_fc1.weight.n == 3072 && parameters_.merger_fc1.weight.k == 3072) {
+            ops::linear_bias_gelu(merged, parameters_.merger_fc1.weight,
+                                 parameters_.merger_fc1_bias, ops::GeluMode::Exact, hidden, stream);
+        } else {
+            project(merged, parameters_.merger_fc1, hidden, layout.merger_first_scratch);
+            ops::add_bias(parameters_.merger_fc1_bias, hidden, stream);
+            ops::gelu(hidden, ops::GeluMode::Exact, stream);
+        }
         project(hidden, parameters_.merger_fc2, output, layout.merger_second_scratch);
         ops::add_bias(parameters_.merger_fc2_bias, output, stream);
         xiaomi_trace(output,"vision_output",stream);

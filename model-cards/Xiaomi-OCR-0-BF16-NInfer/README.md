@@ -41,22 +41,24 @@ This starts an OCR service with 32K context per request, four concurrent request
 
 [Build and conversion guide](https://github.com/ByronLeeeee/ninfer-extended/blob/main/docs/xiaomi-ocr.md)
 
+For RTX 6000D, set `--prefill-chunk 2048` for the measured OCR profile.
+
 ## Transformers vs NInfer performance
 
-On RTX 5070 Ti, full vision/language prefill throughput improves by **0.8–12.9%** and decode reaches **2.83–2.99×** compiled Transformers. On RTX 6000D, prefill changes by **−1.3% to +4.1%** and decode reaches **2.29–2.34×**.
+On RTX 5070 Ti, complete prefill throughput improves by **8.3–15.0%** and decode reaches **2.95–3.06×** compiled Transformers. On RTX 6000D, complete prefill throughput improves by **1.8–11.8%** and decode reaches **2.30–2.33×** compiled Transformers.
 
-Both engines use BF16 weights/KV, 4K context, one request, identical images/prompts, greedy decoding and a 256-token output cap. NInfer uses 1,024-token prefill chunks. Text pages finish naturally; the formula page measures its first 256 output tokens. Results are medians.
+Both engines use BF16 weights/KV, 4K context, one request, identical images/prompts, greedy decoding and a 256-token output cap. NInfer uses 1,024-token chunks on RTX 5070 Ti and 2,048-token chunks on RTX 6000D. Text pages finish naturally; the formula page measures its first 256 output tokens. Results are medians.
 
 Transformers runs compiled vision/language prefill and decode with verified fused causal-conv1d and Gated DeltaNet kernels. Prefill includes vision encoding and language prefill; Transformers uses synchronized stage timing and NInfer uses CUDA events. Decode starts after the first generated token.
 
 | GPU | Input | TF prefill tok/s | NInfer prefill tok/s | Prefill change | TF decode tok/s | NInfer decode tok/s | Decode speedup |
 |---|---|---:|---:|---:|---:|---:|---:|
-| RTX 5070 Ti | Chinese document | 19,991 | 22,240 | +11.3% | 140.7 | 413.3 | 2.94× |
-| RTX 5070 Ti | English contract | 19,793 | 22,338 | +12.9% | 138.6 | 414.7 | 2.99× |
-| RTX 5070 Ti | Dense formulas (256 tokens) | 20,560 | 20,734 | +0.8% | 145.0 | 410.7 | 2.83× |
-| RTX 6000D | Chinese document | 36,426 | 37,921 | +4.1% | 231.9 | 542.4 | 2.34× |
-| RTX 6000D | English contract | 36,439 | 37,664 | +3.4% | 231.8 | 540.8 | 2.33× |
-| RTX 6000D | Dense formulas (256 tokens) | 36,072 | 35,615 | -1.3% | 234.7 | 538.3 | 2.29× |
+| RTX 5070 Ti | Chinese document | 20,983 | 24,125 | +15.0% | 148.6 | 438.6 | 2.95× |
+| RTX 5070 Ti | English contract | 21,402 | 23,830 | +11.3% | 143.6 | 439.5 | 3.06× |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 20,971 | 22,710 | +8.3% | 147.7 | 435.8 | 2.95× |
+| RTX 6000D | Chinese document | 36,263 | 40,404 | +11.4% | 232.2 | 540.5 | 2.33× |
+| RTX 6000D | English contract | 36,247 | 40,541 | +11.8% | 231.7 | 540.6 | 2.33× |
+| RTX 6000D | Dense formulas (256 tokens) | 36,174 | 36,842 | +1.8% | 234.0 | 537.4 | 2.30× |
 
 Prefill change is `(NInfer / Transformers − 1) × 100%`; decode speedup is `NInfer / Transformers`.
 
@@ -64,14 +66,14 @@ Prefill change is `(NInfer / Transformers − 1) × 100%`; decode speedup is `NI
 
 Request time includes preprocessing, inference and the local HTTP round trip.
 
-| GPU | Input | Transformers request time | NInfer request time | Speedup |
+| GPU | Input | TF request ms | NInfer request ms | Speedup |
 |---|---|---:|---:|---:|
-| RTX 5070 Ti | Chinese document | 1006.0 ms | 437.4 ms | 2.30× |
-| RTX 5070 Ti | English contract | 1004.9 ms | 446.0 ms | 2.25× |
-| RTX 5070 Ti | Dense formulas (256 tokens) | 2009.8 ms | 834.7 ms | 2.41× |
-| RTX 6000D | Chinese document | 582.0 ms | 298.0 ms | 1.95× |
-| RTX 6000D | English contract | 582.7 ms | 298.8 ms | 1.95× |
-| RTX 6000D | Dense formulas (256 tokens) | 1203.5 ms | 581.2 ms | 2.07× |
+| RTX 5070 Ti | Chinese document | 956.7 | 412.8 | 2.32× |
+| RTX 5070 Ti | English contract | 980.5 | 432.7 | 2.27× |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 1981.8 | 791.3 | 2.50× |
+| RTX 6000D | Chinese document | 582.2 | 295.1 | 1.97× |
+| RTX 6000D | English contract | 583.5 | 295.6 | 1.97× |
+| RTX 6000D | Dense formulas (256 tokens) | 1208.1 | 581.1 | 2.08× |
 
 ## OCR accuracy and output agreement
 
@@ -82,7 +84,7 @@ The two complete text pages contain 478 annotated characters. Character accuracy
 | RTX 5070 Ti | 100% (CER 0%) | 100% (CER 0%) | 3/3 (100%) | 0% |
 | RTX 6000D | 100% (CER 0%) | 100% (CER 0%) | 3/3 (100%) | 0% |
 
-On both GPUs, NInfer also scores **100% character accuracy (CER 0%)** on six annotated text images totaling 1,117 normalized characters. BF16 projection, fused SwiGLU and D64 attention pass independent FP64 checks, including CUDA Graph replay and dispatch boundaries.
+On both GPUs, NInfer also scores **100% character accuracy (CER 0%)** on six annotated text images totaling 1,117 normalized characters. BF16 projection, fused bias/residual and bias/GELU, SwiGLU, Gated DeltaNet and D64 attention pass independent FP64 checks, including CUDA Graph replay and dispatch boundaries.
 
 ## Artifact and license
 

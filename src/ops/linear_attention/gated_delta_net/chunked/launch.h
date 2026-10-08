@@ -82,6 +82,7 @@ struct state_passing_config {
     float* state_out       = nullptr;
 
     cudaStream_t stream = nullptr;
+    std::int32_t multiprocessor_count = 0;
 };
 
 struct chunk_output_config {
