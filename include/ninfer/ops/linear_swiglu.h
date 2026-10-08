@@ -74,7 +74,8 @@ linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gate_up_rows,
  * Workspace:
  *   Caller-owned transient storage reported by linear_swiglu_workspace_capacity_bytes(),
  *   including private FP32 or BF16 storage when the selected route materializes gate/up.
- *   scoped to the call. BF16 [6144,1024], Q8, NVFP4 A16, and row-scaled FP8 A16 require zero bytes; A4/A8 routes use
+ *   scoped to the call. BF16 [6144,1024]/[7168,1024], Q8, NVFP4 A16, and row-scaled FP8 A16
+ *   require zero bytes; A4/A8 routes use
  *   caller-owned activation storage and may use private projection storage. There is no persistent
  *   state side effect.
  *

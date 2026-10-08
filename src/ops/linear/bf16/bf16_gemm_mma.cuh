@@ -130,7 +130,8 @@ bf16_mma_tile_coordinates(std::int32_t linear, std::int32_t tiles_m, std::int32_
     }
 }
 
-template <class Geometry, class Schedule, bool FullTokens, class Output, bool FusedSwiGlu = false>
+template <class Geometry, class Schedule, bool FullTokens, class Output, bool FusedSwiGlu = false,
+          bool RoundSwiGluIntermediate = false>
 __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) void bf16_gemm_mma_kernel(
     const __nv_bfloat16* __restrict__ x, const __nv_bfloat16* __restrict__ weight, Output output,
     std::int32_t tokens) {
@@ -324,13 +325,24 @@ __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) void bf16
                 const int token1 = token0 + 1;
                 const float* gate = accum[mi][ni];
                 const float* up = accum[mi + 1][ni];
+                auto activate = [](float g, float u) {
+                    if constexpr (RoundSwiGluIntermediate) {
+                        g = __bfloat162float(__float2bfloat16_rn(g));
+                        u = __bfloat162float(__float2bfloat16_rn(u));
+                        const float silu = __bfloat162float(
+                            __float2bfloat16_rn(g / (1.f + expf(-g))));
+                        return silu * u;
+                    } else {
+                        return (g / (1.f + expf(-g))) * u;
+                    }
+                };
                 if (FullTokens || token0 < tokens) {
-                    output_tile.store(row0, token0, (gate[0] / (1.f + expf(-gate[0]))) * up[0]);
-                    output_tile.store(row1, token0, (gate[2] / (1.f + expf(-gate[2]))) * up[2]);
+                    output_tile.store(row0, token0, activate(gate[0], up[0]));
+                    output_tile.store(row1, token0, activate(gate[2], up[2]));
                 }
                 if (FullTokens || token1 < tokens) {
-                    output_tile.store(row0, token1, (gate[1] / (1.f + expf(-gate[1]))) * up[1]);
-                    output_tile.store(row1, token1, (gate[3] / (1.f + expf(-gate[3]))) * up[3]);
+                    output_tile.store(row0, token1, activate(gate[1], up[1]));
+                    output_tile.store(row1, token1, activate(gate[3], up[3]));
                 }
             }
         }

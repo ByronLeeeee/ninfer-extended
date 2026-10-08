@@ -107,7 +107,7 @@ __launch_bounds__(Br * 2, 128 / Br) __global__ void xiaomi_packed_attention_flas
     std::int64_t k_stride_d, std::int64_t k_stride_h, std::int64_t k_stride_t,
     std::int64_t v_stride_d, std::int64_t v_stride_h, std::int64_t v_stride_t) {
     static_assert(Br == 16 || Br == 32 || Br == 64);
-    static_assert(Bc == 16 || Bc == 32 || Bc == 64);
+    static_assert(Bc == 16 || Bc == 32 || Bc == 64 || Bc == 128);
     constexpr int D             = kXiaomiPackedAttentionHeadDim;
     constexpr int Dp            = kXiaomiPackedAttentionPaddedD;
     constexpr int Threads       = Br * 2;

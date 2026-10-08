@@ -114,6 +114,16 @@ void mma_projection(const Tensor& x, const Weight& w, Output output, cudaStream_
         if constexpr(k==3072) if(x.ne[1]<=256){mma_projection_variant<Geometry,NarrowRowsMma>(x,w,output,stream);return;}
         const int tail=x.ne[1]%128;
         if(x.ne[1]>=1024&&(tail==0||tail>64)){mma_projection_variant<Geometry,WideMma>(x,w,output,stream);return;}
+    } else if constexpr (n == 1024 && k == 3584) {
+        if (x.ne[1] <= 512) {
+            mma_projection_variant<Geometry, NarrowRowsMma>(x, w, output, stream);
+            return;
+        }
+        const int tail = x.ne[1] % WideMma::kBlockCols;
+        if (x.ne[1] >= 1024 && (tail == 0 || tail > 64)) {
+            mma_projection_variant<Geometry, WideMma>(x, w, output, stream);
+            return;
+        }
     } else if constexpr(n==4096&&k==1024) {
         const int short_tail=x.ne[1]%64,wide_tail=x.ne[1]%128;
         if(x.ne[1]<=128&&short_tail>0&&short_tail<=32){mma_projection_variant<Geometry,ShortColumnsMma>(x,w,output,stream);return;}
@@ -253,28 +263,37 @@ void swiglu(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& ws, c
     else if (x.ne[1] == 3) small_swiglu<N, K, 3>(x, w, out, stream);
     else if (x.ne[1] == 4) small_swiglu<N, K, 4>(x, w, out, stream);
     else if (x.ne[1] <= bf16_swiglu_small_max_tokens(N, K)) small_swiglu<N, K, 8>(x, w, out, stream);
-    else if constexpr (N == 6144 && K == 1024) {
+    else if constexpr ((N == 6144 || N == 7168) && K == 1024) {
         // Gate/up projection and activation share the accumulator registers.
         // No gate/up intermediate is observable or materialized in global memory.
         auto launch = [&]<class Schedule>() {
             const int blocks = N / Schedule::kBlockRows * div_up(x.ne[1], Schedule::kBlockCols);
             const ContiguousOutput output{static_cast<__nv_bfloat16*>(out.data), N / 2};
             if (x.ne[1] % Schedule::kBlockCols == 0)
-                bf16_gemm_mma_kernel<Geometry, Schedule, true, ContiguousOutput, true>
+                bf16_gemm_mma_kernel<Geometry, Schedule, true, ContiguousOutput, true, N == 7168>
                     <<<blocks, Schedule::kThreads, Schedule::kSharedBytes, stream>>>(
                         static_cast<const __nv_bfloat16*>(x.data),
                         static_cast<const __nv_bfloat16*>(w.qdata), output, x.ne[1]);
-            else bf16_gemm_mma_kernel<Geometry, Schedule, false, ContiguousOutput, true>
+            else bf16_gemm_mma_kernel<Geometry, Schedule, false, ContiguousOutput, true, N == 7168>
                     <<<blocks, Schedule::kThreads, Schedule::kSharedBytes, stream>>>(
                         static_cast<const __nv_bfloat16*>(x.data),
                         static_cast<const __nv_bfloat16*>(w.qdata), output, x.ne[1]);
         };
+        if constexpr (N == 7168) {
+            const int tail = x.ne[1] % WideMma::kBlockCols;
+            if ((x.ne[1] >= 65 && x.ne[1] <= 128) ||
+                (x.ne[1] >= 256 && (tail == 0 || tail > 64))) {
+                launch.template operator()<WideMma>();
+                CUDA_CHECK(cudaGetLastError());
+                return;
+            }
+        }
         if (x.ne[1] < 32) launch.template operator()<PairedCompactMma>();
         else if (x.ne[1] <= 64) launch.template operator()<ShortColumnsMma>();
         // Narrow columns avoid unused tail MMA work, but the wider row tile needs
         // enough CTA waves to amortize its register pressure. Device facts come
         // from the caller; stream-only callers retain the established schedule.
-        else if (x.ne[1] > 2 * Mma::kBlockCols &&
+        else if (N == 6144 && x.ne[1] > 2 * Mma::kBlockCols &&
                  x.ne[1] <= 2 * Mma::kBlockCols + PairedTailMma::kBlockCols &&
                  multiprocessor_count > 0 &&
                  N / PairedTailMma::kBlockRows * div_up(x.ne[1], PairedTailMma::kBlockCols) >=

@@ -40,7 +40,7 @@ std::size_t linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gat
         throw std::invalid_argument("linear_swiglu workspace: invalid profile or token interval");
     }
     if (qtype == QType::BF16 && detail::bf16_swiglu_shape(gate_up_rows, input_rows)) {
-        if (gate_up_rows == 6144 && input_rows == 1024) return 0;
+        if ((gate_up_rows == 6144 || gate_up_rows == 7168) && input_rows == 1024) return 0;
         const std::size_t staging_element_bytes = (gate_up_rows == 12288 && input_rows == 2048)
             ? sizeof(float) : sizeof(std::uint16_t);
         return max_tokens <= detail::bf16_swiglu_small_max_tokens(gate_up_rows, input_rows)

@@ -1,102 +1,105 @@
 {
   "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
-  "date": "2026-10-07",
   "weights": "bf16",
   "kv": "bf16",
   "context": 4096,
   "lanes": 1,
   "output_cap": 256,
-  "prefill_chunk": 1024,
-  "prefill": "vision encoding + language prefill GPU time",
+  "prefill_chunk": {
+    "ninfer_extended": 1024,
+    "transformers": "complete prompt"
+  },
+  "prefill": "Prompt tokens / (vision encoding + language prefill); CPU preprocessing excluded",
   "decode": "after first token; tokens per second per request",
-  "comparison": "audited compiled Transformers baseline and current shared-operator build, same hardware and settings; separate measurement rounds",
+  "comparison": "Transformers versus NInfer Extended; BF16; matched single-request configuration per GPU",
   "hosts": {
     "RTX 5070 Ti": {
       "measurements": [
         {
           "input": "zh_legal",
           "transformers": {
-            "fixture": "zh_legal",
             "prompt_tokens": 1807,
             "completion_tokens": 113,
-            "client_e2e_ms": 839.6487290000039,
-            "vision_ms": 43.42633099999205,
-            "text_prefill_ms": 34.932940000004464,
-            "prefill_ms": 78.35927099999651,
-            "prefill_tps": 23060.449350021143,
-            "decode_ms": 644.6837800000083,
-            "decode_tps": 173.72858364762732
+            "prefill_tps": 19990.799826118087,
+            "decode_tps": 140.66337854790058,
+            "vision_ms": 51.26904700000523,
+            "language_prefill_ms": 36.925651999979436,
+            "prefill_ms": 90.3961549999508,
+            "client_e2e_ms": 1006.0363619999748,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
           },
           "ninfer_extended": {
             "prompt_tokens": 1807,
             "completion_tokens": 113,
-            "prefill_tps": 22489.977781780814,
-            "decode_tps": 423.92393154915055,
-            "vision_ms": 42.04227256774902,
-            "language_prefill_ms": 38.41017599694824,
-            "prefill_ms": 80.45244856469726,
-            "client_e2e_ms": 416.9206119999558
+            "prefill_tps": 22240.167818126407,
+            "decode_tps": 413.30269874815565,
+            "vision_ms": 41.60847854614258,
+            "language_prefill_ms": 38.61798357849122,
+            "prefill_ms": 81.2502285,
+            "client_e2e_ms": 437.3662374999867,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
           },
-          "prefill_speed_ratio": 0.9752619058032447,
-          "decode_speed_ratio": 2.4401507377104563
+          "prefill_speed_ratio": 1.112520159852209,
+          "decode_speed_ratio": 2.938239526270246,
+          "request_speed_ratio": 2.300214958865007
         },
         {
           "input": "en_contract",
           "transformers": {
-            "fixture": "en_contract",
             "prompt_tokens": 1807,
             "completion_tokens": 114,
-            "client_e2e_ms": 829.488696999988,
-            "vision_ms": 43.81348500000115,
-            "text_prefill_ms": 32.04762299999686,
-            "prefill_ms": 79.79451500000323,
-            "prefill_tps": 22645.666810556177,
-            "decode_ms": 667.2399349999978,
-            "decode_tps": 169.3543717523448
+            "prefill_tps": 19792.976831059987,
+            "decode_tps": 138.60188160857524,
+            "vision_ms": 49.861188500017306,
+            "language_prefill_ms": 40.19543550003846,
+            "prefill_ms": 91.29522850003013,
+            "client_e2e_ms": 1004.9038665000012,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
           },
           "ninfer_extended": {
             "prompt_tokens": 1807,
             "completion_tokens": 114,
-            "prefill_tps": 21926.56409653715,
-            "decode_tps": 422.06170093441096,
-            "vision_ms": 42.08502388000488,
-            "language_prefill_ms": 40.43039633740234,
-            "prefill_ms": 82.51542021740723,
-            "client_e2e_ms": 413.59147949998487
+            "prefill_tps": 22338.285184676814,
+            "decode_tps": 414.7140421756369,
+            "vision_ms": 42.0634880065918,
+            "language_prefill_ms": 38.160568265991216,
+            "prefill_ms": 80.89253450000001,
+            "client_e2e_ms": 446.0415935000128,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
           },
-          "prefill_speed_ratio": 0.9682454608188521,
-          "decode_speed_ratio": 2.4921807247563263
+          "prefill_speed_ratio": 1.1285965408509255,
+          "decode_speed_ratio": 2.992124185924318,
+          "request_speed_ratio": 2.2529375761006745
         },
         {
           "input": "dense-equations",
           "transformers": {
-            "fixture": "dense-equations",
             "prompt_tokens": 2368,
             "completion_tokens": 256,
-            "client_e2e_ms": 1726.0353399999815,
-            "vision_ms": 64.371991999991,
-            "text_prefill_ms": 42.3092920000272,
-            "prefill_ms": 106.6812840000182,
-            "prefill_tps": 22196.958184339026,
-            "decode_ms": 1490.371261000007,
-            "decode_tps": 171.0983072961971
+            "prefill_tps": 20559.841954657757,
+            "decode_tps": 145.0267042375852,
+            "vision_ms": 70.37698450005792,
+            "language_prefill_ms": 44.16376900002206,
+            "prefill_ms": 115.17760200001703,
+            "client_e2e_ms": 2009.75080850003,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517"
           },
           "ninfer_extended": {
             "prompt_tokens": 2368,
             "completion_tokens": 256,
-            "prefill_tps": 20640.290213744018,
-            "decode_tps": 420.62286935259954,
-            "vision_ms": 63.230751037597656,
-            "language_prefill_ms": 51.56130039892578,
-            "prefill_ms": 114.79205143652344,
-            "client_e2e_ms": 808.235248999992
+            "prefill_tps": 20734.05113966751,
+            "decode_tps": 410.66499688635037,
+            "vision_ms": 63.8068962097168,
+            "language_prefill_ms": 50.20264802185059,
+            "prefill_ms": 114.209546,
+            "client_e2e_ms": 834.7152780000329,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517"
           },
-          "prefill_speed_ratio": 0.9298702120503471,
-          "decode_speed_ratio": 2.458369553735196
+          "prefill_speed_ratio": 1.0084732745219516,
+          "decode_speed_ratio": 2.8316508952281785,
+          "request_speed_ratio": 2.407708186814751
         }
       ],
-      "transformers_comparison_date": "2026-10-06",
-      "current_ninfer_date": "2026-10-07",
       "quality": {
         "fixtures": 3,
         "raw_exact": 3,
@@ -133,7 +136,8 @@
             "hf_finish_reason": "length",
             "ninfer_finish_reason": "length"
           }
-        ]
+        ],
+        "formal_responses": 60
       },
       "synthetic_text_cer": {
         "hf": {
@@ -148,6 +152,45 @@
           "gold_chars": 478,
           "weighted_cer": 0.0
         }
+      },
+      "comparison": "Paired resident Transformers and final NInfer Extended; alternating requests; median results",
+      "ninfer_binary_sha256": "5c865044d55c4b87e8ab9482126a171b5186120ddf5dc9fe0d4688642b594d4f",
+      "transformers_audit": {
+        "status": "ready",
+        "engine": "transformers",
+        "dtype": "bfloat16",
+        "linear_backends": {
+          "causal_conv1d_fn": {
+            "fused": true,
+            "implementation_module": "causal_conv1d.causal_conv1d_interface"
+          },
+          "causal_conv1d_update": {
+            "fused": true,
+            "implementation_module": "causal_conv1d.causal_conv1d_interface"
+          },
+          "torch_chunk_gated_delta_rule": {
+            "fused": true,
+            "implementation_module": "fla.ops.gated_delta_rule.chunk"
+          },
+          "torch_recurrent_gated_delta_rule": {
+            "fused": true,
+            "implementation_module": "fla.ops.gated_delta_rule.fused_recurrent"
+          }
+        },
+        "torch_num_threads": 1,
+        "torch_num_interop_threads": 16,
+        "compile_decode": true,
+        "compile_mode": "reduce-overhead",
+        "compile_prefill": true,
+        "prefill_scope": "vision and language fullgraph; grid metadata eager",
+        "static_cache_floor": 4096
+      },
+      "additional_annotated_text_quality": {
+        "backend": "ninfer_extended",
+        "fixtures": 6,
+        "gold_characters": 1117,
+        "cer": 0.0,
+        "character_accuracy": 1.0
       }
     },
     "RTX 6000D": {
@@ -155,87 +198,88 @@
         {
           "input": "zh_legal",
           "transformers": {
-            "fixture": "zh_legal",
             "prompt_tokens": 1807,
             "completion_tokens": 113,
-            "client_e2e_ms": 579.0905699832365,
-            "vision_ms": 29.407739057205617,
-            "text_prefill_ms": 20.48295713029802,
-            "prefill_ms": 49.926753039471805,
-            "prefill_tps": 36193.020574989045,
-            "decode_ms": 479.18761894106865,
-            "decode_tps": 233.7289102909271
+            "prefill_tps": 36425.66096554422,
+            "decode_tps": 231.92409842434847,
+            "vision_ms": 29.37667100923136,
+            "language_prefill_ms": 20.336957939434797,
+            "prefill_ms": 49.60789351025596,
+            "client_e2e_ms": 581.9898815243505,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
           },
           "ninfer_extended": {
             "prompt_tokens": 1807,
             "completion_tokens": 113,
-            "prefill_tps": 37717.683815650285,
-            "decode_tps": 542.9869473433307,
-            "vision_ms": 24.67643165588379,
-            "language_prefill_ms": 23.27712499005127,
-            "prefill_ms": 47.95355664593506,
-            "client_e2e_ms": 293.52351295528933
+            "prefill_tps": 37920.76324196979,
+            "decode_tps": 542.4171838660244,
+            "vision_ms": 25.338735580444336,
+            "language_prefill_ms": 22.277738432495113,
+            "prefill_ms": 47.6521685,
+            "client_e2e_ms": 297.98306291922927,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
           },
-          "prefill_speed_ratio": 1.0421258910264828,
-          "decode_speed_ratio": 2.3231484144065186
+          "prefill_speed_ratio": 1.0410453025914839,
+          "decode_speed_ratio": 2.338770259542287,
+          "request_speed_ratio": 1.95309718553401
         },
         {
           "input": "en_contract",
           "transformers": {
-            "fixture": "en_contract",
             "prompt_tokens": 1807,
             "completion_tokens": 114,
-            "client_e2e_ms": 584.704132983461,
-            "vision_ms": 29.326283955015242,
-            "text_prefill_ms": 20.562828052788973,
-            "prefill_ms": 49.980003968812525,
-            "prefill_tps": 36154.458913760114,
-            "decode_ms": 486.64822499267757,
-            "decode_tps": 232.20057979601236
+            "prefill_tps": 36439.011143949676,
+            "decode_tps": 231.77434296889345,
+            "vision_ms": 29.39496049657464,
+            "language_prefill_ms": 20.171870477497578,
+            "prefill_ms": 49.58971950691193,
+            "client_e2e_ms": 582.7217730111443,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
           },
           "ninfer_extended": {
             "prompt_tokens": 1807,
             "completion_tokens": 114,
-            "prefill_tps": 38482.8904793129,
-            "decode_tps": 541.4225468246736,
-            "vision_ms": 24.668831825256348,
-            "language_prefill_ms": 22.25168163861084,
-            "prefill_ms": 46.92051346386719,
-            "client_e2e_ms": 293.40877500362694
+            "prefill_tps": 37664.06029182094,
+            "decode_tps": 540.8357199921875,
+            "vision_ms": 25.34260845184326,
+            "language_prefill_ms": 22.636038531066895,
+            "prefill_ms": 47.976779,
+            "client_e2e_ms": 298.81159303477034,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb"
           },
-          "prefill_speed_ratio": 1.0644023347467828,
-          "decode_speed_ratio": 2.331701959143737
+          "prefill_speed_ratio": 1.033619165542989,
+          "decode_speed_ratio": 2.333458108712116,
+          "request_speed_ratio": 1.9501310745441445
         },
         {
           "input": "dense-equations",
           "transformers": {
-            "fixture": "dense-equations",
             "prompt_tokens": 2368,
             "completion_tokens": 256,
-            "client_e2e_ms": 1206.7218950251117,
-            "vision_ms": 40.50346603617072,
-            "text_prefill_ms": 25.233773980289698,
-            "prefill_ms": 65.79673395026475,
-            "prefill_tps": 35989.62832699193,
-            "decode_ms": 1084.7488389117643,
-            "decode_tps": 235.0774583504691
+            "prefill_tps": 36072.107327850244,
+            "decode_tps": 234.70814846500963,
+            "vision_ms": 40.31154001131654,
+            "language_prefill_ms": 25.276560452766716,
+            "prefill_ms": 65.64628949854523,
+            "client_e2e_ms": 1203.5204619751312,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517"
           },
           "ninfer_extended": {
             "prompt_tokens": 2368,
             "completion_tokens": 256,
-            "prefill_tps": 35428.14170839246,
-            "decode_tps": 537.7736859236953,
-            "vision_ms": 37.89863967895508,
-            "language_prefill_ms": 28.79572914379883,
-            "prefill_ms": 66.69436882275392,
-            "client_e2e_ms": 580.0727305468172
+            "prefill_tps": 35615.466228344994,
+            "decode_tps": 538.2905738682146,
+            "vision_ms": 37.81844902038574,
+            "language_prefill_ms": 28.674657470214846,
+            "prefill_ms": 66.48797449999999,
+            "client_e2e_ms": 581.1896359664388,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517"
           },
-          "prefill_speed_ratio": 0.9843986547041288,
-          "decode_speed_ratio": 2.2876446329530524
+          "prefill_speed_ratio": 0.9873408809927583,
+          "decode_speed_ratio": 2.293446466978811,
+          "request_speed_ratio": 2.0707878934796238
         }
       ],
-      "transformers_comparison_date": "2026-10-06",
-      "current_ninfer_date": "2026-10-07",
       "quality": {
         "fixtures": 3,
         "raw_exact": 3,
@@ -272,7 +316,8 @@
             "hf_finish_reason": "length",
             "ninfer_finish_reason": "length"
           }
-        ]
+        ],
+        "formal_responses": 60
       },
       "synthetic_text_cer": {
         "hf": {
@@ -287,7 +332,51 @@
           "gold_chars": 478,
           "weighted_cer": 0.0
         }
+      },
+      "comparison": "Paired resident Transformers and final NInfer Extended; alternating requests; median results",
+      "ninfer_binary_sha256": "713ffe209f4250da40ffc89cce2a954a892578587937dd66255073758355482f",
+      "transformers_audit": {
+        "status": "ready",
+        "engine": "transformers",
+        "dtype": "bfloat16",
+        "linear_backends": {
+          "causal_conv1d_fn": {
+            "fused": true,
+            "implementation_module": "causal_conv1d.causal_conv1d_interface"
+          },
+          "causal_conv1d_update": {
+            "fused": true,
+            "implementation_module": "causal_conv1d.causal_conv1d_interface"
+          },
+          "torch_chunk_gated_delta_rule": {
+            "fused": true,
+            "implementation_module": "fla.ops.gated_delta_rule.chunk"
+          },
+          "torch_recurrent_gated_delta_rule": {
+            "fused": true,
+            "implementation_module": "fla.ops.gated_delta_rule.fused_recurrent"
+          }
+        },
+        "torch_num_threads": 1,
+        "torch_num_interop_threads": 24,
+        "compile_decode": true,
+        "compile_mode": "reduce-overhead",
+        "compile_prefill": true,
+        "prefill_scope": "vision and language fullgraph; grid metadata eager",
+        "static_cache_floor": 4096
+      },
+      "additional_annotated_text_quality": {
+        "backend": "ninfer_extended",
+        "fixtures": 6,
+        "gold_characters": 1117,
+        "cer": 0.0,
+        "character_accuracy": 1.0
       }
     }
+  },
+  "timing": {
+    "transformers": "synchronized stage wall time",
+    "ninfer_extended": "CUDA events",
+    "request": "client wall time"
   }
 }

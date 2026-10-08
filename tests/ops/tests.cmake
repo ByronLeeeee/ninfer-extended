@@ -39,6 +39,10 @@ ninfer_add_op_test(ninfer_candidate_selector_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_candidate_selector.cpp"
   LIBRARIES ninfer_ops)
 
+ninfer_add_op_test(ninfer_packed_attention_bf16_d64_test
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/softmax_attention/packed_bf16_d64.cpp"
+  LIBRARIES ninfer_ops)
+
 ninfer_add_op_test(ninfer_softmax_attention_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/softmax_attention/main.cpp"
           "${CMAKE_CURRENT_LIST_DIR}/softmax_attention/causal_cache.cpp"

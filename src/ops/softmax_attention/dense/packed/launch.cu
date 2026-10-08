@@ -46,6 +46,10 @@ void packed_attention_launch(const Tensor& q, const Tensor& k, const Tensor& v,
         CUDA_CHECK(cudaGetLastError());
     }
 
+    if (!packed_segments && q.ne[2] >= 6656) {
+        launch_flash<64, 128>(q, k, v, nullptr, 0, max_tiles, out, stream);
+        return;
+    }
     launch_flash<kXiaomiPackedAttentionBr, kXiaomiPackedAttentionBc>(
         q, k, v, packed_segments ? static_cast<const XiaomiPackedAttentionTile*>(tiles->data) : nullptr,
         0, max_tiles, out, stream);
@@ -85,6 +89,10 @@ void packed_attention_uniform_launch_with_tile(const Tensor& q, const Tensor& k,
         launch_flash<32, 32>(q, k, v, nullptr, segment_length, query_tiles, out, stream);
         return;
     case 64:
+        if (segment_length >= 6656) {
+            launch_flash<64, 128>(q, k, v, nullptr, segment_length, query_tiles, out, stream);
+            return;
+        }
         launch_flash<64, 64>(q, k, v, nullptr, segment_length, query_tiles, out, stream);
         return;
     default:

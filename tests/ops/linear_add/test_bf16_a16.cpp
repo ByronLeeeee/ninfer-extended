@@ -57,10 +57,18 @@ int bf16_a16_conformance() {
     constexpr std::array<std::int32_t, 10> kRouteInteriors{
         4, 8, 16, 32, 48, 127, 128, 129, 1024, 1536,
     };
+    constexpr std::array<std::int32_t, 4> kCompactRouteStarts{2, 9, 513, 1024};
+    constexpr std::array<std::int32_t, 10> kCompactInteriors{
+        64, 65, 128, 316, 783, 1087, 1088, 1089, 1152, 2048,
+    };
+    constexpr std::array<std::int32_t, 4> kCompactGraphs{65, 316, 1024, 1089};
     return ninfer::test::linear_add::run_shape(
                "BF16_A16 LinearAdd", WeightFormat::BF16,
                ShapeCase{5120, 6144, 431U, kRouteStarts, kRouteInteriors}) +
-           bf16_a16_rejections();
+           ninfer::test::linear_add::run_shape(
+               "BF16_A16 LinearAdd", WeightFormat::BF16,
+               ShapeCase{1024, 3584, 433U, kCompactRouteStarts, kCompactInteriors,
+                         kCompactGraphs, true}) + bf16_a16_rejections();
 }
 
 } // namespace
