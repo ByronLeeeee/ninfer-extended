@@ -31,7 +31,8 @@ NInfer is a from-scratch C++/CUDA inference engine for maximum single-GPU perfor
 `Qwen3_5ForCausalLM` and `Qwen3_5MoeForCausalLM`; official Qwen3.6/3.8 artifacts and user recipes
 use the same architecture, binding and execution path. The implementation targets `sm_120a` and
 is tuned on NVIDIA GeForce RTX 5090. NInfer Extended also provides native BF16 Qwen3 speech
-recognition and text embedding through startup-fixed `SpeechRecognition` and `TextEmbedding`
+recognition, forced alignment and text embedding through startup-fixed `SpeechRecognition`,
+`ForcedAlignment` and `TextEmbedding`
 Engine purposes, with shared CUDA Ops measured on RTX 5070 Ti and RTX 6000D.
 
 Generation uses one GPU, one resident model, startup-fixed concurrency of one to eight requests,

@@ -157,7 +157,8 @@ public:
         : options(runtime::normalize_engine_options(std::move(engine_options))),
           device(initialize_device(options)) {
         nvtx::ScopedRange load_range(nvtx::Name::EngineLoad, nvtx::Category::Runtime);
-        if (options.purpose == EnginePurpose::SpeechRecognition) {
+        if (options.purpose == EnginePurpose::SpeechRecognition ||
+            options.purpose == EnginePurpose::ForcedAlignment) {
             speech = std::make_unique<models::qwen3_asr::Program>(options, device);
             load = speech->load_summary();
             return;
@@ -456,8 +457,19 @@ void Engine::reset_memory_peaks() noexcept {
 SpeechResult Engine::transcribe_features(std::vector<SpeechFeatures> samples,
                                        const SpeechRunOptions& options) {
     if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
-    if (!impl_->speech) { throw std::logic_error("transcribe_features requires a SpeechRecognition Engine"); }
+    if (!impl_->speech || impl_->options.purpose != EnginePurpose::SpeechRecognition) {
+        throw std::logic_error("transcribe_features requires a SpeechRecognition Engine");
+    }
     return impl_->speech->transcribe(std::move(samples), options);
+}
+
+AlignmentResult Engine::align_features(std::vector<SpeechFeatures> samples,
+                                     const AlignmentRunOptions& options) {
+    if (impl_ == nullptr) { throw std::logic_error("Engine is moved from"); }
+    if (!impl_->speech || impl_->options.purpose != EnginePurpose::ForcedAlignment) {
+        throw std::logic_error("align_features requires a ForcedAlignment Engine");
+    }
+    return impl_->speech->align(std::move(samples), options);
 }
 
 EmbeddingResult Engine::embed_tokens(const std::vector<std::vector<TokenId>>& sequences,

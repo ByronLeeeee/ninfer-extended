@@ -1,0 +1,33 @@
+{
+  "model_repository": "ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer",
+  "source": "Qwen/Qwen3-ForcedAligner-0.6B",
+  "purpose": "forced_alignment",
+  "artifact": "qwen3-forced-aligner-0.6b-bf16.ninfer",
+  "bytes": 1840359257,
+  "sha256": "45234e54ba66833e846e4d3d30eca06c9f95833a35350508c667432a90143473",
+  "published_date": "2026-10-08",
+  "weights": "bf16",
+  "weight_quantization": false,
+  "source_tensors": 708,
+  "source_weight_bytes_preserved": true,
+  "timestamp_step_ms": 80,
+  "languages": [
+    "Chinese",
+    "English",
+    "Cantonese",
+    "French",
+    "German",
+    "Italian",
+    "Japanese",
+    "Korean",
+    "Portuguese",
+    "Russian",
+    "Spanish"
+  ],
+  "kv_cache_bytes": 0,
+  "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
+  "runtime_branch": "main",
+  "runtime_guide": "docs/qwen3-forced-aligner.md",
+  "main_asr_artifact": "qwen3-asr-1.7b-bf16.ninfer",
+  "license": "apache-2.0"
+}

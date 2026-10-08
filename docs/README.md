@@ -9,6 +9,7 @@ run the CLI or HTTP server.
 |---|---|
 | [Xiaomi OCR](xiaomi-ocr.md) | Qwen3.5-0.8B BF16 conversion, native OCR serving and tested Blackwell GPUs |
 | [Qwen3 ASR](qwen3-asr.md) | native BF16 speech recognition, audio frontend, conversion, performance and accuracy |
+| [Qwen3 ForcedAligner](qwen3-forced-aligner.md) | native BF16 word timestamps, independent audio batches, conversion and resident CLI |
 | [Qwen3 Embedding](qwen3-embedding.md) | native BF16 text vectors, batching, retrieval instructions, conversion and measured quality/performance |
 | [CLI](cli.md) | text, chat-history, image/video input, output streams, sampling, MTP, and common runtime options |
 | [HTTP serving](serving.md) | OpenAI Responses/Chat Completions, Anthropic Messages, state, streaming, token counting, authentication, and tool calls |

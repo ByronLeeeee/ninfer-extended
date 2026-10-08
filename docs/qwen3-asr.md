@@ -34,6 +34,22 @@ python tools/qwen3_asr/transcribe.py \
   --audio recording.wav --out transcription.json
 ```
 
+For a single production pass, use `--warmups 0`. The default remains one
+unmeasured warmup for benchmark use; `--repeats` controls measured runs.
+Official processor context and forced language can be supplied directly:
+
+```bash
+python tools/qwen3_asr/transcribe.py \
+  --artifact qwen3-asr-1.7b-bf16.ninfer --engine build/apps/ninfer-asr \
+  --audio recording.wav --out transcription.json --warmups 0 \
+  --language Chinese --prompt 'Financial news in Mandarin.' \
+  --hotwords 交易 停滞
+```
+
+Omit `--language` for automatic language detection. Context and hotwords use
+the official processor's system prompt. Parsed JSON retains a `text` list per
+run and adds a corresponding `language` list for all supplied audio lanes.
+
 Supply one to four mono PCM16 WAV files at 16 kHz. For other audio formats:
 
 ```bash

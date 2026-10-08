@@ -2,6 +2,7 @@
 
 #include "ninfer/types.h"
 #include "ninfer/asr.h"
+#include "ninfer/alignment.h"
 #include "ninfer/embedding.h"
 
 #include <chrono>
@@ -107,6 +108,8 @@ public:
     // CPU log-mel frontend input; all encoder and decoder math runs natively on the GPU.
     SpeechResult transcribe_features(std::vector<SpeechFeatures> samples,
                                     const SpeechRunOptions& options = {});
+    AlignmentResult align_features(std::vector<SpeechFeatures> samples,
+                                   const AlignmentRunOptions& options = {});
     // Raw tokenizer IDs preserve explicit query instructions. No chat template,
     // padding, implicit special token, KV cache, or autoregressive decode is used.
     EmbeddingResult embed_tokens(const std::vector<std::vector<TokenId>>& sequences,

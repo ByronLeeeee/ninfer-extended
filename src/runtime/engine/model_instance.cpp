@@ -80,6 +80,15 @@ EngineOptions normalize_engine_options(EngineOptions options) {
         options.enable_vision = false;
         options.context_cache = ContextCacheOptions{.enabled = false};
         break;
+    case EnginePurpose::ForcedAlignment:
+        if (options.max_context == 0 || options.max_context > 8192) {
+            throw std::invalid_argument("Forced alignment max_context must be in [1,8192]");
+        }
+        options.speculative = {};
+        options.enable_vision = false;
+        options.context_cache = ContextCacheOptions{.enabled = false};
+        options.kv_capacity = KvCapacityPolicy::explicit_capacity(1);
+        break;
     case EnginePurpose::TextEmbedding:
         if (options.max_context == 0 || options.max_context > 32768) {
             throw std::invalid_argument("Embedding max_context must be in [1,32768]");

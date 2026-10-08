@@ -40,6 +40,10 @@ checkpoint 或 cache replica，也不进入 Scheduler/ResourceManager。Generati
 
 扩展版还提供启动时固定的 `SpeechRecognition` 与 `TextEmbedding` purpose，分别通过
 `Engine::transcribe_features()` 和 `Engine::embed_tokens()` 进入原生 BF16 Qwen3 执行。
+`ForcedAlignment` 通过 `Engine::align_features()` 执行完整音频与 causal 语言前向，
+只在 timestamp token 行上计算 5,000 类时间头；没有生成循环或 KV cache。它复用 Qwen3
+音频／语言数学，由固定配置区分宽度、时间头与整段音频注意力。BF16 gate/up、SiLU 与
+projection/residual 的中间舍入遵循官方对齐路径；跨样本音频注意力相互独立。
 Models 拥有音频／语言／向量池化的固定数学组合、权重绑定、工作缓冲及 CUDA Graph；共享计算
 属于 Ops。音频特征提取和文本分词由 CPU 工具完成。Embedding 只执行前向和最后有效 token
 的向量池化，没有 decode 循环或常驻 KV；多条文本的 causal 范围相互独立。

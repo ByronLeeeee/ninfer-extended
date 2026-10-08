@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-08",
+  "model": "Qwen/Qwen3-ForcedAligner-0.6B",
+  "dtype": "bf16",
+  "scope": "Complete audio encoder, language forward and timestamp head, measured with synchronized CUDA events; excludes CPU frontend, model loading and initial graph capture.",
+  "reference": {
+    "package": "qwen-asr==0.0.6",
+    "transformers": "4.57.6",
+    "torch": "2.10.0+cu130",
+    "attention": "fused SDPA",
+    "torch_compile": false,
+    "cpu_offload": false,
+    "math_sdpa_fallback": false
+  },
+  "ninfer": {
+    "audio_cuda_graph": true,
+    "language_cuda_graph": true,
+    "attention": "compensated Tensor Core",
+    "kv_cache_bytes": 0
+  },
+  "single_sample": true,
+  "warmups": 3,
+  "measured_runs": 7,
+  "statistic": "median",
+  "timestamp_step_ms": 80,
+  "gpus": {
+    "RTX 5070 Ti": {
+      "cases": [
+        {
+          "input": "Chinese 4.20 s",
+          "audio_seconds": 4.2039375,
+          "transformers_gpu_ms": 71.33609771728516,
+          "ninfer_gpu_ms": 4.449343919754028,
+          "speedup": 16.032947554485474,
+          "ninfer_engine_wall_ms": 4.887862,
+          "native_weight_bytes": 1835730688,
+          "native_working_buffer_bytes": 246778652
+        },
+        {
+          "input": "English 15.05 s",
+          "audio_seconds": 15.05125,
+          "transformers_gpu_ms": 68.46438598632812,
+          "ninfer_gpu_ms": 10.283008098602295,
+          "speedup": 6.658011481643593,
+          "ninfer_engine_wall_ms": 11.088568,
+          "native_weight_bytes": 1835730688,
+          "native_working_buffer_bytes": 310980608
+        },
+        {
+          "input": "English 60.205 s",
+          "audio_seconds": 60.205,
+          "transformers_gpu_ms": 59.145599365234375,
+          "ninfer_gpu_ms": 33.96985626220703,
+          "speedup": 1.741120095083725,
+          "ninfer_engine_wall_ms": 35.8969,
+          "native_weight_bytes": 1835730688,
+          "native_working_buffer_bytes": 576224032
+        },
+        {
+          "input": "Chinese 0.75 s",
+          "audio_seconds": 0.75,
+          "transformers_gpu_ms": 74.6737289428711,
+          "ninfer_gpu_ms": 3.530079960823059,
+          "speedup": 21.153551696166247,
+          "ninfer_engine_wall_ms": 3.877582,
+          "native_weight_bytes": 1835730688,
+          "native_working_buffer_bytes": 223729336
+        }
+      ],
+      "timestamp_agreement": {
+        "boundaries": 400,
+        "exact_boundaries": 400,
+        "exact_rate": 1.0,
+        "max_abs_ms": 0.0
+      }
+    },
+    "RTX 6000D": {
+      "cases": [
+        {
+          "input": "Chinese 4.20 s",
+          "audio_seconds": 4.2039375,
+          "transformers_gpu_ms": 10.28006362915039,
+          "ninfer_gpu_ms": 3.7044479846954346,
+          "speedup": 2.7750595153775865,
+          "ninfer_engine_wall_ms": 3.8452,
+          "native_weight_bytes": 1835730688,
+          "native_working_buffer_bytes": 246778652
+        },
+        {
+          "input": "English 15.05 s",
+          "audio_seconds": 15.05125,
+          "transformers_gpu_ms": 10.919967651367188,
+          "ninfer_gpu_ms": 6.1568639278411865,
+          "speedup": 1.7736249784549183,
+          "ninfer_engine_wall_ms": 6.4909989999999995,
+          "native_weight_bytes": 1835730688,
+          "native_working_buffer_bytes": 310980608
+        },
+        {
+          "input": "English 60.205 s",
+          "audio_seconds": 60.205,
+          "transformers_gpu_ms": 24.07004737854004,
+          "ninfer_gpu_ms": 23.535871505737305,
+          "speedup": 1.0226962435902371,
+          "ninfer_engine_wall_ms": 24.29661,
+          "native_weight_bytes": 1835730688,
+          "native_working_buffer_bytes": 576224032
+        },
+        {
+          "input": "Chinese 0.75 s",
+          "audio_seconds": 0.75,
+          "transformers_gpu_ms": 9.118144035339355,
+          "ninfer_gpu_ms": 3.2761600017547607,
+          "speedup": 2.783180317950143,
+          "ninfer_engine_wall_ms": 3.358889,
+          "native_weight_bytes": 1835730688,
+          "native_working_buffer_bytes": 223729336
+        }
+      ],
+      "timestamp_agreement": {
+        "boundaries": 400,
+        "exact_boundaries": 399,
+        "exact_rate": 0.9975,
+        "max_abs_ms": 80.00000000000007
+      }
+    }
+  }
+}

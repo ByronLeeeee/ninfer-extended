@@ -1,6 +1,8 @@
 ---
 license: apache-2.0
-base_model: Qwen/Qwen3-ASR-1.7B-hf
+base_model:
+- Qwen/Qwen3-ASR-1.7B-hf
+- Qwen/Qwen3-ForcedAligner-0.6B
 pipeline_tag: automatic-speech-recognition
 library_name: ninfer
 language:
@@ -12,11 +14,15 @@ tags:
 - cuda
 - qwen3-asr
 - speech-recognition
+- forced-alignment
+- word-timestamps
 ---
 
 # Qwen3-ASR-1.7B BF16 for NInfer
 
 This BF16 conversion of [Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf) runs with the **main branch of [ninfer-extended](https://github.com/ByronLeeeee/ninfer-extended)**. Audio encoding, language prefill and decode run in the native C++/CUDA engine. The artifact includes the tokenizer, processor and chat template, with all 707 source parameters preserved byte for byte.
+
+Also included: a native BF16 Qwen3-ForcedAligner-0.6B artifact for word timestamps. See the combined ASR/alignment workflow and measurements dated 2026-10-08 below.
 
 ## Build and transcribe
 
@@ -25,7 +31,7 @@ git clone https://github.com/ByronLeeeee/ninfer-extended.git
 cd ninfer-extended
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCUDNN_ROOT=/path/to/cudnn -DCUBLAS_ROOT=/path/to/cublas
-cmake --build build --target ninfer-asr -j
+cmake --build build --target ninfer-asr ninfer-align -j
 pip install "transformers>=5.13.0" torch numpy
 pip install huggingface_hub
 hf download ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer qwen3-asr-1.7b-bf16.ninfer --local-dir models
@@ -100,6 +106,74 @@ Quality is measured on 73 real labelled English recordings: 481.03 seconds and 1
 | RTX 6000D | 3.5652% | 3.5652% | 1.2585% | 1.2585% | 97.26% | 100.00% | 0.1720% |
 
 On 5070 Ti, Transformers has 45 word errors and NInfer 44; the differing `has/is` choice matches the gold transcript in NInfer. On 6000D both have 41 errors and all normalized texts agree; raw differences are capitalization and punctuation. Both GPUs pass independent FP64 operator checks, and the final iteration preserves all 73 previously qualified outputs.
+
+## Word timestamps with Qwen3-ForcedAligner-0.6B
+
+**Updated 2026-10-08:** this repository now includes `qwen3-forced-aligner-0.6b-bf16.ninfer` alongside the main ASR artifact. Both run with the `main` branch of [ninfer-extended](https://github.com/ByronLeeeee/ninfer-extended).
+
+The ASR model produces the transcript and detected language. ForcedAligner then takes the same audio and transcript and assigns start/end times to each word. Audio encoding, language forward and timestamp classification run in one native BF16 pass with CUDA Graphs and no KV cache. Conversion preserves all 708 source BF16 parameters byte for byte. The timestamp step is **80 ms**.
+
+Supported languages: Chinese, English, Cantonese, French, German, Italian, Japanese, Korean, Portuguese, Russian and Spanish.
+
+### Run ASR and alignment together
+
+The commands below transcribe the recording, read its text and detected language, and generate word timestamps. The CPU frontends use Transformers 5.17.0 and 4.57.6 respectively, so each has its own Python environment. Both GPU stages run in NInfer. Configure the build dependencies above before a first installation.
+
+```bash
+# Run from the ninfer-extended repository root.
+cmake --build build --target ninfer-asr ninfer-align -j
+python3 -m venv .venv-asr
+.venv-asr/bin/python -m pip install "transformers==5.17.0" torch numpy huggingface_hub
+python3 -m venv .venv-align
+.venv-align/bin/python -m pip install "qwen-asr==0.0.6" "transformers==4.57.6" torch numpy soundfile
+
+.venv-asr/bin/hf download ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer \
+  qwen3-asr-1.7b-bf16.ninfer qwen3-forced-aligner-0.6b-bf16.ninfer --local-dir models
+ffmpeg -i recording.wav -ac 1 -ar 16000 -c:a pcm_s16le recording-16k.wav
+
+.venv-asr/bin/python tools/qwen3_asr/transcribe.py \
+  --artifact models/qwen3-asr-1.7b-bf16.ninfer --engine build/apps/ninfer-asr \
+  --audio recording-16k.wav --warmups 0 --repeats 1 --out transcription.json
+
+TRANSCRIPT="$(.venv-asr/bin/python -c 'import json; print(json.load(open("transcription.json", encoding="utf-8"))["runs"][-1]["text"][0])')"
+LANGUAGE="$(.venv-asr/bin/python -c 'import json; print(json.load(open("transcription.json", encoding="utf-8"))["runs"][-1]["language"][0])')"
+.venv-align/bin/python tools/qwen3_forced_aligner/align.py \
+  --artifact models/qwen3-forced-aligner-0.6b-bf16.ninfer --engine build/apps/ninfer-align \
+  --audio recording-16k.wav --text "$TRANSCRIPT" --language "$LANGUAGE" \
+  --warmups 0 --repeats 1 --out timestamps.json
+
+.venv-align/bin/python -c 'import json; r=json.load(open("timestamps.json", encoding="utf-8")); print(json.dumps(r["cases"][0]["runs"][-1]["words"][0], ensure_ascii=False, indent=2))'
+```
+
+`transcription.json` contains the recognition result. Word timestamps are in `timestamps.json` at `cases[0].runs[-1].words[0]`: each entry contains `text`, `start` and `end`, in seconds. You can also pass an edited transcript directly with `--text`. For multiple recordings, supply matching `--audio`, `--text` and `--language` lists; ASR accepts 1–4 samples and the aligner accepts 1–8.
+
+### Alignment timing and timestamp agreement
+
+Measured on 2026-10-08, single sample, three warmups and seven timed runs per case, reported as medians. Synchronized CUDA events cover the complete audio encoder, language forward and timestamp head, including scheduling gaps between stages; model loading, CPU preprocessing and initial Graph capture are excluded. The official reference uses `qwen-asr 0.0.6`, Transformers 4.57.6 and PyTorch 2.10.0+cu130 with BF16 GPU weights and fused SDPA, without CPU offload or MATH attention fallback. This alignment reference runs eagerly; the main ASR reference above uses compilation and decode Graphs.
+
+| GPU | Audio | Transformers ms | NInfer ms | Speedup |
+| --- | --- | --- | --- | --- |
+| RTX 5070 Ti | Chinese 4.20 s | 71.336 | 4.449 | 16.03× |
+| RTX 5070 Ti | English 15.05 s | 68.464 | 10.283 | 6.66× |
+| RTX 5070 Ti | English 60.205 s | 59.146 | 33.970 | 1.74× |
+| RTX 5070 Ti | Chinese 0.75 s | 74.674 | 3.530 | 21.15× |
+| RTX 6000D | Chinese 4.20 s | 10.280 | 3.704 | 2.78× |
+| RTX 6000D | English 15.05 s | 10.920 | 6.157 | 1.77× |
+| RTX 6000D | English 60.205 s | 24.070 | 23.536 | 1.02× |
+| RTX 6000D | Chinese 0.75 s | 9.118 | 3.276 | 2.78× |
+
+The 60.205-second input repeats a fixed English recording. Alignment emits all timestamps in one forward pass.
+
+| GPU | Timestamp boundaries exactly matching the official reference | Agreement | Maximum difference |
+| --- | --- | --- | --- |
+| RTX 5070 Ti | 400 / 400 | 100.00% | 0 ms |
+| RTX 6000D | 399 / 400 | 99.75% | 80 ms |
+
+Agreement covers single-sample boundaries from the four cases above. Repeated Graph execution and eager execution agree for a fixed input geometry. Changing batch geometry can move a classifier tie by one 80 ms step.
+
+Artifact: `qwen3-forced-aligner-0.6b-bf16.ninfer` · 1,840,359,257 bytes · BF16 · Apache-2.0. SHA256: `45234e54ba66833e846e4d3d30eca06c9f95833a35350508c667432a90143473`.
+
+[Alignment guide](https://github.com/ByronLeeeee/ninfer-extended/blob/main/docs/qwen3-forced-aligner.md) · [Alignment measurements](forced-alignment-results.json) · [Alignment artifact manifest](forced-aligner-manifest.json)
 
 ## Artifact and license
 

@@ -2,6 +2,9 @@ add_executable(ninfer
   cli/main.cpp
   cli/options.cpp)
 add_executable(ninfer-asr asr/main.cpp)
+add_executable(ninfer-align alignment/main.cpp)
+ninfer_internal_includes(ninfer-align)
+target_link_libraries(ninfer-align PRIVATE ninfer_engine ninfer::json)
 add_executable(ninfer-embed embedding/main.cpp)
 ninfer_internal_includes(ninfer-embed)
 target_link_libraries(ninfer-embed PRIVATE ninfer_engine ninfer::json)

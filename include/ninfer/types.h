@@ -40,6 +40,7 @@ enum class EnginePurpose : std::uint8_t {
     CausalScoring,
     SpeechRecognition,
     TextEmbedding,
+    ForcedAlignment,
 };
 
 enum class KvCapacityMode : std::uint8_t {

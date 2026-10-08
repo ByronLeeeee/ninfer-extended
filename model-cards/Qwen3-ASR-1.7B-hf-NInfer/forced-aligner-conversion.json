@@ -1,0 +1,9 @@
+{
+  "source": "Qwen/Qwen3-ForcedAligner-0.6B",
+  "dtype": "bf16",
+  "weight_quantization": false,
+  "source_tensors": 708,
+  "lossless_row_concatenations": 104,
+  "zero_head_rows": 120,
+  "artifact_bytes": 1840359257
+}

@@ -20,6 +20,11 @@ void float_bias_cast(const float* input, const void* bias, void* output,
 // Exact transpose [chunks,channels,frequency,steps] -> [chunks,steps,channels*frequency].
 void conv_to_tokens(const void* input, void* output, int chunks, int channels,
     int frequency, int steps, cudaStream_t stream);
+// Exact in-place zeroing of NCHW columns outside ceil(physical_width/stride).
+// widths[chunk] is the unpadded source convolution width; valid values remain
+// bit-identical. This preserves sub-second convolution boundary semantics.
+void zero_conv_padding(void* input_output, const std::int32_t* widths, int chunks,
+    int channels, int frequency, int steps, int stride, cudaStream_t stream);
 // In-place R(x + positions[step,width]), repeated independently per chunk.
 void add_chunk_positions(void* input_output, const void* positions, int chunks,
     int steps, int width, cudaStream_t stream);
@@ -60,4 +65,8 @@ void bf16_residual_add(void* residual, const void* delta, int elements, cudaStre
 // Scratch values (FP32) and indices (I32) each hold rows*ceil(width/1024).
 void bf16_argmax(const void* logits, float* scratch_values, std::int32_t* scratch_indices,
     std::int32_t* output_indices, int rows, int width, cudaStream_t stream);
+// Same exact argmax over width valid columns in rows with row_stride columns.
+// Padding columns never participate. Scratch holds rows*ceil(width/1024).
+void bf16_argmax_valid(const void* logits, float* scratch_values, std::int32_t* scratch_indices,
+    std::int32_t* output_indices, int rows, int width, int row_stride, cudaStream_t stream);
 }

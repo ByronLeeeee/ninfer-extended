@@ -38,6 +38,11 @@ __global__ void conv_transpose_kernel(const BF* x,BF* y,int n,int channels,int f
     if(i<n){int d=i%(channels*freq),t=(i/(channels*freq))%steps,c=i/(channels*freq*steps);
         y[i]=x[((c*channels+d/freq)*freq+d%freq)*steps+t];}
 }
+__global__ void conv_padding_kernel(BF* x,const int* widths,int n,int channels,int frequency,int steps,int stride){
+    int i=blockIdx.x*blockDim.x+threadIdx.x;
+    if(i<n){int chunk=i/(channels*frequency*steps),step=i%steps;
+        if(step>=(widths[chunk]+stride-1)/stride)x[i]=b(0.f);}
+}
 __global__ void pos_kernel(BF* x,const BF* pos,int n,int width,int steps) {
     int i=blockIdx.x*blockDim.x+threadIdx.x;if(i<n)x[i]=b(f(x[i])+f(pos[i%(width*steps)]));
 }
@@ -157,9 +162,9 @@ __global__ void attention_merge(const float* partials,BF* out,int heads){
         for(int s=0;s<Splits;++s)total=fmaf(src[s*(D+2)+lane+d*32],scales[s],total);
         out[static_cast<long long>(row)*D+lane+d*32]=b(total/denominator);}
 }
-__global__ void argmax_first(const BF* logits,float* values,int* indices,int width,int blocks){
+__global__ void argmax_first(const BF* logits,float* values,int* indices,int width,int blocks,int row_stride){
     int lane=threadIdx.x,group=blockIdx.x,t=blockIdx.y;float maximum=-INFINITY;int index=0x7fffffff;
-    for(int i=group*1024+lane;i<min(width,(group+1)*1024);i+=256){float v=f(logits[static_cast<long long>(t)*width+i]);
+    for(int i=group*1024+lane;i<min(width,(group+1)*1024);i+=256){float v=f(logits[static_cast<long long>(t)*row_stride+i]);
         if(v>maximum||(v==maximum&&i<index)){maximum=v;index=i;}}
     __shared__ float vals[256];__shared__ int ids[256];vals[lane]=maximum;ids[lane]=index;__syncthreads();
     for(int size=128;size;size/=2){if(lane<size){float v=vals[lane+size];int i=ids[lane+size];
@@ -207,6 +212,8 @@ void float_to_bf16(const float* x,void* y,int n,cudaStream_t s){cast_kernel<<<(n
 void rounded_bias_gelu(void* x,const void* bias,int n,int channels,int spatial,bool a,cudaStream_t s){bias_kernel<<<(n+255)/256,256,0,s>>>(static_cast<BF*>(x),static_cast<const BF*>(bias),n,channels,spatial,a);}
 void float_bias_cast(const float* x,const void* bias,void* out,int n,int channels,bool a,cudaStream_t s){float_bias_kernel<<<(n+255)/256,256,0,s>>>(x,static_cast<const BF*>(bias),static_cast<BF*>(out),n,channels,a);}
 void conv_to_tokens(const void* x,void* y,int chunks,int channels,int freq,int steps,cudaStream_t s){int n=chunks*channels*freq*steps;conv_transpose_kernel<<<(n+255)/256,256,0,s>>>(static_cast<const BF*>(x),static_cast<BF*>(y),n,channels,freq,steps);}
+void zero_conv_padding(void* x,const int* widths,int chunks,int channels,int freq,int steps,int stride,cudaStream_t s){
+    int n=chunks*channels*freq*steps;conv_padding_kernel<<<(n+255)/256,256,0,s>>>(static_cast<BF*>(x),widths,n,channels,freq,steps,stride);}
 void add_chunk_positions(void* x,const void* pos,int chunks,int steps,int width,cudaStream_t s){int n=chunks*steps*width;pos_kernel<<<(n+255)/256,256,0,s>>>(static_cast<BF*>(x),static_cast<const BF*>(pos),n,width,steps);}
 void gather_rows(const void* x,const int* indices,void* y,int rows,int width,cudaStream_t s){int n=rows*width;gather_kernel<<<(n+255)/256,256,0,s>>>(static_cast<const BF*>(x),indices,static_cast<BF*>(y),n,width);}
 void embed_audio_tokens(const void* x,const void* a,const int* ids,const int* rows,void* y,int tokens,int width,cudaStream_t s){int n=tokens*width;embed_kernel<<<(n+255)/256,256,0,s>>>(static_cast<const BF*>(x),static_cast<const BF*>(a),ids,rows,static_cast<BF*>(y),n,width);}
@@ -222,7 +229,13 @@ void rounded_rope(void* x,const float* inv,const int* positions,int t,int h,int 
 void rounded_swiglu(const void* x,void* out,int t,int width,cudaStream_t s){int n=t*width;swiglu_rounded_kernel<<<(n+255)/256,256,0,s>>>(static_cast<const BF*>(x),static_cast<BF*>(out),t,width);}
 void bf16_residual_add(void* x,const void* delta,int n,cudaStream_t s){residual_kernel<<<(n+255)/256,256,0,s>>>(static_cast<BF*>(x),static_cast<const BF*>(delta),n);}
 void bf16_argmax(const void* x,float* vals,int* ids,int* out,int rows,int width,cudaStream_t s){int blocks=(width+1023)/1024;
-    argmax_first<<<dim3(blocks,rows),256,0,s>>>(static_cast<const BF*>(x),vals,ids,width,blocks);
+    argmax_first<<<dim3(blocks,rows),256,0,s>>>(static_cast<const BF*>(x),vals,ids,width,blocks,width);
+    argmax_second<<<rows,256,0,s>>>(vals,ids,out,blocks);
+}
+void bf16_argmax_valid(const void* x,float* vals,int* ids,int* out,int rows,int width,int row_stride,cudaStream_t s){
+    if(rows<=0||width<=0||row_stride<width)throw std::invalid_argument("argmax valid shape invalid");
+    int blocks=(width+1023)/1024;
+    argmax_first<<<dim3(blocks,rows),256,0,s>>>(static_cast<const BF*>(x),vals,ids,width,blocks,row_stride);
     argmax_second<<<rows,256,0,s>>>(vals,ids,out,blocks);
 }
 void dense_bf16_attention(const void* q,const void* k,const void* v,void* o,int t,int keys,int d,int qh,int kh,int qs,int ks,const int* begin,const int* end,const int* pos,bool causal,cudaStream_t s){

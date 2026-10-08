@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ninfer/asr.h"
+#include "ninfer/alignment.h"
 #include "ninfer/types.h"
 #include "core/device.h"
 
@@ -15,6 +16,7 @@ public:
     Program(const Program&) = delete;
     Program& operator=(const Program&) = delete;
     SpeechResult transcribe(std::vector<SpeechFeatures>, const SpeechRunOptions&);
+    AlignmentResult align(std::vector<SpeechFeatures>, const AlignmentRunOptions&);
     LoadSummary load_summary() const;
     MemorySummary memory_summary() const;
 private:

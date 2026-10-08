@@ -16,11 +16,12 @@ template<class T> std::vector<T> binary(const std::filesystem::path& path,std::s
 }
 double median(std::vector<double> x){std::sort(x.begin(),x.end());return x[x.size()/2];}
 int main(int argc,char** argv){try{
-    std::filesystem::path artifact,input,out;ninfer::SpeechRunOptions run;int repeats=3,context=4096;bool abba=false,variants=false;
+    std::filesystem::path artifact,input,out;ninfer::SpeechRunOptions run;int repeats=3,context=4096,warmups=1;bool abba=false,variants=false;
     for(int i=1;i<argc;++i){std::string arg=argv[i];auto value=[&](){if(++i==argc)throw std::invalid_argument("Missing argument");return std::string(argv[i]);};
         if(arg=="--artifact")artifact=value();else if(arg=="--input")input=value();else if(arg=="--out")out=value();
         else if(arg=="--backend"){auto name=value();if(name!="native"&&name!="cublas")throw std::invalid_argument("Backend must be native or cublas");run.linear=name=="native"?ninfer::SpeechLinearBackend::Native:ninfer::SpeechLinearBackend::Cublas;}
         else if(arg=="--repeats")repeats=std::stoi(value());else if(arg=="--context")context=std::stoi(value());
+        else if(arg=="--warmups")warmups=std::stoi(value());
         else if(arg=="--max-new-tokens")run.max_new_tokens=std::stoul(value());
         else if(arg=="--no-graph")run.decode_graph=run.audio_graph=run.prefill_graph=false;
         else if(arg=="--no-decode-graph")run.decode_graph=false;else if(arg=="--no-audio-graph")run.audio_graph=false;else if(arg=="--no-prefill-graph")run.prefill_graph=false;
@@ -30,14 +31,14 @@ int main(int argc,char** argv){try{
         else if(arg=="--abba")abba=true;
         else if(arg=="--variants")variants=true;
         else if(arg=="--help"){std::cout<<"ninfer-asr --artifact model.ninfer --input features.json --out result.json\n"
-            "[--backend native|cublas] [--context 4096] [--max-new-tokens 1024] [--repeats 3]\n"
+            "[--backend native|cublas] [--context 4096] [--max-new-tokens 1024] [--repeats 3] [--warmups 1]\n"
             "[--no-graph] [--no-audio-graph] [--no-prefill-graph] [--no-decode-graph]\n"
             "[--no-audio-flash] [--no-fuse] [--no-residual-fuse] [--tensorcore-prefill] [--abba] [--variants]\n"
             "Input accepts {samples:[...]} or {cases:[{id:...,samples:[...]}]}; one to four lanes.\n"
             "CPU frontend supplies log-mel features and audio-token prompts. Encoder and decoder run natively in BF16.\n";return 0;}
         else throw std::invalid_argument("Unknown option: "+arg);
     }
-    if(artifact.empty()||input.empty()||out.empty()||repeats<1||context<1)throw std::invalid_argument("Artifact, input and output are required");
+    if(artifact.empty()||input.empty()||out.empty()||repeats<1||context<1||warmups<0)throw std::invalid_argument("Artifact, input and output are required; warmups must be nonnegative");
     std::ifstream file(input);Json spec;file>>spec;
     ninfer::EngineOptions options;options.artifact_path=artifact;options.purpose=ninfer::EnginePurpose::SpeechRecognition;options.max_context=context;options.max_concurrency=4;options.kv_cache=ninfer::KvCacheStorage::BFloat16;
     ninfer::Engine engine(options);
@@ -57,7 +58,7 @@ int main(int argc,char** argv){try{
                   {"prompt_tokens",measured.prompt_tokens},{"decode_tokens",measured.decode_tokens},{"decode_tps",tps},{"language_prefill_tps",measured.prompt_tokens/(measured.language_prefill_ms/1000)},
                   {"weight_bytes",measured.weight_bytes},{"runtime_bytes",measured.runtime_bytes},{"token_ids",measured.token_ids}};
         result["runs"].push_back(row);std::cout<<row.dump()<<std::endl;std::ofstream stream(out);stream<<(suite?combined:result).dump(2)<<'\n';};
-    execute(run,false);
+    for(int n=0;n<warmups;++n)execute(run,false);
     if(variants){std::vector<ninfer::SpeechRunOptions> settings;auto setting=run;setting.linear=ninfer::SpeechLinearBackend::Cublas;setting.decode_graph=setting.audio_graph=setting.prefill_graph=setting.audio_flash_attention=setting.fused_qk_norm_rope=false;settings.push_back(setting);
         setting.decode_graph=true;settings.push_back(setting);setting.audio_flash_attention=true;settings.push_back(setting);setting.fused_qk_norm_rope=true;settings.push_back(setting);
         setting.linear=ninfer::SpeechLinearBackend::Native;settings.push_back(setting);setting.audio_graph=setting.prefill_graph=true;settings.push_back(setting);

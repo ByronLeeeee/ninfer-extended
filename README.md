@@ -29,7 +29,12 @@ Dependencies: 64-bit Linux (WSL2 on Windows), CUDA supporting `sm_120a`, C++20, 
 |---|---|---|---|
 | Xiaomi-OCR-0 BF16 | [OCR setup/conversion](docs/xiaomi-ocr.md) | [Model](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Xiaomi-OCR-0-Ninfer) |
 | Qwen3-ASR-1.7B-hf BF16 | [ASR setup/conversion](docs/qwen3-asr.md) | [Model](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
+| Qwen3-ForcedAligner-0.6B BF16 | [Alignment setup/conversion](docs/qwen3-forced-aligner.md) | [ASR and alignment models](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [ASR and alignment models](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
 | Qwen3-Embedding-0.6B BF16 | [Embedding setup/conversion](docs/qwen3-embedding.md) | [Model](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) |
+
+[Qwen3-ForcedAligner-0.6B](docs/qwen3-forced-aligner.md) also runs through the native BF16 Engine.
+It produces word timestamps in one audio/language forward pass, supports independent batches,
+and reuses CUDA Graphs without allocating an autoregressive KV cache.
 
 ## Upstream compatibility and performance
 

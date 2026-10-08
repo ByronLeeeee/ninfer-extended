@@ -42,8 +42,12 @@ def main():
     parser.add_argument('--context', type=int, default=4096)
     parser.add_argument('--max-new-tokens', type=int, default=1024)
     parser.add_argument('--repeats', type=int, default=1)
+    parser.add_argument('--warmups', type=int, default=1, help='Unmeasured warmup runs; use 0 for a single production pass')
     parser.add_argument('--no-graph', action='store_true')
     parser.add_argument('--tensorcore-prefill', action='store_true')
+    parser.add_argument('--language', default=None, help='Official language name/code; omitted for automatic detection')
+    parser.add_argument('--prompt', default='', help='Official processor system context')
+    parser.add_argument('--hotwords', nargs='*', default=[], help='Domain terms appended to the system context')
     args = parser.parse_args()
     if not 1 <= len(args.audio) <= 4:
         parser.error('Supply one to four WAV files.')
@@ -54,7 +58,8 @@ def main():
         specs = []
         for index, path in enumerate(args.audio):
             audio = waveform(path)
-            inputs = processor.apply_transcription_request(audio=audio, return_tensors='pt')
+            prompt = '\n'.join(value for value in [args.prompt, 'Hotwords: '+', '.join(args.hotwords) if args.hotwords else ''] if value) or None
+            inputs = processor.apply_transcription_request(audio=audio, language=args.language, prompt=prompt, return_tensors='pt')
             features = inputs['input_features'].float().contiguous()
             feature_path = directory / f'{index}.features.f32'
             mask_path = directory / f'{index}.mask.i32'
@@ -69,7 +74,7 @@ def main():
         request.write_text(json.dumps({'samples': specs}))
         command = [str(args.engine.resolve()), '--artifact', str(args.artifact.resolve()), '--input', str(request),
                    '--out', str(args.out.resolve()), '--backend', args.backend, '--context', str(args.context),
-                   '--max-new-tokens', str(args.max_new_tokens), '--repeats', str(args.repeats)]
+                   '--max-new-tokens', str(args.max_new_tokens), '--repeats', str(args.repeats), '--warmups', str(args.warmups)]
         if args.no_graph:
             command.append('--no-graph')
         if args.tensorcore_prefill:
@@ -79,7 +84,9 @@ def main():
         result['frontend_seconds'] = frontend_seconds
         result['audio_paths'] = [str(path.resolve()) for path in args.audio]
         for row in result['runs']:
-            row['text'] = processor.decode(row['token_ids'], return_format='transcription_only')
+            parsed = processor.decode(row['token_ids'], return_format='parsed')
+            row['text'] = [item['transcription'] for item in parsed]
+            row['language'] = [item['language'] or args.language for item in parsed]
         args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
         print(json.dumps({'text': result['runs'][-1]['text'], 'wall_seconds': result['runs'][-1]['wall_seconds'],
                           'frontend_seconds': frontend_seconds}, ensure_ascii=False, indent=2))
