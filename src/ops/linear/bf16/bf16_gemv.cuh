@@ -156,7 +156,7 @@ __device__ __forceinline__ int bf16_phase_index(int iteration, int row0) {
     if constexpr (Schedule::kPhaseOrder == Bf16PhaseOrder::Sequential) {
         return iteration;
     } else {
-        const int row_group = row0 / Schedule::kRowsPerWarp;
+        const int row_group = row0 / Schedule::kPhaseRows;
         int phase           = iteration + (row_group * Schedule::kPhaseStride) % Phases;
         if (phase >= Phases) { phase -= Phases; }
         return phase;

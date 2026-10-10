@@ -1,5 +1,163 @@
 # Changelog
 
+## BF16 partial RoPE and batched decode fusion on RTX 6000D
+
+- Fuse Q/K RMSNorm and 64-dimension partial RoPE for 256-dimension heads,
+  including one-axis and three-axis positions. Preserve the normalized BF16
+  boundary. Six Full Attention layers remove 12 kernel launches per decode step.
+- Tune 2–8-token BF16 projections with 1024 output rows and 2048/3584 input
+  columns while preserving the previous accumulation order.
+- Extend BF16 GDN projection/convolution/state-snapshot fusion to 2–8 requests
+  with one token each. Preserve per-request state and BF16 projection rounding;
+  this route needs no workspace and removes another 18 launches per batch step.
+
+Nsight Systems confirms **222 → 210 kernels** per single-request decode replay
+and **240 → 210 kernels** per four-request replay. The following measurements
+use unprofiled public HTTP inference and compare against the preceding NInfer
+Extended build, which already included the two decode optimizations below.
+
+Xiaomi-OCR-0 on RTX 6000D, BF16 weights/KV, 32768-token context capacity per
+request, 2048-token prefill chunks, greedy decoding, and no prefix/media cache.
+Short Chinese/English pages contain 1807 input tokens; the dense-equation page
+contains 2368, and the handwritten page 8232. A 256-token output cap is used
+for short-output measurements; complete-page measurements use a 4096-token cap
+and every request reaches natural completion.
+
+Single-request short-output medians, 12 balanced paired cycles after warmup:
+
+| Input | Previous decode tok/s | Updated decode tok/s | Full prefill ms, previous → updated | HTTP latency ms, previous → updated |
+|---|---:|---:|---:|---:|
+| Chinese document | 579.47 | 584.86 | 44.670 → 44.523 | 279.58 → 277.53 |
+| English contract | 579.49 | 584.96 | 44.506 → 44.576 | 279.68 → 277.42 |
+| Dense equations, capped output | 575.30 | 581.20 | 64.547 → 64.529 | 547.37 → 543.29 |
+
+Paired single-request decode gains are **0.89–1.09%**; their bootstrap 95%
+intervals are positive. Single-request end-to-end throughput improves about
+0.6–0.8%. Full vision/language prefill has no confirmed change.
+
+Four-request short-page tests pool all 60 paired cycles, including the initial
+12 cycles with negative/noisy results. Each version processes 480 formal
+requests per input. Paired gains take the median of within-cycle speed ratios;
+the absolute rates separately summarize all requests. These differ when GPU
+clocks drift. Bootstrap resamples whole paired cycles.
+
+| Input | Decode tok/s per request, previous → updated | Paired decode gain, 95% interval | Actual total tok/s, previous → updated | Paired total-throughput gain, 95% interval |
+|---|---:|---:|---:|---:|
+| Chinese document | 454.22 → 470.08 | +5.05%, [4.13%, 5.28%] | 903.32 → 911.90 | +2.60%, [2.08%, 2.76%] |
+| English contract | 452.40 → 473.09 | +5.14%, [4.34%, 5.42%] | 904.07 → 933.19 | +2.53%, [0.95%, 2.69%] |
+
+Actual total throughput is all output tokens divided by HTTP batch completion
+time, including preprocessing, serial prefill and decode. Temperatures and SM
+clocks vary naturally across this pooled test: 61–86°C and 930–2422 MHz.
+No cooling, power or clock settings were changed; all formal samples are retained.
+
+Complete-page four-request medians, eight balanced paired cycles:
+
+| Input | Decode tok/s per request, previous → updated | Full prefill ms/request, previous → updated | Batch completion s, previous → updated | Actual total tok/s, previous → updated |
+|---|---:|---:|---:|---:|
+| Dense equations | 414.21 → 424.94 | 74.662 → 74.771 | 5.302 → 5.126 | 1524.34 → 1576.59 |
+| Handwritten formulas | 374.98 → 387.48 | 726.130 → 725.117 | 6.042 → 5.824 | 756.10 → 784.30 |
+
+Both complete-page decode gains have positive paired intervals. Dense-equation
+total throughput improves 3.43% by the aggregate medians, with a positive paired
+interval. The handwritten-page total-throughput median improves 3.73%, but its
+paired interval crosses zero, so a stable throughput gain is not established.
+
+All 11 single-request complete pages match exactly. Four-request output variants
+and their occurrence counts match on all 11 pages; dense and handwritten formulas
+retain the two variants already present in the preceding build. Six annotated
+text fixtures retain CER 0% over 1117 unique reference characters, using NFKC,
+whitespace removal and Markdown heading/emphasis cleanup. Full raw output
+comparisons use no normalization. The quality suite contains 220 formal requests.
+
+Independent FP64 reference, guard, read-only operand, state-transition and
+changed-input CUDA Graph tests pass for the affected public Ops. ASR token IDs,
+embedding vectors and forced-alignment timestamp classes match exactly. Follow-up
+tests retain the initial measurements: pooled embedding B4×512 and 60-second
+alignment changes are -0.25% and -0.55%, with 95% intervals crossing zero.
+Short-token embedding improves about 1.0–1.2% with positive paired intervals.
+The deployed OCR service passes complete four-request and streaming-output checks.
+
+## BF16 GDN decode fusion on RTX 6000D
+
+The BF16 [8192,1024] single-column GDN input projection now writes convolution,
+SiLU and history snapshots directly from its GEMV epilogue. It preserves the
+previous projection reduction order and BF16 rounding, removes the intermediate
+projected plane and eliminates 18 separate convolution launches per OCR token.
+The 16-head, 1024-input norm/control projection also distributes one-column work
+across two head groups. Multi-column routes retain their existing schedules.
+
+Xiaomi-OCR-0, BF16 weights/KV, 4K context, 2,048-token prefill chunks and greedy
+decoding; seven alternating A-B-B-A/B-A-A-B cycles, two warmups and 14 measured
+requests per engine/input, with a 256-token output cap:
+
+| Input | Previous decode tok/s | Updated decode tok/s | Change |
+|---|---:|---:|---:|
+| Chinese document | 564.1 | 579.7 | +2.8% |
+| English contract | 563.2 | 579.3 | +2.9% |
+| Dense equations | 560.2 | 574.9 | +2.6% |
+
+Every paired cycle improved. End-to-end throughput increased 1.8–2.2%; full
+vision/language prefill stayed within -0.07% to +0.14%. Four-request decode
+remained within +0.04% to +0.08%. These figures compare with the preceding
+NInfer Extended build, which already included the narrow-projection optimization.
+
+A separate same-session comparison against the build before both decode
+iterations measured 540.4 → 579.5, 540.1 → 579.6 and 537.2 → 575.7 tok/s for
+these three inputs, respectively: +7.2–7.3% cumulatively. The GPU remained at
+2,422 MHz throughout the seven paired cycles.
+
+All 11 complete pages matched exactly across 44 formal requests at 16K context
+and a 4,096-token cap. The six annotated text fixtures retained CER 0% over
+1,117 reference characters. Public GDN snapshot and norm/control Ops passed
+independent FP64 reference tests, state/guard checks and CUDA Graph replay
+with changed inputs and selectors. The added 1024-wide norm test uses the BF16
+rounding bound; its inherited tighter threshold rejected the same valid
+rounding case in both the preceding and updated kernels.
+
+After controlling starting GPU temperature, ASR, embedding and forced-alignment
+outputs matched exactly; measured stage/throughput changes stayed within
+-0.14% to +0.11%. The installed OCR service passed complete four-request and
+streaming-output checks with its existing configuration.
+
+FFN schedule variants and vocabulary Tensor Core variants did not demonstrate
+useful gains and were not selected. Measurements affected by temperature-related
+clock variation were excluded from speed claims.
+
+## BF16 narrow decode projections on RTX 6000D
+
+Single-token BF16 projections with 1,024 output rows and 2,048 or 3,584 input
+columns now launch 256 row CTAs instead of 32. The schedule preserves the
+previous per-row accumulation order; weights and the BF16 rounding boundaries
+are unchanged. Vocabulary projections and multi-token routes retain their
+existing schedules.
+
+Xiaomi-OCR-0 on RTX 6000D, BF16 weights/KV, 4K context, 2,048-token prefill
+chunks, greedy decoding, seven alternating A-B-B-A/B-A-A-B cycles and 14 measured
+requests per engine/input after warmup:
+
+| Input | Previous decode tok/s | Updated decode tok/s | Change |
+|---|---:|---:|---:|
+| Chinese document | 540.8 | 564.5 | +4.4% |
+| English contract | 541.1 | 563.8 | +4.2% |
+| Dense equations | 538.2 | 559.4 | +3.9% |
+
+Single-request end-to-end throughput improved 2.8–3.2%; full vision/language
+prefill remained within -0.2% to +0.3%. Four-request decode remained within
++0.05% to +0.30%. These comparisons are against the preceding NInfer Extended
+build, using a 256-token output cap for speed tests.
+
+Separate complete-page checks used a 16K context and a 4,096-token cap: all 11
+pages finished normally and matched exactly across 44 formal requests. The six
+annotated text fixtures retained CER 0% over 1,117 reference characters. Public
+Linear and LinearAdd routes passed independent numerical-oracle tests, including
+CUDA Graph replay with changed inputs.
+
+ASR token IDs, embedding vectors and forced-alignment timestamp classes matched
+the preceding build. Initial long-input embedding timing regressions did not
+reproduce with longer warmup; no embedding speedup is claimed. The deployed OCR
+service passed complete four-request and streaming-output checks.
+
 ## Fused vision projection and resource-aware prefill
 
 New BF16 `linear_bias_add` and `linear_bias_gelu` Ops fuse vision projection,

@@ -74,6 +74,10 @@ ninfer_add_op_test(ninfer_rmsnorm_rope_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_rmsnorm_rope.cpp"
   LIBRARIES ninfer_ops)
 
+ninfer_add_op_test(ninfer_rmsnorm_rope_partial_test
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_rmsnorm_rope_partial.cpp"
+  LIBRARIES ninfer_ops)
+
 ninfer_add_op_test(ninfer_context_kv_materialize_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_context_kv_materialize.cpp"
   LIBRARIES ninfer_ops)
@@ -145,3 +149,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/linear/tests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/linear_add/tests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/linear_pair/tests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/linear_swiglu/tests.cmake")
+
+ninfer_add_op_test(ninfer_gdn_bf16_conv_snapshot_test
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_gdn_bf16_conv_snapshot.cpp"
+  LIBRARIES ninfer_ops)

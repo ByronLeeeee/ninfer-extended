@@ -15,6 +15,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <utility>
 
 namespace {
 
@@ -268,6 +269,14 @@ int run_bf16_linear() {
         for (int tokens : {3, 7, 13, 19, 23, 25, 29}) {
             failures += run_bf16_linear_case(*weight, tokens, true);
         }
+    }
+    for (const auto [rows, columns] : {std::pair{1024, 3584}, std::pair{1024, 2048}}) {
+        DeviceWeight weight(make_patterned(rows, columns, 439U));
+        for (int tokens : {1, 2, 3, 4, 5, 8, 9}) {
+            failures += run_bf16_linear_case(weight, tokens);
+        }
+        for (int tokens : {1, 2, 3, 4, 5, 8})
+            failures += run_bf16_linear_case(weight, tokens, true);
     }
     failures += run_selector_linear();
     return failures;

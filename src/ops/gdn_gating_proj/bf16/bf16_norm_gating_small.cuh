@@ -7,14 +7,14 @@ namespace ninfer::ops::detail {
 
 // The explicit normalized BF16 output is also the control projection operand.
 // The first 256 threads retain the existing pair-wise RMS reduction ordering.
-template <int InputRows, int Heads, int Threads>
+template <int InputRows, int Heads, int Threads, int Groups = 1>
 __global__ __launch_bounds__(Threads) void bf16_norm_gating_small_kernel(
     const __nv_bfloat16* x, const __nv_bfloat16* norm, const __nv_bfloat16* ab,
     const float* alog, const float* bias, __nv_bfloat16* h, float* g, float* beta, float eps) {
     static_assert(InputRows % 512 == 0 && Threads >= 256 && Threads <= 1024);
-    static_assert(Heads % (Threads / 32) == 0);
+    static_assert(Groups >= 1 && Heads % (Groups * (Threads / 32)) == 0);
     constexpr int Pairs = InputRows / 512, Warps = Threads / 32;
-    constexpr int HeadsPerWarp = Heads / Warps;
+    constexpr int HeadsPerWarp = Heads / (Warps * Groups);
     const int tid = threadIdx.x, lane = tid & 31, warp = tid >> 5, token = blockIdx.x;
     const auto base = std::int64_t(token) * (InputRows / 2);
     __nv_bfloat162 values[Pairs], gains[Pairs];
@@ -44,7 +44,7 @@ __global__ __launch_bounds__(Threads) void bf16_norm_gating_small_kernel(
                 rmsnorm_epilogue<RmsEpilogue::Offset>(v.x, inverse, gain.x, 0),
                 rmsnorm_epilogue<RmsEpilogue::Offset>(v.y, inverse, gain.y, 0));
             reinterpret_cast<__nv_bfloat162*>(normalized)[pair] = result;
-            reinterpret_cast<__nv_bfloat162*>(h)[base + pair] = result;
+            if (blockIdx.y == 0) reinterpret_cast<__nv_bfloat162*>(h)[base + pair] = result;
         }
     }
     __syncthreads();
@@ -53,7 +53,7 @@ __global__ __launch_bounds__(Threads) void bf16_norm_gating_small_kernel(
         const float value = __bfloat162float(normalized[k]);
 #pragma unroll
         for (int i = 0; i < HeadsPerWarp; ++i) {
-            const int head = warp + i * Warps;
+            const int head = blockIdx.y * (Heads / Groups) + warp + i * Warps;
             aa[i] = fmaf(__bfloat162float(ab[head * InputRows + k]), value, aa[i]);
             bb[i] = fmaf(__bfloat162float(ab[(Heads + head) * InputRows + k]), value, bb[i]);
         }
@@ -63,7 +63,7 @@ __global__ __launch_bounds__(Threads) void bf16_norm_gating_small_kernel(
         aa[i] = warp_reduce_sum(aa[i]);
         bb[i] = warp_reduce_sum(bb[i]);
         if (lane == 0) {
-            const int head = warp + i * Warps;
+            const int head = blockIdx.y * (Heads / Groups) + warp + i * Warps;
             const float a = __bfloat162float(__float2bfloat16_rn(aa[i]));
             const float b = __bfloat162float(__float2bfloat16_rn(bb[i]));
             const float z = a + bias[head];

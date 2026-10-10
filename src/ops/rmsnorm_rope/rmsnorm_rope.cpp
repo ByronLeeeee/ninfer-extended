@@ -3,6 +3,7 @@
 #include "ops/rmsnorm_rope/launch.h"
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -88,6 +89,29 @@ void rmsnorm_rope(const Tensor& positions, const Tensor& norm_weight, Tensor& x,
     require_tensor(positions, DType::I32, {tokens, 1, 1, 1}, "positions");
     require_single_nonoverlap(positions, norm_weight, x);
     detail::rmsnorm_rope_single_launch(positions, norm_weight, x, tokens, stream);
+}
+
+void rmsnorm_rope_partial(const Tensor& positions, const Tensor& q_norm_weight,
+                          const Tensor& k_norm_weight, float epsilon, float theta,
+                          bool unit_offset, Tensor& q, Tensor& k, cudaStream_t stream) {
+    const std::int32_t tokens = q.ne[2];
+    if (tokens < 1 || tokens > 131072 || q.ne[1] < 1 || q.ne[1] > 64 ||
+        k.ne[1] < 1 || k.ne[1] > 64 || !std::isfinite(epsilon) || epsilon <= 0.0F ||
+        !std::isfinite(theta) || theta <= 0.0F) {
+        throw std::invalid_argument("rmsnorm_rope_partial: invalid execution domain");
+    }
+    require_tensor(q, DType::BF16, {256, q.ne[1], tokens, 1}, "partial q");
+    require_tensor(k, DType::BF16, {256, k.ne[1], tokens, 1}, "partial k");
+    require_tensor(q_norm_weight, DType::BF16, {256, 1, 1, 1}, "partial q norm weight");
+    require_tensor(k_norm_weight, DType::BF16, {256, 1, 1, 1}, "partial k norm weight");
+    const int axes = positions.ne[1];
+    if (axes != 1 && axes != 3) {
+        throw std::invalid_argument("rmsnorm_rope_partial: positions must have one or three axes");
+    }
+    require_tensor(positions, DType::I32, {tokens, axes, 1, 1}, "partial positions");
+    require_pair_nonoverlap(positions, q_norm_weight, k_norm_weight, q, k);
+    detail::rmsnorm_rope_partial_launch(positions, q_norm_weight, k_norm_weight, epsilon,
+                                       theta, unit_offset, q, k, stream);
 }
 
 } // namespace ninfer::ops

@@ -35,7 +35,7 @@ struct Bf16Geometry {
 template <int WarpsPerCta, int WarpsPerRow, int RowsPerWarp, int ValuesPerLane,
           int AccumulatorChains, Bf16ActivationAccess ActivationAccess, Bf16WeightCache WeightCache,
           Bf16PhaseOrder PhaseOrder, int PhaseStride, int PrefetchDepth, int PhaseUnroll,
-          int MinBlocksPerSm>
+          int MinBlocksPerSm, int PhaseRows = RowsPerWarp>
 struct Bf16GemvSchedule {
     static_assert(WarpsPerCta > 0 && WarpsPerCta <= 32);
     static_assert(WarpsPerRow > 0 && WarpsPerRow <= WarpsPerCta);
@@ -48,6 +48,7 @@ struct Bf16GemvSchedule {
     static_assert(PhaseUnroll == 1 || PhaseUnroll == 2 || PhaseUnroll == 4 || PhaseUnroll == 8);
     static_assert(PhaseStride > 0);
     static_assert(MinBlocksPerSm > 0);
+    static_assert(PhaseRows >= RowsPerWarp && (PhaseRows % RowsPerWarp) == 0);
 
     static constexpr int kWarpsPerCta       = WarpsPerCta;
     static constexpr int kWarpsPerRow       = WarpsPerRow;
@@ -58,6 +59,8 @@ struct Bf16GemvSchedule {
     static constexpr auto kWeightCache      = WeightCache;
     static constexpr auto kPhaseOrder       = PhaseOrder;
     static constexpr int kPhaseStride       = PhaseStride;
+    // Preserve column traversal when distributing each row group across more warps.
+    static constexpr int kPhaseRows         = PhaseRows;
     static constexpr int kPrefetchDepth     = PrefetchDepth;
     static constexpr int kPhaseUnroll       = PhaseUnroll;
     static constexpr int kMinBlocksPerSm    = MinBlocksPerSm;

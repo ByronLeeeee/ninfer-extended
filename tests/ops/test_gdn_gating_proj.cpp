@@ -27,6 +27,7 @@ struct Geometry {
     bool parent_weight;
 };
 
+constexpr Geometry kSmallParent{"bf16_1024_16", 1024, 16, true};
 constexpr Geometry kQwen27{"qwen3_6_27b", 5120, 48, false};
 constexpr Geometry kQwen38Parent{"qwen3_8_27b_parent", 5120, 48, true};
 constexpr Geometry kQwen35{"qwen3_6_35b_a3b", 2048, 32, true};
@@ -39,6 +40,9 @@ constexpr ReductionCriterion kGdnNormOutputBf16{/*relative_l2=*/1.75e-3,
                                                 /*gross_relative_to_max_reference=*/4.0e-3};
 // FP32 public controls permit 16-bit private operands/materialization. The gross cap includes
 // propagated BF16 staging error; relative L2 remains the accuracy gate for the full formula.
+// The 1024-wide output retains direct BF16 RNE. The legacy 1.75e-3
+// normwise bound rejects a valid rounding case in both old and grouped kernels.
+constexpr ReductionCriterion kGdnSmallNormOutputBf16{1.0 / 256.0, 1.0e-4, 4.0e-3};
 constexpr ReductionCriterion kGdnNormControlFp32{/*relative_l2=*/8.0e-4,
                                                  /*gross_absolute=*/1.5e-4,
                                                  /*gross_relative_to_max_reference=*/2.0e-3};
@@ -423,7 +427,8 @@ int run_norm_projection_case(const Geometry& geometry, std::int32_t tokens, std:
                                   " T=" + std::to_string(tokens) + " mode=" + std::to_string(mode) +
                                   " phase=" + std::to_string(phase);
         failures += verify_normwise(label + " h", from_device_bf16(device_h.data(), h_elements), rh,
-                                    kGdnNormOutputBf16);
+                                    geometry.hidden == 1024 ? kGdnSmallNormOutputBf16
+                                                            : kGdnNormOutputBf16);
         failures += verify_normwise(label + " g", read_fp32(device_g.data(), control_elements), rg,
                                     kGdnNormControlFp32);
         failures +=
@@ -494,6 +499,14 @@ int main() {
     const DeviceExecutionView execution{nullptr, device.multiprocessor_count()};
     const DeviceExecutionView norm_execution{device.stream, device.multiprocessor_count()};
     int failures = 0;
+    for (int tokens : {1, 2, 8, 9}) {
+        failures += run_norm_projection_case(kSmallParent, tokens, 0x8100u + tokens,
+                                             norm_execution, true);
+    }
+    for (int mode : {1, 2, 3, 4}) {
+        failures += run_norm_projection_case(kSmallParent, 1, 0x8200u + mode,
+                                             norm_execution, true, mode);
+    }
     failures += verify_workspace_capacity_contract(kQwen27, {1, 8, 1024, 2048, 4096, 4097});
     failures += verify_workspace_capacity_contract(kQwen35, {1, 127, 1024, 2048, 4096, 4097});
 

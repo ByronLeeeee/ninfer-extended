@@ -92,7 +92,8 @@ void gdn_input_proj(const Tensor& x, const Weight& query_key_value_z_weight, Ten
     std::int32_t batch_size, std::int32_t min_width, std::int32_t max_width);
 
 /**
- * Returns the transient capacity for a registered [16384,5120] NVFP4 or row-scaled FP8 snapshot
+ * Returns the transient capacity for a registered BF16 [8192,1024] or
+ * [16384,5120] NVFP4 or row-scaled FP8 snapshot
  * profile. `batch_size` is exact and the query covers every W in the inclusive width interval.
  * B=1 preserves the format-specific fused/materialized resolver; B=2..8 covers its aggregate
  * projection mechanism plus any projected BF16 plane selected by the complete-Op plan.
@@ -144,7 +145,10 @@ void gdn_input_proj_conv_snapshot(const Tensor& x, const Weight& qk_weight,
                                   cudaStream_t stream);
 
 /**
- * Single-parent form of gdn_input_proj_conv_snapshot. Registered parents are Q8_G32_FP16 RowSplit
+ * Single-parent form of gdn_input_proj_conv_snapshot. BF16 Contiguous [8192,1024]
+ * uses q/k/value/z row counts [2048,2048,2048,2048]. Its W=1 route requires
+ * zero workspace for B=1..8; other widths use a private BF16 projected plane.
+ * Registered quantized parents are Q8_G32_FP16 RowSplit
  * [12288,2048], NVFP4 BlockScaleK16M128x4 [16384,5120], and FP8_E4M3FN_ROW_BF16 RowScale
  * [16384,5120], all in q/k/value/z row order. All policies permit Q8 A16. NVFP4 uses A16
  * under A16Only/AllowA8; AllowA4 may use A4. FP8 may use A8 under AllowA8/AllowA4. B=1 accepts

@@ -16,4 +16,8 @@ void text_rope(const Tensor& positions, const RopeConfig& config, Tensor& query,
 void text_rope(const Tensor& positions, const RopeConfig& config, Tensor& query, Tensor& key,
                cudaStream_t stream);
 
+void text_norm_rope(const Tensor& positions, const RopeConfig& config, const Tensor& query_weight,
+                    const Tensor& key_weight, float epsilon, Tensor& query, Tensor& key,
+                    Tensor& normalized_query, Tensor& normalized_key, cudaStream_t stream);
+
 } // namespace ninfer::models::qwen3_5::execution

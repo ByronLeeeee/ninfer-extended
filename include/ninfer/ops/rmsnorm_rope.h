@@ -39,4 +39,25 @@ void rmsnorm_rope(const Tensor& positions, const Tensor& q_norm_weight, const Te
 void rmsnorm_rope(const Tensor& positions, const Tensor& norm_weight, Tensor& x,
                   cudaStream_t stream);
 
+/**
+ * Per-head RMSNorm with an explicit BF16 boundary, followed by partial split-half RoPE.
+ *
+ * q and k are contiguous, 4-byte-aligned BF16 [256,Hq,T] and [256,Hk,T], with
+ * Hq,Hk in 1..64 and T in 1..131072. Norm weights are BF16 [256]. positions is
+ * contiguous I32 [T] or [T,3]. epsilon and theta must be positive and finite.
+ * For each head, n[d] = BF16(x[d] / sqrt(sum(x*x)/256 + epsilon) *
+ * (weight[d] + (unit_offset ? 1 : 0))). Only n[0..64) is rotated: pair i uses
+ * dimensions i and i+32, angle = positions[t,axis] * theta^(-2*i/64), and
+ * axis = i%3 for three-axis positions, otherwise zero. Dimensions 64..256
+ * retain n. Both final outputs are BF16 and overwrite q and k in place.
+ *
+ * q and k must not overlap each other, positions, or either norm weight.
+ * Read-only inputs remain unchanged. The independent FP64 oracle evaluates
+ * the complete formula from represented BF16 inputs, including the specified
+ * intermediate BF16 boundary. This Op has no workspace or persistent state.
+ */
+void rmsnorm_rope_partial(const Tensor& positions, const Tensor& q_norm_weight,
+                          const Tensor& k_norm_weight, float epsilon, float theta,
+                          bool unit_offset, Tensor& q, Tensor& k, cudaStream_t stream);
+
 } // namespace ninfer::ops

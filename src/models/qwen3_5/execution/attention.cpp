@@ -2,6 +2,8 @@
 
 #include "ninfer/ops/attn_input_proj.h"
 #include "ninfer/ops/rope.h"
+#include "ninfer/ops/rmsnorm.h"
+#include "ninfer/ops/rmsnorm_rope.h"
 
 #include <stdexcept>
 
@@ -54,6 +56,24 @@ void text_rope(const Tensor& positions, const RopeConfig& config, Tensor& query,
                cudaStream_t stream) {
     require_rope_axes(positions, config);
     ops::rope(positions, dimension(config.rotary_dim), config.rope_theta, query, key, stream);
+}
+
+void text_norm_rope(const Tensor& positions, const RopeConfig& config, const Tensor& query_weight,
+                    const Tensor& key_weight, float epsilon, Tensor& query, Tensor& key,
+                    Tensor& normalized_query, Tensor& normalized_key, cudaStream_t stream) {
+    require_rope_axes(positions, config);
+    if (query.ne[0] == 256 && key.ne[0] == 256 && query.ne[1] == 8 && key.ne[1] == 2 &&
+        config.rotary_dim == 64 && query.ne[2] <= 131072 &&
+        query.is_contiguous() && key.is_contiguous()) {
+        ops::rmsnorm_rope_partial(positions, query_weight, key_weight, epsilon,
+                                  config.rope_theta, true, query, key, stream);
+        normalized_query = query;
+        normalized_key = key;
+    } else {
+        ops::rmsnorm(query, query_weight, epsilon, true, normalized_query, stream);
+        ops::rmsnorm(key, key_weight, epsilon, true, normalized_key, stream);
+        text_rope(positions, config, normalized_query, normalized_key, stream);
+    }
 }
 
 } // namespace ninfer::models::qwen3_5::execution

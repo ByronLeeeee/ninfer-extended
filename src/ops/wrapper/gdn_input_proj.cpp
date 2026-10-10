@@ -6,6 +6,7 @@
 #include "ops/gdn_input_proj/fp8/fp8_gdn_conv_plan.h"
 #include "ops/gdn_input_proj/fp8/fp8_gdn_input_plan.h"
 #include "ops/gdn_input_proj/gdn_projected_conv.h"
+#include "ops/gdn_input_proj/bf16/bf16_gdn_snapshot.h"
 #include "ops/gdn_input_proj/nvfp4/nvfp4_gdn_input_plan.h"
 #include "ops/gdn_input_proj/nvfp4/nvfp4_gdn_snapshot_plan.h"
 #include "ops/gdn_input_proj/q4_q5/q4_q5_gdn_input_kernels.h"
@@ -423,8 +424,19 @@ void dispatch_single_parent_snapshot(const Tensor& x, const Weight& weight,
                                      Tensor& value, Tensor& z, LinearPolicy policy,
                                      WorkspaceArena& workspace, cudaStream_t stream) {
 if(weight.qtype==QType::BF16&&weight.n==8192&&weight.k==1024){
+        if (weight.layout != QuantLayout::Contiguous || !aligned_to(weight.qdata, 16)) {
+            throw std::invalid_argument("gdn_input_proj_conv_snapshot: invalid BF16 parent");
+        }
         auto scope=workspace.scope();const auto geometry=require_snapshot_input(x,1024);
         require_snapshot_operands(conv_weight,conv_states,valid_columns,initial_state_slots,snapshot_base_slots,6144,geometry);
+        if (geometry.width == 1) {
+            for (const Tensor* output : {&query, &key, &value, &z}) {
+                require_conv_tensor(*output, 2048, 1, geometry.batch, "gdn_input_proj_conv_snapshot", "output");
+            }
+            detail::bf16_gdn_snapshot_decode(x, weight, conv_weight, conv_states, valid_columns,
+                initial_state_slots, snapshot_base_slots, query, key, value, z, stream);
+            return;
+        }
         Tensor projected=workspace.alloc(DType::BF16,{6144,geometry.width,geometry.batch},256);
         Tensor flat_x(x.data,DType::BF16,{1024,geometry.aggregate_columns});
         Tensor flat_p(projected.data,DType::BF16,{6144,geometry.aggregate_columns});
@@ -839,6 +851,7 @@ std::size_t gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
     if (parent_qtype == QType::BF16 && parent_rows == 8192 && input_rows == 1024) {
         validate_policy(policy);
         require_snapshot_capacity_domain(batch_size, min_width, max_width);
+        if (max_width == 1) { return 0; }
         return composed_snapshot_capacity(6144, batch_size * max_width, 0);
     }
 

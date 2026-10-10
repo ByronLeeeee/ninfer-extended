@@ -6,15 +6,21 @@
 #include "ops/kernel/gelu.cuh"
 
 #include <stdexcept>
+#include <type_traits>
 
 namespace ninfer::ops::detail {
 namespace {
 using Gemv = Bf16GemvSchedule<4, 1, 8, 8, 4, Bf16ActivationAccess::Direct,
     Bf16WeightCache::Default, Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2>;
+using NarrowGemv = Bf16GemvSchedule<4, 1, 1, 8, 4, Bf16ActivationAccess::Direct,
+    Bf16WeightCache::Default, Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2, 8>;
 using SwiGluGemv = Bf16GemvSchedule<4, 1, 2, 8, 4, Bf16ActivationAccess::Direct,
     Bf16WeightCache::Default, Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2>;
 using SmallT = Bf16SimtSchedule<4, 1, 2, 8, 1, 4, Bf16SimtActivationAccess::WarpPacked,
     Bf16WeightCache::Default, Bf16PhaseOrder::Sequential, 1, 1, 1, 2>;
+using NarrowSmallT = Bf16SimtSchedule<4, 1, 1, 8, 1, 4,
+    Bf16SimtActivationAccess::WarpPacked, Bf16WeightCache::Default,
+    Bf16PhaseOrder::Sequential, 1, 1, 1, 2>;
 using Mma = Bf16MmaSchedule<64, 64, 64, 32, 32, 2, 2, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 using WideMma = Bf16MmaSchedule<64, 128, 64, 32, 64, 2, 1, Cache::cg, Cache::cg,
@@ -118,8 +124,11 @@ struct GemvOutput {
 
 template <class Geometry, int Capacity, class Output>
 void small_projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
-    bf16_simt_kernel<Geometry, Capacity, SmallT, Output, true>
-        <<<Geometry::kOutputRows / SmallT::kRowsPerCta, SmallT::kThreads, 0, stream>>>(
+    using Schedule = std::conditional_t<Geometry::kOutputRows == 1024 &&
+        (Geometry::kInputRows == 2048 || Geometry::kInputRows == 3584),
+        NarrowSmallT, SmallT>;
+    bf16_simt_kernel<Geometry, Capacity, Schedule, Output, true>
+        <<<Geometry::kOutputRows / Schedule::kRowsPerCta, Schedule::kThreads, 0, stream>>>(
             static_cast<const __nv_bfloat16*>(x.data),
             static_cast<const __nv_bfloat16*>(w.qdata), output, x.ne[1]);
 }
@@ -209,8 +218,12 @@ template <int N, int K, class Output>
 void projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
     using Geometry = Bf16Geometry<N, K>;
     if (x.ne[1] == 1) {
-        bf16_gemv_kernel<Geometry, Gemv>
-            <<<N / Gemv::kRowsPerCta, Gemv::kThreads, 0, stream>>>(
+        // One row per warp exposes more CTAs for narrow outputs. PhaseRows keeps
+        // the existing column traversal and per-row accumulation order.
+        using Schedule = std::conditional_t<N == 1024 && (K == 2048 || K == 3584),
+                                            NarrowGemv, Gemv>;
+        bf16_gemv_kernel<Geometry, Schedule>
+            <<<N / Schedule::kRowsPerCta, Schedule::kThreads, 0, stream>>>(
                 static_cast<const __nv_bfloat16*>(x.data),
                 static_cast<const __nv_bfloat16*>(w.qdata), GemvOutput<Output>{output});
     } else {
