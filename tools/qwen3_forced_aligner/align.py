@@ -16,23 +16,45 @@ from tools.artifact.reader import Artifact
 
 class AlignmentProcessor:
     def __init__(self, artifact, directory):
-        from qwen_asr.core.transformers_backend import Qwen3ASRProcessor
-        from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForceAlignProcessor
+        from transformers import Qwen3ASRProcessor
         with Artifact(artifact) as source:
             component = source.directory.components['text']
             self.config = component['config']
             for name, object_id in component['resources'].items():
                 (directory/name).write_bytes(source.read_object(object_id))
         self.processor = Qwen3ASRProcessor.from_pretrained(directory, local_files_only=True, fix_mistral_regex=True)
-        self.text_processor = Qwen3ForceAlignProcessor()
+        self.korean_tokenizer = None
+
+    def split_words(self, text, language):
+        from transformers.models.qwen3_asr.processing_qwen3_asr import (
+            FORCED_ALIGNER_LANGUAGES, LANGUAGE_CODE_TO_NAME, _clean_tokens, prepare_language_inputs,
+        )
+        language = prepare_language_inputs(language, 1, LANGUAGE_CODE_TO_NAME, return_code=False)[0]
+        if language not in FORCED_ALIGNER_LANGUAGES:
+            raise ValueError(f'Unsupported alignment language: {language}')
+        if language == 'Korean':
+            # The original checkpoint uses this dictionary; the Transformers
+            # default LTokenizer has no scores and changes the word boundaries.
+            from soynlp.tokenizer import LTokenizer
+            if self.korean_tokenizer is None:
+                path = Path(__file__).with_name('assets')/'korean_dict_jieba.dict'
+                scores = {line.split()[0]: 1.0 for line in path.read_text(encoding='utf-8').splitlines()
+                          if line.strip()}
+                self.korean_tokenizer = LTokenizer(scores=scores)
+            return _clean_tokens(self.korean_tokenizer.tokenize(text))
+        return self.processor.split_words_for_alignment(text, language)
 
     def prepare(self, audio, text, language, directory, index=0):
-        words, prompt = self.text_processor.encode_timestamp(text, language)
+        words = self.split_words(text, language)
         if not words:
             raise ValueError('No alignable words in the transcript')
+        # The embedded legacy chat template is an ASR template and omits the
+        # transcript. Alignment requires the checkpoint's explicit timestamp prompt.
+        prompt = '<|audio_start|><|audio_pad|><|audio_end|>' + ''.join(
+            word+'<timestamp><timestamp>' for word in words)
         inputs = self.processor(text=[prompt], audio=[np.asarray(audio, dtype=np.float32)],
                                 return_tensors='pt', padding=True)
-        valid = int(inputs['feature_attention_mask'][0].sum())
+        valid = int(inputs['input_features_mask'][0].sum())
         frames = (valid+99)//100*100
         # The official tower trims the feature prefix, then zero-pads its last
         # convolution chunk. Padded log-mel values are not valid input frames.
@@ -45,14 +67,13 @@ class AlignmentProcessor:
                 'prompt_ids': inputs['input_ids'][0].tolist()}, words
 
     def parse(self, words, classes, segment_ms):
-        import torch
+        from transformers.models.qwen3_asr.processing_qwen3_asr import _fix_timestamps
         expected = self.config['timestamp_segment_time']
-        if segment_ms != expected or len(classes) != 2*len(words):
+        if not words or segment_ms != expected or len(classes) != 2*len(words):
             raise ValueError('Native timestamp output does not match the transcript')
-        times = torch.tensor(classes, dtype=torch.int64)*segment_ms
-        output = self.text_processor.parse_timestamp(words, times)
-        return [{'text': row['text'], 'start': round(row['start_time']/1000, 3),
-                 'end': round(row['end_time']/1000, 3)} for row in output]
+        times = _fix_timestamps(np.asarray(classes, dtype=np.int64)*segment_ms)
+        return [{'text': word, 'start': round(times[2*i]/1000, 3),
+                 'end': round(times[2*i+1]/1000, 3)} for i, word in enumerate(words)]
 
 
 def main():

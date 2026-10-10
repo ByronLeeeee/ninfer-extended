@@ -64,7 +64,7 @@ cd ninfer-extended
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCUDNN_ROOT=/path/to/cudnn -DCUBLAS_ROOT=/path/to/cublas
 cmake --build build --target ninfer-asr ninfer-align -j
-pip install "transformers>=5.13.0" torch numpy
+pip install -r tools/qwen3_asr/requirements.txt
 pip install huggingface_hub
 hf download ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer qwen3-asr-1.7b-bf16.ninfer --local-dir models
 python tools/qwen3_asr/transcribe.py \
@@ -148,32 +148,30 @@ Supported languages: Chinese, English, Cantonese, French, German, Italian, Japan
 
 ### Run ASR and alignment together
 
-The commands below transcribe the recording, read its text and detected language, and generate word timestamps. The CPU frontends use Transformers 5.17.0 and 4.57.6 respectively, so each has its own Python environment. Both GPU stages run in NInfer. Configure the build dependencies above before a first installation.
+The commands below transcribe the recording, read its text and detected language, and generate word timestamps. Both CPU frontends share one Transformers 5.17.0 environment; GPU inference runs in NInfer. Configure the build dependencies above before a first installation.
 
 ```bash
 # Run from the ninfer-extended repository root.
 cmake --build build --target ninfer-asr ninfer-align -j
-python3 -m venv .venv-asr
-.venv-asr/bin/python -m pip install "transformers==5.17.0" torch numpy huggingface_hub
-python3 -m venv .venv-align
-.venv-align/bin/python -m pip install "qwen-asr==0.0.6" "transformers==4.57.6" torch numpy soundfile
+python3 -m venv .venv
+.venv/bin/python -m pip install -r tools/qwen3_asr/requirements.txt huggingface_hub
 
-.venv-asr/bin/hf download ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer \
+.venv/bin/hf download ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer \
   qwen3-asr-1.7b-bf16.ninfer qwen3-forced-aligner-0.6b-bf16.ninfer --local-dir models
 ffmpeg -i recording.wav -ac 1 -ar 16000 -c:a pcm_s16le recording-16k.wav
 
-.venv-asr/bin/python tools/qwen3_asr/transcribe.py \
+.venv/bin/python tools/qwen3_asr/transcribe.py \
   --artifact models/qwen3-asr-1.7b-bf16.ninfer --engine build/apps/ninfer-asr \
   --audio recording-16k.wav --warmups 0 --repeats 1 --out transcription.json
 
-TRANSCRIPT="$(.venv-asr/bin/python -c 'import json; print(json.load(open("transcription.json", encoding="utf-8"))["runs"][-1]["text"][0])')"
-LANGUAGE="$(.venv-asr/bin/python -c 'import json; print(json.load(open("transcription.json", encoding="utf-8"))["runs"][-1]["language"][0])')"
-.venv-align/bin/python tools/qwen3_forced_aligner/align.py \
+TRANSCRIPT="$(.venv/bin/python -c 'import json; print(json.load(open("transcription.json", encoding="utf-8"))["runs"][-1]["text"][0])')"
+LANGUAGE="$(.venv/bin/python -c 'import json; print(json.load(open("transcription.json", encoding="utf-8"))["runs"][-1]["language"][0])')"
+.venv/bin/python tools/qwen3_forced_aligner/align.py \
   --artifact models/qwen3-forced-aligner-0.6b-bf16.ninfer --engine build/apps/ninfer-align \
   --audio recording-16k.wav --text "$TRANSCRIPT" --language "$LANGUAGE" \
   --warmups 0 --repeats 1 --out timestamps.json
 
-.venv-align/bin/python -c 'import json; r=json.load(open("timestamps.json", encoding="utf-8")); print(json.dumps(r["cases"][0]["runs"][-1]["words"][0], ensure_ascii=False, indent=2))'
+.venv/bin/python -c 'import json; r=json.load(open("timestamps.json", encoding="utf-8")); print(json.dumps(r["cases"][0]["runs"][-1]["words"][0], ensure_ascii=False, indent=2))'
 ```
 
 `transcription.json` contains the recognition result. Word timestamps are in `timestamps.json` at `cases[0].runs[-1].words[0]`: each entry contains `text`, `start` and `end`, in seconds. You can also pass an edited transcript directly with `--text`. For multiple recordings, supply matching `--audio`, `--text` and `--language` lists; ASR accepts 1–4 samples and the aligner accepts 1–8.

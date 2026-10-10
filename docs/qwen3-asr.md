@@ -20,8 +20,12 @@ cmake --build build --target ninfer-asr -j
 `CUDNN_ROOT` contains `include/cudnn.h` and `lib/libcudnn.so.9`.
 `CUBLAS_ROOT` contains `lib/libcublas.so.13`; omit it when cuBLAS is installed
 with the CUDA toolkit. Python is used for conversion and the CPU audio/token
-frontend. The frontend needs NumPy, PyTorch, and Transformers with native
-Qwen3-ASR support; the local qualification used Transformers 5.17.0.
+frontend. ASR and forced alignment share the native Transformers 5.17.0 CPU
+frontend environment:
+
+```bash
+python -m pip install -r tools/qwen3_asr/requirements.txt
+```
 
 ## Convert and transcribe
 

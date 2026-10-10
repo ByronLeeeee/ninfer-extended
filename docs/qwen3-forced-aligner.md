@@ -11,13 +11,17 @@ German, Italian, Japanese, Korean, Portuguese, Russian and Spanish.
 
 ## Convert and build
 
-Install `qwen-asr==0.0.6`, `transformers==4.57.6`, PyTorch, NumPy and SoundFile for the CPU tools.
+The ASR and alignment CPU tools share one Transformers 5.17.0 environment:
+
+```bash
+python -m pip install -r tools/qwen3_asr/requirements.txt
+```
+
 Keep the original model directory, including its processor and tokenizer files.
 
 The ready-to-use BF16 artifact is available in the
 [ASR model repository](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer), together with
-the main ASR model and a complete transcription-to-timestamps example. Use separate Python
-environments for the ASR frontend (Transformers 5.17.0) and alignment frontend (4.57.6).
+the main ASR model and a complete transcription-to-timestamps example.
 
 ```bash
 python tools/qwen3_forced_aligner/convert.py \

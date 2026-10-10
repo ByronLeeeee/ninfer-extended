@@ -1,5 +1,18 @@
 # Changelog
 
+## Shared ASR and forced-alignment CPU frontend
+
+Use native Transformers 5.17.0 for both speech frontends with one shared
+requirements file. Remove the legacy `qwen-asr` wrapper dependency from the
+alignment tool. Preserve the checkpoint's timestamp prompt and the official
+Korean segmentation dictionary.
+
+Validation retains byte-identical features, masks and prompt IDs for English,
+Chinese, sub-second and 60-second inputs. All eleven language word lists and
+106 timestamp-repair cases match the previous official frontend. A complete
+ASR-to-alignment run and a mixed English/Chinese batch retain identical
+timestamp classes and parsed words.
+
 ## Batched Qwen3-ASR language prefill on RTX 6000D
 
 Pack actual prompt rows across two to four ASR lanes for shared projections,
