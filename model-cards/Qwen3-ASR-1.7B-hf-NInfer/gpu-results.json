@@ -1,5 +1,4 @@
 {
-  "date": "2026-10-07",
   "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
   "weights": "bf16",
   "kv": "bf16",
@@ -534,7 +533,8 @@
           "reference_normalized_chars": 5152,
           "normalized_char_edit_distance": 2
         },
-        "normalization": "NFKC, lowercase, punctuation removed, apostrophes retained, whitespace collapsed; no abbreviation expansion"
+        "normalization": "NFKC, lowercase, punctuation removed, apostrophes retained, whitespace collapsed; no abbreviation expansion",
+        "lanes": 1
       }
     },
     "RTX 6000D": {
@@ -544,58 +544,74 @@
           "lanes": 1,
           "audio_seconds": 15.05125,
           "transformers": {
-            "forward_prefill": 13.336480140686035,
-            "decode_tps": 93.47479244567592,
-            "wall_seconds": 0.5413312800228596,
+            "wall_seconds": 0.5431026020087302,
+            "audio": 5.490592002868652,
+            "language_prefill": 7.2775678634643555,
+            "forward_prefill": 13.487199783325195,
+            "forward_decode": 514.617374420166,
+            "decode_tps": 93.273181952092,
+            "rtf": 0.036083554655509026,
             "completion_tokens": 49,
-            "full_prefill_tps": 15821.26601428329,
-            "audio_seconds_per_inference_second": 27.804138714031836
+            "full_prefill_tps": 15644.463149486995,
+            "audio_seconds_per_inference_second": 27.713455881690024
           },
           "ninfer_extended": {
-            "full_prefill_ms": 10.518943905830383,
-            "audio_ms": 2.4579520225524902,
-            "language_prefill_ms": 8.059600353240967,
-            "decode_tps": 294.5537594417372,
-            "wall_seconds": 0.175092194,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 781185388.0,
-            "prompt_tokens": 211.0,
-            "full_prefill_tps": 20059.04793189819,
+            "full_prefill_ms": 10.544064283370972,
+            "audio_ms": 2.462239980697632,
+            "language_prefill_ms": 8.08182430267334,
+            "decode_tps": 294.7589787501814,
+            "wall_seconds": 0.1748954695,
+            "weight_bytes": 4076132096,
+            "runtime_bytes": 781185392,
+            "prompt_tokens": 211,
+            "full_prefill_tps": 20011.258877923174,
             "completion_tokens": 49,
-            "audio_seconds_per_inference_second": 85.96185618646139
+            "audio_seconds_per_inference_second": 86.05854710261661
           },
-          "prefill_speed_ratio": 1.267853527890187,
-          "decode_speed_ratio": 3.151157138037198,
-          "inference_speed_ratio": 3.0916928256827916
+          "prefill_speed_ratio": 1.279127234134549,
+          "decode_speed_ratio": 3.1601685777330806,
+          "inference_speed_ratio": 3.1052982879509647,
+          "warm_measurements": {
+            "transformers": 3,
+            "ninfer_extended": 10
+          }
         },
         {
           "input": "official-zh",
           "lanes": 1,
           "audio_seconds": 4.2039375,
           "transformers": {
-            "forward_prefill": 10.6048002243042,
-            "decode_tps": 92.45668691716666,
-            "wall_seconds": 0.12454601901117712,
+            "wall_seconds": 0.12484799395315349,
+            "audio": 5.313024044036865,
+            "language_prefill": 4.72822380065918,
+            "forward_prefill": 10.77888011932373,
+            "forward_decode": 108.38444709777832,
+            "decode_tps": 92.26416029025424,
+            "rtf": 0.029697871091840324,
             "completion_tokens": 11,
-            "full_prefill_tps": 6600.784410777793,
-            "audio_seconds_per_inference_second": 33.75408972022403
+            "full_prefill_tps": 6494.181141741079,
+            "audio_seconds_per_inference_second": 33.67244732484398
           },
           "ninfer_extended": {
-            "full_prefill_ms": 6.368384063243866,
-            "audio_ms": 1.7024800181388855,
-            "language_prefill_ms": 4.6659040451049805,
-            "decode_tps": 296.011566408999,
-            "wall_seconds": 0.0405480585,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 717239240.0,
-            "prompt_tokens": 70.0,
-            "full_prefill_tps": 10991.79938031942,
+            "full_prefill_ms": 6.368144094944,
+            "audio_ms": 1.7056320309638977,
+            "language_prefill_ms": 4.662544012069702,
+            "decode_tps": 296.6604089173836,
+            "wall_seconds": 0.040408484999999994,
+            "weight_bytes": 4076132096,
+            "runtime_bytes": 717239244,
+            "prompt_tokens": 70,
+            "full_prefill_tps": 10992.213580025085,
             "completion_tokens": 11,
-            "audio_seconds_per_inference_second": 103.67789865943891
+            "audio_seconds_per_inference_second": 104.03600877389987
           },
-          "prefill_speed_ratio": 1.6652262361988308,
-          "decode_speed_ratio": 3.201624201332243,
-          "inference_speed_ratio": 3.0715655352814766
+          "prefill_speed_ratio": 1.6926250346441818,
+          "decode_speed_ratio": 3.215337439631145,
+          "inference_speed_ratio": 3.089647977476847,
+          "warm_measurements": {
+            "transformers": 3,
+            "ninfer_extended": 10
+          }
         },
         {
           "input": "en-2s",
@@ -689,29 +705,37 @@
           "lanes": 1,
           "audio_seconds": 60.0,
           "transformers": {
-            "forward_prefill": 33.136192321777344,
-            "decode_tps": 92.2542692889765,
-            "wall_seconds": 2.0708156670443714,
+            "wall_seconds": 2.070935309980996,
+            "audio": 12.102208137512207,
+            "language_prefill": 20.126623153686523,
+            "forward_prefill": 32.995361328125,
+            "forward_decode": 1984.3319330215454,
+            "decode_tps": 92.22247394937882,
+            "rtf": 0.03451558849968327,
             "completion_tokens": 184,
-            "full_prefill_tps": 23991.8935851154,
-            "audio_seconds_per_inference_second": 28.97409023645096
+            "full_prefill_tps": 24094.29592523807,
+            "audio_seconds_per_inference_second": 28.97241633325118
           },
           "ninfer_extended": {
-            "full_prefill_ms": 32.54790377616882,
-            "audio_ms": 6.335072040557861,
-            "language_prefill_ms": 26.216768264770508,
-            "decode_tps": 282.6794495309906,
-            "wall_seconds": 0.6854828550000001,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 1039264388.0,
-            "prompt_tokens": 795.0,
-            "full_prefill_tps": 24425.536141042954,
+            "full_prefill_ms": 32.58782434463501,
+            "audio_ms": 6.3289759159088135,
+            "language_prefill_ms": 26.259407997131348,
+            "decode_tps": 283.09409585663195,
+            "wall_seconds": 0.684315732,
+            "weight_bytes": 4076132096,
+            "runtime_bytes": 1039264392,
+            "prompt_tokens": 795,
+            "full_prefill_tps": 24395.614496764716,
             "completion_tokens": 184,
-            "audio_seconds_per_inference_second": 87.52954149378397
+            "audio_seconds_per_inference_second": 87.67882600717414
           },
-          "prefill_speed_ratio": 1.01807454482028,
-          "decode_speed_ratio": 3.0641340689126038,
-          "inference_speed_ratio": 3.020959097575637
+          "prefill_speed_ratio": 1.0125058052105613,
+          "decode_speed_ratio": 3.069686636383482,
+          "inference_speed_ratio": 3.0262862785989495,
+          "warm_measurements": {
+            "transformers": 3,
+            "ninfer_extended": 10
+          }
         },
         {
           "input": "zh-2s",
@@ -830,207 +854,152 @@
           "inference_speed_ratio": 2.845560593932461
         },
         {
-          "input": "official-en-batch2",
-          "lanes": 2,
-          "audio_seconds": 30.1025,
-          "transformers": {
-            "forward_prefill": 21.273344039916992,
-            "decode_tps": 165.35477787220108,
-            "wall_seconds": 0.6190622870344669,
-            "completion_tokens": 98,
-            "full_prefill_tps": 19837.031696011938,
-            "audio_seconds_per_inference_second": 48.625963219633206
-          },
-          "ninfer_extended": {
-            "full_prefill_ms": 20.43617582321167,
-            "audio_ms": 3.7871360778808594,
-            "language_prefill_ms": 16.65241575241089,
-            "decode_tps": 584.0961136337025,
-            "wall_seconds": 0.1864979465,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 1329570392.0,
-            "prompt_tokens": 422.0,
-            "full_prefill_tps": 20649.65596551029,
-            "completion_tokens": 98,
-            "audio_seconds_per_inference_second": 161.40928393546682
-          },
-          "prefill_speed_ratio": 1.0409650134128547,
-          "decode_speed_ratio": 3.5323812299221076,
-          "inference_speed_ratio": 3.3194053803400285
-        },
-        {
           "input": "official-en-batch4",
           "lanes": 4,
           "audio_seconds": 60.205,
           "transformers": {
-            "forward_prefill": 34.548065185546875,
-            "decode_tps": 279.81982717191,
-            "wall_seconds": 0.7377347840229049,
+            "wall_seconds": 0.7398285910021514,
+            "audio": 12.491840362548828,
+            "language_prefill": 21.16806411743164,
+            "forward_prefill": 34.43711853027344,
+            "forward_decode": 688.3198728561401,
+            "decode_tps": 278.94007941875634,
+            "rtf": 0.012288490839666995,
             "completion_tokens": 196,
-            "full_prefill_tps": 24429.732764111086,
-            "audio_seconds_per_inference_second": 81.6079183249285
+            "full_prefill_tps": 24508.438453061783,
+            "audio_seconds_per_inference_second": 81.37695776051041
           },
           "ninfer_extended": {
-            "full_prefill_ms": 40.310336112976074,
-            "audio_ms": 6.5192320346832275,
-            "language_prefill_ms": 33.785664081573486,
-            "decode_tps": 1130.356263085991,
-            "wall_seconds": 0.21242198499999998,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 2426340400.0,
-            "prompt_tokens": 844.0,
-            "full_prefill_tps": 20937.55799094696,
+            "full_prefill_ms": 29.374064445495605,
+            "audio_ms": 6.522288084030151,
+            "language_prefill_ms": 22.796287536621094,
+            "decode_tps": 1129.4575802169502,
+            "wall_seconds": 0.201021261,
+            "weight_bytes": 4076132096,
+            "runtime_bytes": 2470430132,
+            "prompt_tokens": 844,
+            "full_prefill_tps": 28732.829995864737,
             "completion_tokens": 196,
-            "audio_seconds_per_inference_second": 283.42169950064255
+            "audio_seconds_per_inference_second": 299.4956836928806
           },
-          "prefill_speed_ratio": 0.857052272864222,
-          "decode_speed_ratio": 4.039586024015181,
-          "inference_speed_ratio": 3.4729681300309148
-        },
-        {
-          "input": "official-zh-batch2",
-          "lanes": 2,
-          "audio_seconds": 8.407875,
-          "transformers": {
-            "forward_prefill": 11.674816131591797,
-            "decode_tps": 165.21816864451517,
-            "wall_seconds": 0.13865448790602386,
-            "completion_tokens": 22,
-            "full_prefill_tps": 11991.623544388254,
-            "audio_seconds_per_inference_second": 60.6390397236808
-          },
-          "ninfer_extended": {
-            "full_prefill_ms": 11.379072189331055,
-            "audio_ms": 1.9964320063591003,
-            "language_prefill_ms": 9.38262391090393,
-            "decode_tps": 589.796518818089,
-            "wall_seconds": 0.045808106,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 1211499028.0,
-            "prompt_tokens": 140.0,
-            "full_prefill_tps": 12303.287796281238,
-            "completion_tokens": 22,
-            "audio_seconds_per_inference_second": 183.54557160691166
-          },
-          "prefill_speed_ratio": 1.0259901631117192,
-          "decode_speed_ratio": 3.569804239188126,
-          "inference_speed_ratio": 3.0268548519780287
+          "prefill_speed_ratio": 1.1723647775803199,
+          "decode_speed_ratio": 4.0491046771423695,
+          "inference_speed_ratio": 3.680349965579767,
+          "warm_measurements": {
+            "transformers": 3,
+            "ninfer_extended": 10
+          }
         },
         {
           "input": "official-zh-batch4",
           "lanes": 4,
           "audio_seconds": 16.81575,
           "transformers": {
-            "forward_prefill": 17.39958381652832,
-            "decode_tps": 279.55262797648567,
-            "wall_seconds": 0.16640358802396804,
+            "wall_seconds": 0.16768436506390572,
+            "audio": 7.224287986755371,
+            "language_prefill": 10.088704109191895,
+            "forward_prefill": 18.097728729248047,
+            "forward_decode": 143.59555435180664,
+            "decode_tps": 278.560155852741,
+            "rtf": 0.009971863584074793,
             "completion_tokens": 44,
-            "full_prefill_tps": 16092.338929050744,
-            "audio_seconds_per_inference_second": 101.05401091218017
+            "full_prefill_tps": 15471.554701087282,
+            "audio_seconds_per_inference_second": 100.28215805087969
           },
           "ninfer_extended": {
-            "full_prefill_ms": 21.401567935943604,
-            "audio_ms": 2.5863200426101685,
-            "language_prefill_ms": 18.815167903900146,
-            "decode_tps": 1153.5095023876515,
-            "wall_seconds": 0.056802765000000005,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 2200018604.0,
-            "prompt_tokens": 280.0,
-            "full_prefill_tps": 13083.153572582143,
+            "full_prefill_ms": 12.533567786216736,
+            "audio_ms": 2.585039973258972,
+            "language_prefill_ms": 9.949055671691895,
+            "decode_tps": 1152.9876188450564,
+            "wall_seconds": 0.047738587,
+            "weight_bytes": 4076132096,
+            "runtime_bytes": 2214645540,
+            "prompt_tokens": 280,
+            "full_prefill_tps": 22340.00763197836,
             "completion_tokens": 44,
-            "audio_seconds_per_inference_second": 296.03752563805654
+            "audio_seconds_per_inference_second": 352.2464961101593
           },
-          "prefill_speed_ratio": 0.8130050970380533,
-          "decode_speed_ratio": 4.126269571268985,
-          "inference_speed_ratio": 2.9294980274986266
-        },
-        {
-          "input": "en-30s-batch2",
-          "lanes": 2,
-          "audio_seconds": 60.0,
-          "transformers": {
-            "forward_prefill": 33.146175384521484,
-            "decode_tps": 165.168589269992,
-            "wall_seconds": 1.1897200460080057,
-            "completion_tokens": 188,
-            "full_prefill_tps": 24437.208534721376,
-            "audio_seconds_per_inference_second": 50.43203247799714
-          },
-          "ninfer_extended": {
-            "full_prefill_ms": 33.1670401096344,
-            "audio_ms": 6.365648031234741,
-            "language_prefill_ms": 26.80672025680542,
-            "decode_tps": 573.4529337663895,
-            "wall_seconds": 0.359875432,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 1482167232.0,
-            "prompt_tokens": 810.0,
-            "full_prefill_tps": 24421.835572982294,
-            "completion_tokens": 188,
-            "audio_seconds_per_inference_second": 166.7243569991741
-          },
-          "prefill_speed_ratio": 0.9993709198938481,
-          "decode_speed_ratio": 3.471924875673531,
-          "inference_speed_ratio": 3.3059218279952094
+          "prefill_speed_ratio": 1.4439407069031265,
+          "decode_speed_ratio": 4.1390974072206355,
+          "inference_speed_ratio": 3.512554007178841,
+          "warm_measurements": {
+            "transformers": 3,
+            "ninfer_extended": 10
+          }
         },
         {
           "input": "en-30s-batch4",
           "lanes": 4,
           "audio_seconds": 120.0,
           "transformers": {
-            "forward_prefill": 59.17046356201172,
-            "decode_tps": 279.489489026856,
-            "wall_seconds": 1.4204009920358658,
+            "wall_seconds": 1.4242801610380411,
+            "audio": 19.766687393188477,
+            "language_prefill": 38.08854293823242,
+            "forward_prefill": 58.85478210449219,
+            "forward_decode": 1335.7703075408936,
+            "decode_tps": 278.4909934738997,
+            "rtf": 0.011869001341983676,
             "completion_tokens": 376,
-            "full_prefill_tps": 27378.524731384106,
-            "audio_seconds_per_inference_second": 84.48318515182362
+            "full_prefill_tps": 27525.375884049885,
+            "audio_seconds_per_inference_second": 84.25308677510598
           },
           "ninfer_extended": {
-            "full_prefill_ms": 65.49078369140625,
-            "audio_ms": 13.679887771606445,
-            "language_prefill_ms": 51.86529588699341,
-            "decode_tps": 1095.7933576007817,
-            "wall_seconds": 0.408689003,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 2718021592.0,
-            "prompt_tokens": 1620.0,
-            "full_prefill_tps": 24736.304998783784,
+            "full_prefill_ms": 57.5381760597229,
+            "audio_ms": 13.665552139282227,
+            "language_prefill_ms": 43.8525276184082,
+            "decode_tps": 1096.4915376644876,
+            "wall_seconds": 0.401359813,
+            "weight_bytes": 4076132096,
+            "runtime_bytes": 2815166164,
+            "prompt_tokens": 1620,
+            "full_prefill_tps": 28155.219906840433,
             "completion_tokens": 376,
-            "audio_seconds_per_inference_second": 293.6217982845993
+            "audio_seconds_per_inference_second": 298.983595549961
           },
-          "prefill_speed_ratio": 0.903492983697126,
-          "decode_speed_ratio": 3.92069612855991,
-          "inference_speed_ratio": 3.4755057797233313
+          "prefill_speed_ratio": 1.0228823041488608,
+          "decode_speed_ratio": 3.937260318500215,
+          "inference_speed_ratio": 3.5486366968135923,
+          "warm_measurements": {
+            "transformers": 3,
+            "ninfer_extended": 10
+          }
         },
         {
           "input": "mixed-batch4",
           "lanes": 4,
           "audio_seconds": 31.255187499999998,
           "transformers": {
-            "forward_prefill": 50.11827087402344,
-            "decode_tps": 144.10307934962205,
-            "wall_seconds": 0.7540856620762497,
+            "wall_seconds": 0.7571966820396483,
+            "audio": 10.279135704040527,
+            "language_prefill": 39.38790512084961,
+            "forward_prefill": 50.568511962890625,
+            "forward_decode": 689.4306192398071,
+            "decode_tps": 143.59675540544055,
+            "rtf": 0.02422627226407291,
             "completion_tokens": 103,
-            "full_prefill_tps": 9317.95913657605,
-            "audio_seconds_per_inference_second": 41.4477944242356
+            "full_prefill_tps": 9234.995887217423,
+            "audio_seconds_per_inference_second": 41.27750192434601
           },
           "ninfer_extended": {
-            "full_prefill_ms": 27.87567973136902,
-            "audio_ms": 3.92633593082428,
-            "language_prefill_ms": 23.949439764022827,
-            "decode_tps": 584.8195854525868,
-            "wall_seconds": 0.19890221149999998,
-            "weight_bytes": 4076132096.0,
-            "runtime_bytes": 2274723452.0,
-            "prompt_tokens": 467.0,
-            "full_prefill_tps": 16752.954708203088,
+            "full_prefill_ms": 18.693344235420227,
+            "audio_ms": 3.941632032394409,
+            "language_prefill_ms": 14.750560283660889,
+            "decode_tps": 585.3723048681852,
+            "wall_seconds": 0.1892510515,
+            "weight_bytes": 4076132096,
+            "runtime_bytes": 2292554380,
+            "prompt_tokens": 467,
+            "full_prefill_tps": 24982.153761183432,
             "completion_tokens": 103,
-            "audio_seconds_per_inference_second": 157.13846147959998
+            "audio_seconds_per_inference_second": 165.151988600708
           },
-          "prefill_speed_ratio": 1.7979210321326953,
-          "decode_speed_ratio": 4.058342043015617,
-          "inference_speed_ratio": 3.7912381988585873
+          "prefill_speed_ratio": 2.705161330473613,
+          "decode_speed_ratio": 4.076500915465719,
+          "inference_speed_ratio": 4.001017040793817,
+          "warm_measurements": {
+            "transformers": 3,
+            "ninfer_extended": 10
+          }
         }
       ],
       "quality": {
@@ -1059,8 +1028,10 @@
           "reference_normalized_chars": 5151,
           "normalized_char_edit_distance": 0
         },
-        "normalization": "NFKC, lowercase, punctuation removed, apostrophes retained, whitespace collapsed; no abbreviation expansion"
+        "normalization": "NFKC, lowercase, punctuation removed, apostrophes retained, whitespace collapsed; no abbreviation expansion",
+        "lanes": 1
       }
     }
-  }
+  },
+  "audio_throughput": "total input audio seconds divided by complete warm model-call seconds, including audio encoding, language prefill, all generated tokens and synchronization; sum audio duration across lanes; excludes model loading, CPU features and first graph capture"
 }

@@ -1,5 +1,38 @@
 # Changelog
 
+## Batched Qwen3-ASR language prefill on RTX 6000D
+
+Pack actual prompt rows across two to four ASR lanes for shared projections,
+normalization, FFNs and the first-token head. Keep per-sample FP32 probability
+attention, local RoPE positions and independent KV. Allocate workspace for
+the packed row count before Graph capture. Single-lane ASR and forced alignment
+retain their existing execution paths.
+
+BF16 weights/KV, 4096 context tokens per lane, greedy decoding to natural EOS.
+Full prefill includes audio encoding, language prefill and the first token.
+Results compare the previous NInfer Extended build with this change and
+strict GPU BF16 compiled Transformers. NInfer medians pool ten warm runs per
+input from an old/new/new/old order; Transformers uses three warm runs.
+
+| Four-lane input | Previous prefill ms | Updated prefill ms | TF prefill ms | Speedup over previous |
+|---|---:|---:|---:|---:|
+| English 15.05 s × 4 | 40.211 | 29.374 | 34.437 | 1.37× |
+| Chinese 4.20 s × 4 | 21.348 | 12.534 | 18.098 | 1.70× |
+| English 30 s × 4 | 65.799 | 57.538 | 58.855 | 1.14× |
+| Mixed English/Chinese × 4 | 27.963 | 18.693 | 50.569 | 1.50× |
+
+Four-lane prefill time falls **12.6–41.3%**. Single-lane and decode speed remain
+within measurement variation. Additional Engine runtime allocation is
+**13.9–92.6 MiB** for the measured four-lane inputs; KV precision is unchanged.
+
+Quality regression: all 73 recordings retain identical tokens and text between
+previous and updated execution, both singly and in groups of up to four.
+Single-lane WER stays 3.5652%; batched WER stays 3.6522%. Changed-input Graph
+replays match fresh Engines; heterogeneous two/three-lane requests and
+Graph/eager checks pass. Forced-aligner timestamps and runtime allocation
+are identical. Web frontend automatic/forced language and prompt/hotword
+checks pass. Temperatures are 52–72°C and SM clocks 2400–2422 MHz.
+
 ## BF16 partial RoPE and batched decode fusion on RTX 6000D
 
 - Fuse Q/K RMSNorm and 64-dimension partial RoPE for 256-dimension heads,

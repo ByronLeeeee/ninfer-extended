@@ -73,22 +73,41 @@ outputs and the same 256-token formula prefix. [Full OCR results](docs/xiaomi-oc
 
 ### Qwen3-ASR-1.7B
 
-One 15.05-second English recording. Prefill includes audio encoding, language
-prefill and first-token computation.
+Complete transcription speed, measured as **audio seconds processed per second**.
+This equals total audio duration divided by the complete warm model-call time;
+four-lane results sum all four recordings. Model loading, CPU features and
+first Graph capture are excluded.
+
+| GPU | Input | TF audio seconds/s | NInfer audio seconds/s | Speedup |
+|---|---|---:|---:|---:|
+| RTX 5070 Ti | English 60 s | 19.9 | **62.5** | 3.14× |
+| RTX 5070 Ti | English 30 s × 4 | 54.1 | **197.8** | 3.66× |
+| RTX 6000D | English 60 s | 29.0 | **87.7** | 3.03× |
+| RTX 6000D | English 30 s × 4 | 84.3 | **299.0** | 3.55× |
+
+Prefill and decode for one 15.05-second English recording:
 
 | GPU | TF prefill ms | NInfer prefill ms | Prefill speedup | TF decode tok/s | NInfer decode tok/s | Decode speedup |
 |---|---:|---:|---:|---:|---:|---:|
 | RTX 5070 Ti | 39.416 | 16.456 | 2.40× | 68.2 | 213.4 | 3.13× |
-| RTX 6000D | 13.336 | 10.519 | 1.27× | 93.5 | 294.6 | 3.15× |
+| RTX 6000D | 13.487 | 10.544 | 1.28× | 93.3 | 294.8 | 3.16× |
+
+Four-lane inference on RTX 6000D:
+
+| Input | TF prefill ms | NInfer prefill ms | Prefill speedup | TF decode tok/s | NInfer decode tok/s | Decode speedup |
+|---|---:|---:|---:|---:|---:|---:|
+| English 15.05 s × 4 | 34.437 | 29.374 | 1.17× | 278.9 | 1129.5 | 4.05× |
+| Chinese 4.20 s × 4 | 18.098 | 12.534 | 1.44× | 278.6 | 1153.0 | 4.14× |
+| English 30 s × 4 | 58.855 | 57.538 | 1.02× | 278.5 | 1096.5 | 3.94× |
 
 For 60 seconds of concatenated English audio, complete warm inference takes:
 
 | GPU | TF inference time | NInfer inference time | TF audio s/s | NInfer audio s/s | Speedup |
 |---|---:|---:|---:|---:|---:|
 | RTX 5070 Ti | 3.011 s | 0.960 s | 19.9 | 62.5 | 3.14× |
-| RTX 6000D | 2.071 s | 0.685 s | 29.0 | 87.5 | 3.02× |
+| RTX 6000D | 2.071 s | 0.684 s | 29.0 | 87.7 | 3.03× |
 
-Recognition quality on 73 labelled English recordings, totaling 1,150 gold words:
+Single-lane recognition quality on 73 labelled English recordings, totaling 1,150 gold words:
 
 | GPU | TF WER | NInfer WER | Raw output agreement | Normalized text agreement |
 |---|---:|---:|---:|---:|

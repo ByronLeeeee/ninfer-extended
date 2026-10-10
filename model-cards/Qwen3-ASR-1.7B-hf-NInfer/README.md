@@ -22,7 +22,39 @@ tags:
 
 This BF16 conversion of [Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf) runs with the **main branch of [ninfer-extended](https://github.com/ByronLeeeee/ninfer-extended)**. Audio encoding, language prefill and decode run in the native C++/CUDA engine. The artifact includes the tokenizer, processor and chat template, with all 707 source parameters preserved byte for byte.
 
-Also included: a native BF16 Qwen3-ForcedAligner-0.6B artifact for word timestamps. See the combined ASR/alignment workflow and measurements dated 2026-10-08 below.
+Also included: a native BF16 Qwen3-ForcedAligner-0.6B artifact for word timestamps. See the combined ASR/alignment workflow and measurements below.
+
+## Transcription speed: audio seconds processed per second
+
+On 60-second English audio, NInfer processes **62.5 seconds of audio per second** on RTX 5070 Ti and **87.7 seconds per second** on RTX 6000D. Four 30-second English recordings reach **197.8** and **299.0 audio seconds per second**, respectively.
+
+Audio seconds/s = total input audio duration ÷ complete warm inference time. For example, 60 seconds of audio transcribed in 0.684 seconds is 87.7 audio seconds/s. The measurement includes audio encoding, prefill, the full transcript generation and synchronization. Model loading, CPU feature extraction and first Graph capture are excluded. Four-lane results sum the duration of all four recordings. The 60-second inputs repeat fixed clips; recognition quality is evaluated separately below.
+
+### RTX 5070 Ti
+
+| Input | Lanes | TF audio seconds/s | NInfer audio seconds/s | Speedup |
+| --- | ---: | ---: | ---: | ---: |
+| English 15.05 s | 1 | 18.9 | **60.5** | 3.21× |
+| Chinese 4.20 s | 1 | 20.0 | **73.8** | 3.69× |
+| English 60 s | 1 | 19.9 | **62.5** | 3.14× |
+| Chinese 60 s | 1 | 35.7 | **107.1** | 3.00× |
+| English 15.05 s × 4 | 4 | 52.0 | **194.5** | 3.74× |
+| Chinese 4.20 s × 4 | 4 | 56.8 | **206.3** | 3.63× |
+| English 30 s × 4 | 4 | 54.1 | **197.8** | 3.66× |
+| Mixed English/Chinese × 4 | 4 | 26.5 | **111.2** | 4.19× |
+
+### RTX 6000D
+
+| Input | Lanes | TF audio seconds/s | NInfer audio seconds/s | Speedup |
+| --- | ---: | ---: | ---: | ---: |
+| English 15.05 s | 1 | 27.7 | **86.1** | 3.11× |
+| Chinese 4.20 s | 1 | 33.7 | **104.0** | 3.09× |
+| English 60 s | 1 | 29.0 | **87.7** | 3.03× |
+| Chinese 60 s | 1 | 53.8 | **153.1** | 2.85× |
+| English 15.05 s × 4 | 4 | 81.4 | **299.5** | 3.68× |
+| Chinese 4.20 s × 4 | 4 | 100.3 | **352.2** | 3.51× |
+| English 30 s × 4 | 4 | 84.3 | **299.0** | 3.55× |
+| Mixed English/Chinese × 4 | 4 | 41.3 | **165.2** | 4.00× |
 
 ## Build and transcribe
 
@@ -44,9 +76,9 @@ Build dependencies: 64-bit Linux (WSL2 on Windows), CUDA supporting `sm_120a`, C
 
 [Build, conversion and API guide](https://github.com/ByronLeeeee/ninfer-extended/blob/main/docs/qwen3-asr.md)
 
-## Transformers vs NInfer performance
+## Prefill and decode performance
 
-Measured on 2026-10-07. Transformers uses BF16 GPU audio encoding, fullgraph language compilation and decode CUDA Graphs; CPU offload, compilation fallback and graph breaks were checked, with MATH SDPA disabled. NInfer uses CUDA Graphs for audio, language prefill and decode. Toolchains: CUDA 13.3/GCC 13.3 on 5070 Ti and CUDA 13.2/GCC 15.2 on 6000D; Transformers 5.17.0 and PyTorch 2.14.0+cu132 on both. Medians use three warm measurements for Transformers and six for NInfer.
+BF16 weights and KV, 4,096 context tokens per lane, greedy decoding. Transformers uses GPU audio encoding, fullgraph language compilation and decode CUDA Graphs. NInfer uses CUDA Graphs for audio, language prefill and decode. Results are warm medians. Toolchains: CUDA 13.3/GCC 13.3 on 5070 Ti and CUDA 13.2/GCC 15.2 on 6000D; Transformers 5.17.0 and PyTorch 2.14.0+cu132.
 
 Prefill includes audio encoding, language prefill and first-token GPU computation. Decode starts after the first token, includes EOS and sums tokens across lanes. All speed ratios compare this NInfer version with Transformers.
 
@@ -67,14 +99,13 @@ Prefill includes audio encoding, language prefill and first-token GPU computatio
 
 | Input | Lanes | TF prefill ms | NInfer prefill ms | Prefill speedup | TF decode tok/s | NInfer decode tok/s | Decode speedup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| English 15.05 s | 1 | 13.336 | 10.519 | 1.27× | 93.5 | 294.6 | 3.15× |
-| Chinese 4.20 s | 1 | 10.605 | 6.368 | 1.67× | 92.5 | 296.0 | 3.20× |
-| English 10 s | 1 | 11.189 | 8.375 | 1.34× | 92.3 | 294.8 | 3.19× |
-| English 30 s | 1 | 20.763 | 16.872 | 1.23× | 92.3 | 289.9 | 3.14× |
-| English 60 s | 1 | 33.136 | 32.548 | 1.02× | 92.3 | 282.7 | 3.06× |
-| Chinese 60 s | 1 | 32.940 | 32.509 | 1.01× | 92.2 | 283.5 | 3.08× |
-| English 15.05 s × 4 | 4 | 34.548 | 40.310 | 0.86× | 279.8 | 1130.4 | 4.04× |
-| English 30 s × 4 | 4 | 59.170 | 65.491 | 0.90× | 279.5 | 1095.8 | 3.92× |
+| English 15.05 s | 1 | 13.487 | 10.544 | 1.28× | 93.3 | 294.8 | 3.16× |
+| Chinese 4.20 s | 1 | 10.779 | 6.368 | 1.69× | 92.3 | 296.7 | 3.22× |
+| English 60 s | 1 | 32.995 | 32.588 | 1.01× | 92.2 | 283.1 | 3.07× |
+| English 15.05 s × 4 | 4 | 34.437 | 29.374 | 1.17× | 278.9 | 1129.5 | 4.05× |
+| Chinese 4.20 s × 4 | 4 | 18.098 | 12.534 | 1.44× | 278.6 | 1153.0 | 4.14× |
+| English 30 s × 4 | 4 | 58.855 | 57.538 | 1.02× | 278.5 | 1096.5 | 3.94× |
+| Mixed English/Chinese × 4 | 4 | 50.569 | 18.693 | 2.71× | 143.6 | 585.4 | 4.08× |
 
 ## Inference latency and 60-second audio
 
@@ -84,8 +115,8 @@ Latency measures a complete warm model call, including audio encoding, prefill, 
 | --- | --- | --- | --- | --- |
 | RTX 5070 Ti | English 15.05 s | 798.0 | 248.8 | 3.21× |
 | RTX 5070 Ti | Chinese 4.20 s | 210.0 | 56.9 | 3.69× |
-| RTX 6000D | English 15.05 s | 541.3 | 175.1 | 3.09× |
-| RTX 6000D | Chinese 4.20 s | 124.5 | 40.5 | 3.07× |
+| RTX 6000D | English 15.05 s | 543.1 | 174.9 | 3.11× |
+| RTX 6000D | Chinese 4.20 s | 124.8 | 40.4 | 3.09× |
 
 The 60-second inputs concatenate fixed clips for benchmarking. Audio seconds per inference second equals 60 divided by measured warm inference time.
 
@@ -93,23 +124,23 @@ The 60-second inputs concatenate fixed clips for benchmarking. Audio seconds per
 | --- | --- | --- | --- | --- | --- | --- |
 | RTX 5070 Ti | English 60 s | 3.011 | 0.960 | 19.9 | 62.5 | 3.14× |
 | RTX 5070 Ti | Chinese 60 s | 1.679 | 0.560 | 35.7 | 107.1 | 3.00× |
-| RTX 6000D | English 60 s | 2.071 | 0.685 | 29.0 | 87.5 | 3.02× |
+| RTX 6000D | English 60 s | 2.071 | 0.684 | 29.0 | 87.7 | 3.03× |
 | RTX 6000D | Chinese 60 s | 1.115 | 0.392 | 53.8 | 153.1 | 2.85× |
 
 ## Recognition quality and output agreement
 
-Quality is measured on 73 real labelled English recordings: 481.03 seconds and 1,150 gold words. WER normalization removes case, punctuation and extra whitespace while retaining apostrophes; CER excludes spaces.
+Single-lane quality is measured on 73 real labelled English recordings: 481.03 seconds and 1,150 gold words. WER normalization removes case, punctuation and extra whitespace while retaining apostrophes; CER excludes spaces.
 
 | GPU | TF WER | NInfer WER | TF CER | NInfer CER | Raw text/token agreement | Normalized text agreement | Token edit rate |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | RTX 5070 Ti | 3.9130% | 3.8261% | 1.3553% | 1.3166% | 98.63% | 98.63% | 0.0573% |
 | RTX 6000D | 3.5652% | 3.5652% | 1.2585% | 1.2585% | 97.26% | 100.00% | 0.1720% |
 
-On 5070 Ti, Transformers has 45 word errors and NInfer 44; the differing `has/is` choice matches the gold transcript in NInfer. On 6000D both have 41 errors and all normalized texts agree; raw differences are capitalization and punctuation. Both GPUs pass independent FP64 operator checks, and the final iteration preserves all 73 previously qualified outputs.
+On 5070 Ti, Transformers has 45 word errors and NInfer 44; the differing `has/is` choice matches the gold transcript in NInfer. On 6000D both have 41 errors and all normalized texts agree; raw differences are capitalization and punctuation. Both GPUs pass independent FP64 operator checks.
 
 ## Word timestamps with Qwen3-ForcedAligner-0.6B
 
-**Updated 2026-10-08:** this repository now includes `qwen3-forced-aligner-0.6b-bf16.ninfer` alongside the main ASR artifact. Both run with the `main` branch of [ninfer-extended](https://github.com/ByronLeeeee/ninfer-extended).
+This repository includes `qwen3-forced-aligner-0.6b-bf16.ninfer` alongside the main ASR artifact. Both run with the `main` branch of [ninfer-extended](https://github.com/ByronLeeeee/ninfer-extended).
 
 The ASR model produces the transcript and detected language. ForcedAligner then takes the same audio and transcript and assigns start/end times to each word. Audio encoding, language forward and timestamp classification run in one native BF16 pass with CUDA Graphs and no KV cache. Conversion preserves all 708 source BF16 parameters byte for byte. The timestamp step is **80 ms**.
 
@@ -149,7 +180,7 @@ LANGUAGE="$(.venv-asr/bin/python -c 'import json; print(json.load(open("transcri
 
 ### Alignment timing and timestamp agreement
 
-Measured on 2026-10-08, single sample, three warmups and seven timed runs per case, reported as medians. Synchronized CUDA events cover the complete audio encoder, language forward and timestamp head, including scheduling gaps between stages; model loading, CPU preprocessing and initial Graph capture are excluded. The official reference uses `qwen-asr 0.0.6`, Transformers 4.57.6 and PyTorch 2.10.0+cu130 with BF16 GPU weights and fused SDPA, without CPU offload or MATH attention fallback. This alignment reference runs eagerly; the main ASR reference above uses compilation and decode Graphs.
+Single-sample medians from seven measurements after warmup. Synchronized CUDA events cover the complete audio encoder, language forward and timestamp head, including scheduling gaps between stages; model loading, CPU preprocessing and initial Graph capture are excluded. The official reference uses `qwen-asr 0.0.6`, Transformers 4.57.6 and PyTorch 2.10.0+cu130 with BF16 GPU weights and fused SDPA, without CPU offload or MATH attention fallback. This alignment reference runs eagerly; the main ASR reference above uses compilation and decode Graphs.
 
 | GPU | Audio | Transformers ms | NInfer ms | Speedup |
 | --- | --- | --- | --- | --- |
