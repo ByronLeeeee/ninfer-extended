@@ -108,4 +108,3 @@ report = dict(scope='Transformers + explicit custom PyTorch MTP adapter; not nat
     smoke=a.smoke,summary=summary)
 (result_dir/'summary.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n')
 print(json.dumps(report,indent=2,ensure_ascii=False),flush=True)
-
