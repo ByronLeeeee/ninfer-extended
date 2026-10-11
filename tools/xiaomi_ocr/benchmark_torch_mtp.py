@@ -104,7 +104,8 @@ report = dict(scope='Transformers + explicit custom PyTorch MTP adapter; not nat
     proposal_head=reference.proposal_metadata if a.proposal_artifact else 'full original BF16 vocabulary',mtp_tensors=reference.mtp.loaded_tensor_count,
     backends=reference.backends,prefill_compiler_stats=reference.prefill_stats,
     rollback='snapshot conv/recurrent/attention frontiers; restore and replay accepted prefix on rejection',
-    rollback_control_passed=True,method='2 warmups, 3 alternating balanced cycles; 6 formal runs per mode and fixture',
+    rollback_control_passed=True,method=f'2 warmups, {a.cycles} alternating balanced cycles; {2*a.cycles} formal runs per mode and fixture',
     smoke=a.smoke,summary=summary)
 (result_dir/'summary.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n')
 print(json.dumps(report,indent=2,ensure_ascii=False),flush=True)
+
