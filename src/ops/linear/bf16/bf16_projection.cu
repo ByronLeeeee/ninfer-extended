@@ -5,6 +5,7 @@
 #include "ops/linear_swiglu/bf16/bf16_swiglu_small.cuh"
 #include "ops/kernel/gelu.cuh"
 
+#include <algorithm>
 #include <stdexcept>
 #include <type_traits>
 
@@ -16,11 +17,17 @@ using NarrowGemv = Bf16GemvSchedule<4, 1, 1, 8, 4, Bf16ActivationAccess::Direct,
     Bf16WeightCache::Default, Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2, 8>;
 using SwiGluGemv = Bf16GemvSchedule<4, 1, 2, 8, 4, Bf16ActivationAccess::Direct,
     Bf16WeightCache::Default, Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2>;
-using SmallT = Bf16SimtSchedule<4, 1, 2, 8, 1, 4, Bf16SimtActivationAccess::WarpPacked,
-    Bf16WeightCache::Default, Bf16PhaseOrder::Sequential, 1, 1, 1, 2>;
-using NarrowSmallT = Bf16SimtSchedule<4, 1, 1, 8, 1, 4,
+using SmallT = Bf16SimtSchedule<4, 1, 2, 8, 4, 4, Bf16SimtActivationAccess::WarpPacked,
+    Bf16WeightCache::Default, Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2>;
+using ProjectionSmallT = Bf16SimtSchedule<4, 1, 2, 8, 4, 4,
     Bf16SimtActivationAccess::WarpPacked, Bf16WeightCache::Default,
-    Bf16PhaseOrder::Sequential, 1, 1, 1, 2>;
+    Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2, 8>;
+using NarrowSmallT = Bf16SimtSchedule<4, 1, 1, 8, 4, 4,
+    Bf16SimtActivationAccess::WarpPacked, Bf16WeightCache::Default,
+    Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2, 8>;
+using SixteenColumns = Bf16SimtSchedule<4, 1, 1, 8, 4, 4,
+    Bf16SimtActivationAccess::WarpPacked, Bf16WeightCache::Default,
+    Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2, 8>;
 using Mma = Bf16MmaSchedule<64, 64, 64, 32, 32, 2, 2, Cache::cg, Cache::cg,
     Bf16MmaFragmentPipeline::PingPong, Bf16MmaRaster::TokenFast>;
 using WideMma = Bf16MmaSchedule<64, 128, 64, 32, 64, 2, 1, Cache::cg, Cache::cg,
@@ -114,6 +121,21 @@ struct SplitOutput {
     }
 };
 
+// Short 0.8B verification batches keep the single-column accumulation order.
+// Offset only token-major output storage; bias and weight rows stay unchanged.
+template <class Output>
+Output offset_columns(Output output, int columns) {
+    output.data += static_cast<std::int64_t>(columns) * output.rows;
+    return output;
+}
+
+template <int Planes>
+SplitOutput<Planes> offset_columns(SplitOutput<Planes> output, int columns) {
+    for (int plane = 0; plane < Planes; ++plane)
+        output.data[plane] += static_cast<std::int64_t>(columns) * output.rows[plane];
+    return output;
+}
+
 template <class Output>
 struct GemvOutput {
     Output output;
@@ -124,9 +146,10 @@ struct GemvOutput {
 
 template <class Geometry, int Capacity, class Output>
 void small_projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
-    using Schedule = std::conditional_t<Geometry::kOutputRows == 1024 &&
-        (Geometry::kInputRows == 2048 || Geometry::kInputRows == 3584),
-        NarrowSmallT, SmallT>;
+    using Schedule = std::conditional_t<Capacity == 16, SixteenColumns,
+        std::conditional_t<Geometry::kOutputRows == 1024 &&
+            (Geometry::kInputRows == 2048 || Geometry::kInputRows == 3584),
+            NarrowSmallT, ProjectionSmallT>>;
     bf16_simt_kernel<Geometry, Capacity, Schedule, Output, true>
         <<<Geometry::kOutputRows / Schedule::kRowsPerCta, Schedule::kThreads, 0, stream>>>(
             static_cast<const __nv_bfloat16*>(x.data),
@@ -227,16 +250,21 @@ void projection(const Tensor& x, const Weight& w, Output output, cudaStream_t st
                 static_cast<const __nv_bfloat16*>(x.data),
                 static_cast<const __nv_bfloat16*>(w.qdata), GemvOutput<Output>{output});
     } else {
-        if constexpr (N < 65536) {
-            if (x.ne[1] == 2) small_projection<Geometry, 2>(x, w, output, stream);
-            else if (x.ne[1] == 3) small_projection<Geometry, 3>(x, w, output, stream);
-            else if (x.ne[1] == 4) small_projection<Geometry, 4>(x, w, output, stream);
-            else if (x.ne[1] <= 8) small_projection<Geometry, 8>(x, w, output, stream);
-            else mma_projection<Geometry>(x, w, output, stream);
-        } else {
-            // Vocabulary-sized projections showed no useful small-T gain on RTX 5070 Ti.
-            mma_projection<Geometry>(x, w, output, stream);
-        }
+        // Keep the single-token accumulation order for short verification windows.
+        // This includes the vocabulary head, whose BF16 rounding can change argmax.
+        if (x.ne[1] == 2) small_projection<Geometry, 2>(x, w, output, stream);
+        else if (x.ne[1] == 3) small_projection<Geometry, 3>(x, w, output, stream);
+        else if (x.ne[1] == 4) small_projection<Geometry, 4>(x, w, output, stream);
+        else if (x.ne[1] <= 8) small_projection<Geometry, 8>(x, w, output, stream);
+        else if (x.ne[1] <= 32 &&
+                 (K == 1024 || (N == 1024 && (K == 2048 || K == 3584)))) {
+            // One row per warp bounds register pressure at sixteen columns.
+            if (x.ne[1] <= 16) small_projection<Geometry, 16>(x, w, output, stream);
+            else for (int begin = 0; begin < x.ne[1]; begin += 16) {
+                Tensor block = x.slice(1, begin, std::min(16, x.ne[1] - begin));
+                projection<N, K>(block, w, offset_columns(output, begin), stream);
+            }
+        } else mma_projection<Geometry>(x, w, output, stream);
     }
     CUDA_CHECK(cudaGetLastError());
 }
@@ -309,6 +337,14 @@ void swiglu(const Tensor& x, const Weight& w, Tensor& out, WorkspaceArena& ws, c
     else if (x.ne[1] == 3) small_swiglu<N, K, 3>(x, w, out, stream);
     else if (x.ne[1] == 4) small_swiglu<N, K, 4>(x, w, out, stream);
     else if (x.ne[1] <= bf16_swiglu_small_max_tokens(N, K)) small_swiglu<N, K, 8>(x, w, out, stream);
+    else if (x.ne[1] <= 32 && N == 7168 && K == 1024) {
+        for (int begin = 0; begin < x.ne[1]; begin += 8) {
+            const int columns = std::min(8, x.ne[1] - begin);
+            Tensor input = x.slice(1, begin, columns), output = out.slice(1, begin, columns);
+            if (columns == 1) swiglu<N, K>(input, w, output, ws, stream, multiprocessor_count);
+            else small_swiglu<N, K, 8>(input, w, output, stream);
+        }
+    }
     else if constexpr ((N == 6144 || N == 7168) && K == 1024) {
         // Gate/up projection and activation share the accumulator registers.
         // No gate/up intermediate is observable or materialized in global memory.

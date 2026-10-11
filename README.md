@@ -55,24 +55,23 @@ alignment uses the official eager Transformers reference. Tables report medians.
 
 ### Xiaomi-OCR-0
 
-BF16 MTP1 with a 65,536-row BF16 proposal head, full-vocabulary target verification,
-one request, 4K context, BF16 KV and a 256-token output cap. Prefill includes vision
+BF16 MTP1 with a 131,072-row BF16 proposal head and full-vocabulary target verification.
+One request, 4K context, BF16 KV and a 256-token output cap. Prefill includes vision
 encoding and language prefill. NInfer chunks are 1,024 on 5070 Ti and 2,048 on 6000D.
 
 | GPU | Input | TF prefill tok/s | MTP1 prefill tok/s | Prefill change | TF decode tok/s | MTP1 decode tok/s | Decode speedup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| RTX 5070 Ti | Chinese document | 21,238 | 23,553 | +10.9% | 162.7 | 707.5 | 4.35× |
-| RTX 5070 Ti | English contract | 21,003 | 23,812 | +13.4% | 155.2 | 728.1 | 4.69× |
-| RTX 5070 Ti | Dense formulas (256 tokens) | 21,937 | 21,350 | -2.7% | 159.6 | 748.5 | 4.69× |
-| RTX 6000D | Chinese document | 36,299 | 40,061 | +10.4% | 233.8 | 872.6 | 3.73× |
-| RTX 6000D | English contract | 36,311 | 40,212 | +10.7% | 233.4 | 926.6 | 3.97× |
-| RTX 6000D | Dense formulas (256 tokens) | 36,366 | 36,450 | +0.2% | 235.6 | 950.4 | 4.03× |
+| RTX 5070 Ti | Chinese document | 21,764 | 24,168 | +11.0% | 166.4 | 717.1 | 4.31× |
+| RTX 5070 Ti | English contract | 22,066 | 23,383 | +6.0% | 163.3 | 718.6 | 4.40× |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 21,353 | 22,204 | +4.0% | 162.3 | 717.6 | 4.42× |
+| RTX 6000D | Chinese document | 36,383 | 40,038 | +10.0% | 232.8 | 904.4 | 3.88× |
+| RTX 6000D | English contract | 36,337 | 40,141 | +10.5% | 231.9 | 916.9 | 3.95× |
+| RTX 6000D | Dense formulas (256 tokens) | 36,254 | 36,284 | +0.1% | 235.4 | 910.8 | 3.87× |
 
-The three speed-test outputs match compiled Transformers. The two complete labelled
-text pages score CER 0%. Eleven complete-page MTP/ordinary comparisons have 10/11
-raw agreement and a 0.0414% character difference; six labelled text fixtures score
-CER 0%. MTP3, four-lane throughput and mixed-batch output differences are in the
-[full OCR results](docs/xiaomi-ocr-performance.md#bf16-mtp1-and-mtp3).
+All three speed-test outputs match compiled Transformers on both GPUs. Six labelled
+text images, 1,117 scored characters, retain CER 0%. Both MTP1 and MTP3 match ordinary
+decoding on all 11 complete pages and all 36 mixed-batch requests across four cycles,
+with 0% character difference. [MTP3, four-lane throughput and draft acceptance](docs/xiaomi-ocr-performance.md#bf16-mtp1-and-mtp3).
 
 ### Qwen3-ASR-1.7B
 

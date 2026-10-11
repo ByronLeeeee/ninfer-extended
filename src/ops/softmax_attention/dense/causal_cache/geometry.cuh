@@ -4,17 +4,18 @@
 
 namespace ninfer::ops {
 
-template <int QHeadsValue, int KVHeadsValue, int SmallTSplitScaleValue>
+template <int QHeadsValue, int KVHeadsValue, int SmallTSplitScaleValue,
+          int MaximumSplitsValue = 85 * SmallTSplitScaleValue>
 struct CausalAttentionGeometry : AttentionHeadMapping<QHeadsValue, KVHeadsValue> {
     static_assert(SmallTSplitScaleValue > 0);
 
     static constexpr int SmallTSplitScale    = SmallTSplitScaleValue;
-    static constexpr int SmallTMaximumSplits = 85 * SmallTSplitScale;
+    static constexpr int SmallTMaximumSplits = MaximumSplitsValue;
 };
 
 using CausalD256H24Kv4 = CausalAttentionGeometry<24, 4, 1>;
 using CausalD256H16Kv2 = CausalAttentionGeometry<16, 2, 2>;
 using CausalD256H8Kv2 = CausalAttentionGeometry<8, 2, 2>;
-using CausalD256H8Kv2Compact = CausalAttentionGeometry<8, 2, 1>;
+using CausalD256H8Kv2Compact = CausalAttentionGeometry<8, 2, 1, 256>;
 
 } // namespace ninfer::ops

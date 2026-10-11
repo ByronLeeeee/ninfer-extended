@@ -32,13 +32,15 @@ int tiled_block_for(std::int32_t physical_rows, std::int32_t valid_rows, std::in
     return kArgmaxBlock;
 }
 
+template <class Order>
 void argmax_tiled_atomic_launch(const Tensor& logits, Tensor& out, std::int32_t valid_rows,
-                                int block, cudaStream_t stream);
+                                int block, Order order, cudaStream_t stream);
 
 } // namespace
 
-void argmax_launch(const Tensor& logits, Tensor& out, std::int32_t valid_rows,
-                   cudaStream_t stream) {
+template <class Order>
+void argmax_launch_with_order(const Tensor& logits, Tensor& out, std::int32_t valid_rows,
+                              Order order, cudaStream_t stream) {
     const std::int32_t physical_rows = logits.ne[0];
     const std::int32_t t_count       = logits.ne[1];
     if (t_count == 0) { return; }
@@ -46,21 +48,33 @@ void argmax_launch(const Tensor& logits, Tensor& out, std::int32_t valid_rows,
     constexpr int kTileElems = kArgmaxBlock * kArgmaxItemsPerThread;
     const int tiled_blocks   = div_up(valid_rows, kTileElems);
     if (tiled_blocks < 2) {
-        argmax_kernel<<<static_cast<unsigned int>(t_count), kArgmaxBlock, 0, stream>>>(
+        argmax_kernel<Order><<<static_cast<unsigned int>(t_count), kArgmaxBlock, 0, stream>>>(
             static_cast<const __nv_bfloat16*>(logits.data), static_cast<std::int32_t*>(out.data),
-            valid_rows, physical_rows);
+            valid_rows, physical_rows, order);
         CUDA_CHECK(cudaGetLastError());
         return;
     }
 
     argmax_tiled_atomic_launch(logits, out, valid_rows,
-                               tiled_block_for(physical_rows, valid_rows, t_count), stream);
+                               tiled_block_for(physical_rows, valid_rows, t_count), order, stream);
+}
+
+void argmax_launch(const Tensor& logits, Tensor& out, std::int32_t valid_rows,
+                   cudaStream_t stream) {
+    argmax_launch_with_order(logits, out, valid_rows, ArgmaxRowOrder{}, stream);
+}
+
+void argmax_indexed_launch(const Tensor& logits, const Tensor& token_ids, Tensor& out,
+                           std::int32_t valid_rows, cudaStream_t stream) {
+    argmax_launch_with_order(logits, out, valid_rows,
+        ArgmaxTokenIdOrder{static_cast<const std::int32_t*>(token_ids.data)}, stream);
 }
 
 namespace {
 
+template <class Order>
 void argmax_tiled_atomic_launch(const Tensor& logits, Tensor& out, std::int32_t valid_rows,
-                                int block, cudaStream_t stream) {
+                                int block, Order order, cudaStream_t stream) {
     const std::int32_t physical_rows = logits.ne[0];
     const std::int32_t t_count       = logits.ne[1];
     const int tiled_blocks           = div_up(valid_rows, block * kArgmaxItemsPerThread);
@@ -72,9 +86,9 @@ void argmax_tiled_atomic_launch(const Tensor& logits, Tensor& out, std::int32_t 
                                    stream));
         const dim3 grid(static_cast<unsigned int>(tiled_blocks),
                         static_cast<unsigned int>(token_count));
-        argmax_tiled_atomic_kernel<<<grid, block, 0, stream>>>(
+        argmax_tiled_atomic_kernel<Order><<<grid, block, 0, stream>>>(
             static_cast<const __nv_bfloat16*>(logits_slice.data),
-            static_cast<std::int32_t*>(out_slice.data), valid_rows, physical_rows);
+            static_cast<std::int32_t*>(out_slice.data), valid_rows, physical_rows, order);
         CUDA_CHECK(cudaGetLastError());
     });
 }

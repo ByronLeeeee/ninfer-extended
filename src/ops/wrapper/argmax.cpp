@@ -32,9 +32,7 @@ std::int64_t numel_allow_zero(const Tensor& t, const char* label) {
     return total;
 }
 
-} // namespace
-
-void argmax(const Tensor& logits, Tensor& out, std::int32_t valid_rows, cudaStream_t stream) {
+void validate_argmax(const Tensor& logits, const Tensor& out, std::int32_t valid_rows) {
     if (logits.dtype != DType::BF16) { throw std::invalid_argument("argmax: logits must be BF16"); }
     if (out.dtype != DType::I32) { throw std::invalid_argument("argmax: out must be I32"); }
 
@@ -65,7 +63,24 @@ void argmax(const Tensor& logits, Tensor& out, std::int32_t valid_rows, cudaStre
         throw std::invalid_argument("argmax: logits/out data must be non-null");
     }
 
+}
+
+} // namespace
+
+void argmax(const Tensor& logits, Tensor& out, std::int32_t valid_rows, cudaStream_t stream) {
+    validate_argmax(logits, out, valid_rows);
     detail::argmax_launch(logits, out, valid_rows, stream);
+}
+
+void argmax_indexed(const Tensor& logits, const Tensor& token_ids, Tensor& out,
+                    std::int32_t valid_rows, cudaStream_t stream) {
+    validate_argmax(logits, out, valid_rows);
+    if (token_ids.dtype != DType::I32 || token_ids.ne[0] < valid_rows ||
+        token_ids.ne[1] != 1 || token_ids.ne[2] != 1 || token_ids.ne[3] != 1 ||
+        !token_ids.is_contiguous() || (logits.ne[1] != 0 && token_ids.data == nullptr)) {
+        throw std::invalid_argument("argmax_indexed: token IDs must be contiguous I32 [N], N >= valid_rows");
+    }
+    detail::argmax_indexed_launch(logits, token_ids, out, valid_rows, stream);
 }
 
 } // namespace ninfer::ops

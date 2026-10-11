@@ -131,8 +131,15 @@ __launch_bounds__(128, 2) __global__ void causal_attention_small_t_tc_partial_bf
     const bool tile_split   = logical_tiles >= active_split_count;
     const int units_per_split =
         tile_split ? div_up(logical_tiles, active_split_count) : div_up(window, active_split_count);
-    const int split_start = split * units_per_split * (tile_split ? Bc : 1);
-    const int split_limit = split_start + units_per_split * (tile_split ? Bc : 1);
+    constexpr bool FixedPartitions = Geometry::QHeads == 8 && Geometry::SmallTSplitScale == 1;
+    // Anchor partitions to allocated logical pages, shared by single decode and verification.
+    // Both the key tile boundaries and FP32 partial reduction stay unchanged when the last
+    // query, number of lanes, or a private CUDA Graph replay interval changes.
+    const int fixed_span =
+        div_up(div_up(table_stride * kPagedKVPageSize, Geometry::SmallTMaximumSplits), Bc) * Bc;
+    const int span = FixedPartitions ? fixed_span : units_per_split * (tile_split ? Bc : 1);
+    const int split_start = split * span;
+    const int split_limit = split_start + span;
     const int split_end   = (split_limit < window) ? split_limit : window;
     if (split_start >= split_end) {
         write_neutral();

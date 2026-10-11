@@ -103,7 +103,7 @@ __device__ __forceinline__ void bf16_simt_compute_rows(
     using Pack            = Bf16GemvPack<Schedule::kValuesPerLane>;
     const int phase0      = Schedule::kPhaseOrder == Bf16PhaseOrder::Sequential
                                 ? 0
-                                : ((row0 / Schedule::kRowsPerWarp) * Schedule::kPhaseStride) % kPhases;
+                                : ((row0 / Schedule::kPhaseRows) * Schedule::kPhaseStride) % kPhases;
 
     if constexpr (Schedule::kActivationAccess == Bf16SimtActivationAccess::WarpPacked) {
 #pragma unroll Schedule::kPhaseUnroll

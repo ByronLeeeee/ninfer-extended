@@ -573,14 +573,16 @@ void TextContext::proposal_argmax(const Tensor& hidden, Tensor& logits, Tensor& 
     if (proposal_head_ != nullptr) {
         Tensor proposal_logits = work_.alloc(DType::BF16, {proposal_head_n_, T});
         project(hidden, *proposal_head_, proposal_logits, work_, ctx_.stream);
-        ops::argmax(proposal_logits, proposal_tokens,
-                    proposal_head_ids_
-                        ? proposal_head_n_
-                        : dimension(parameters_.model.resources().public_token_count),
-                    ctx_.stream);
         if (proposal_head_ids_ != nullptr) {
+            Tensor token_ids(const_cast<std::int32_t*>(proposal_head_ids_), DType::I32,
+                             {proposal_head_n_});
+            ops::argmax_indexed(proposal_logits, token_ids, proposal_tokens,
+                                proposal_head_n_, ctx_.stream);
             ops::proposal_remap_token_ids(proposal_tokens, proposal_head_ids_, proposal_head_n_,
                                           ctx_.stream);
+        } else {
+            ops::argmax(proposal_logits, proposal_tokens,
+                        dimension(parameters_.model.resources().public_token_count), ctx_.stream);
         }
     } else {
         Tensor output_logits = matrix_window(logits, T);

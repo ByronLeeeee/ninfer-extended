@@ -1888,6 +1888,7 @@ struct BatchAttentionCase {
     MappingPattern mapping;
     std::uint32_t seed;
     bool graph_replay = false;
+    bool token_consistency = false;
 };
 
 std::vector<float> extract_request_columns(const std::vector<float>& source,
@@ -2041,6 +2042,34 @@ int run_batch_case(const Geometry& geometry, KvCacheStorage storage,
                                   cache_name(storage) + " W=" + std::to_string(width) +
                                   " B=" + std::to_string(batch) + " phase=" + std::to_string(phase);
         const auto output = copy_from_guarded<std::uint16_t>(dout, q.size());
+        if (test_case.token_consistency) {
+            GuardedDeviceBuffer one_output(q_column_elements * sizeof(std::uint16_t));
+            Tensor one_out(one_output.data(), DType::BF16,
+                           {kHeadDim, geometry.q_heads, 1});
+            for (int b = 0; b < batch; ++b) {
+                for (int t = 0; t < valid[b]; ++t) {
+                    const std::size_t offset = (b * width + t) * q_column_elements;
+                    Tensor one_q(static_cast<std::uint16_t*>(dq.data()) + offset,
+                                 DType::BF16, {kHeadDim, geometry.q_heads, 1});
+                    Tensor one_pos(static_cast<int*>(dp.data()) + b * width + t,
+                                   DType::I32, {1});
+                    const auto visible = static_cast<unsigned>(positions[b * width + t] + 1);
+                    ops::causal_softmax_attention_cached(
+                        one_q, one_pos, op_geometry(geometry), 1.0f / std::sqrt(float(kHeadDim)),
+                        cache.single_view(lanes[b]), {visible, visible}, workspace,
+                        one_out, device.stream);
+                    cuda_synchronize(device.stream);
+                    const auto single = copy_from_guarded<std::uint16_t>(
+                        one_output, q_column_elements);
+                    failures += verify_exact(
+                        (label + " single-token parity lane=" + std::to_string(b) +
+                         " token=" + std::to_string(t)).c_str(), single,
+                        std::vector<std::uint16_t>(output.begin() + offset,
+                                                  output.begin() + offset + q_column_elements));
+                }
+            }
+            failures += one_output.verify_guards(label);
+        }
         failures += verify_attention(label, bf16_bits_to_double(output), reference,
                                      attention_criterion(storage));
         failures += verify_invalid_columns_zero(label, output, geometry, width, valid);
@@ -2471,6 +2500,27 @@ int run_softmax_attention_causal_cache_tests() {
     std::cout << (failures == 0 ? "PASS" : "FAIL")
               << " causal_softmax_attention public-contract correctness\n";
     return failures == 0 ? 0 : 1;
+}
+
+int run_softmax_attention_bf16_stability_tests() {
+    if (cuda_unavailable()) return 77;
+    const Geometry geometry{"d256-h8-kv2", 8, 2};
+    int failures = 0;
+    const BatchAttentionCase cases[] = {
+        {1, {63, 4095, 8191, 16383}, {1, 1, 1, 1}, {3, 1, 0, 2},
+         MappingPattern::Fragmented, 910u, true, true},
+        {2, {4095}, {2}, {0}, MappingPattern::Fragmented, 911u, true, true},
+        {4, {63, 2047, 4095, 8191}, {4, 3, 1, 4}, {3, 1, 0, 2},
+         MappingPattern::Fragmented, 912u, true, true},
+        {4, {16383, 2368, 8197}, {4, 4, 4}, {2, 0, 1},
+         MappingPattern::Fragmented, 913u, true, true},
+        {4, {32763}, {4}, {0}, MappingPattern::Identity, 914u, true, true},
+    };
+    for (const auto& item : cases)
+        failures += run_batch_case(geometry, KvCacheStorage::BFloat16, item);
+    std::cout << (failures ? "FAIL" : "PASS")
+              << " BF16 attention single-token/window/batch/graph consistency\n";
+    return failures ? 1 : 0;
 }
 
 int run_softmax_attention_dflash2_tests() {

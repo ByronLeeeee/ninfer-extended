@@ -49,9 +49,9 @@ void bf16_gdn_snapshot_decode_kernel(const __nv_bfloat16* __restrict__ x,
     }
 }
 
-using BatchSchedule = Bf16SimtSchedule<4, 1, 2, 8, 1, 4,
+using BatchSchedule = Bf16SimtSchedule<4, 1, 2, 8, 4, 4,
     Bf16SimtActivationAccess::WarpPacked, Bf16WeightCache::Default,
-    Bf16PhaseOrder::Sequential, 1, 1, 1, 2>;
+    Bf16PhaseOrder::RowSwizzled, 1, 1, 1, 2, 8>;
 
 template <int Batch>
 __global__ __launch_bounds__(BatchSchedule::kThreads, BatchSchedule::kMinBlocksPerSm)
@@ -61,7 +61,7 @@ void bf16_gdn_snapshot_batch_kernel(const __nv_bfloat16* __restrict__ x,
                                     __nv_bfloat16* z, int live_batch) {
     const int lane = threadIdx.x % kWarpSize, warp = threadIdx.x / kWarpSize;
     const int row0 = blockIdx.x * BatchSchedule::kRowsPerCta + warp * BatchSchedule::kRowsPerWarp;
-    float accumulators[BatchSchedule::kRowsPerWarp][Batch][1] = {};
+    float accumulators[BatchSchedule::kRowsPerWarp][Batch][BatchSchedule::kAccumulatorChains] = {};
     bf16_simt_compute_rows<Geometry, Batch, BatchSchedule>(x, weight, row0, 0, lane,
                                                          accumulators, live_batch);
     // Each participating lane owns one (column,row) output. Publish all columns
@@ -71,7 +71,12 @@ void bf16_gdn_snapshot_batch_kernel(const __nv_bfloat16* __restrict__ x,
     for (int token = 0; token < Batch; ++token) {
 #pragma unroll
         for (int row = 0; row < BatchSchedule::kRowsPerWarp; ++row) {
-            float sum = warp_reduce_sum(accumulators[row][token][0]);
+            float sum = 0.0F;
+#pragma unroll
+            for (int chain = 0; chain < BatchSchedule::kAccumulatorChains; ++chain) {
+                sum += accumulators[row][token][chain];
+            }
+            sum = warp_reduce_sum(sum);
             sum = __shfl_sync(kFullWarpMask, sum, 0);
             if (lane == token * BatchSchedule::kRowsPerWarp + row) projected = sum;
         }

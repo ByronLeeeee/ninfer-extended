@@ -16,7 +16,8 @@ namespace {
 
 std::vector<std::int32_t> argmax_oracle(const std::vector<std::uint16_t>& logits,
                                         std::int32_t physical_rows, std::int32_t tokens,
-                                        std::int32_t valid_rows) {
+                                        std::int32_t valid_rows,
+                                        const std::vector<std::int32_t>* token_ids = nullptr) {
     std::vector<std::int32_t> expected(static_cast<std::size_t>(tokens));
     for (std::int32_t token = 0; token < tokens; ++token) {
         const std::size_t base = static_cast<std::size_t>(token) * physical_rows;
@@ -24,7 +25,8 @@ std::vector<std::int32_t> argmax_oracle(const std::vector<std::uint16_t>& logits
         float best_value       = bf16_to_f32(logits[base]);
         for (std::int32_t row = 1; row < valid_rows; ++row) {
             const float value = bf16_to_f32(logits[base + row]);
-            if (value > best_value) {
+            if (value > best_value || (value == best_value && token_ids != nullptr &&
+                                      (*token_ids)[row] < (*token_ids)[best])) {
                 best       = row;
                 best_value = value;
             }
@@ -71,27 +73,38 @@ std::vector<std::uint16_t> make_logits(std::int32_t physical_rows, std::int32_t 
     return logits;
 }
 
-int run_case(std::int32_t physical_rows, std::int32_t valid_rows, std::int32_t tokens) {
+int run_case(std::int32_t physical_rows, std::int32_t valid_rows, std::int32_t tokens,
+              bool indexed = false) {
+    std::vector<std::int32_t> token_ids(physical_rows);
+    for (int row = 0; row < physical_rows; ++row) token_ids[row] = 2 * (physical_rows - row) + 7;
     auto logits   = make_logits(physical_rows, tokens, valid_rows);
-    auto expected = argmax_oracle(logits, physical_rows, tokens, valid_rows);
+    auto expected = argmax_oracle(logits, physical_rows, tokens, valid_rows,
+                                  indexed ? &token_ids : nullptr);
 
     GuardedDeviceBuffer device_logits(logits.size() * sizeof(std::uint16_t));
     GuardedDeviceBuffer device_output(static_cast<std::size_t>(tokens) * sizeof(std::int32_t));
+    GuardedDeviceBuffer device_ids(token_ids.size() * sizeof(std::int32_t));
+    device_ids.copy_from_host(token_ids.data(), device_ids.bytes());
     device_logits.copy_from_host(logits.data(), logits.size() * sizeof(std::uint16_t));
     device_output.fill(0xcd);
 
     Tensor logits_tensor(device_logits.data(), DType::BF16, {physical_rows, tokens});
     Tensor output_tensor(device_output.data(), DType::I32, {tokens});
-    ops::argmax(logits_tensor, output_tensor, valid_rows, nullptr);
+    Tensor ids_tensor(device_ids.data(), DType::I32, {physical_rows});
+    auto launch = [&](cudaStream_t stream) {
+        if (indexed) ops::argmax_indexed(logits_tensor, ids_tensor, output_tensor, valid_rows, stream);
+        else ops::argmax(logits_tensor, output_tensor, valid_rows, stream);
+    };
+    launch(nullptr);
     cuda_synchronize();
 
-    if (physical_rows == 248320 && tokens == 128) {
+    if ((physical_rows == 248320 && tokens == 128) || (indexed && tokens == 15)) {
         cudaStream_t stream;
         cudaGraph_t graph;
         cudaGraphExec_t executable;
         CUDA_CHECK(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
         CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
-        ops::argmax(logits_tensor, output_tensor, valid_rows, stream);
+        launch(stream);
         CUDA_CHECK(cudaStreamEndCapture(stream, &graph));
         CUDA_CHECK(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0));
         CUDA_CHECK(cudaGraphLaunch(executable, stream));
@@ -105,13 +118,14 @@ int run_case(std::int32_t physical_rows, std::int32_t valid_rows, std::int32_t t
         CUDA_CHECK(cudaGraphExecDestroy(executable));
         CUDA_CHECK(cudaGraphDestroy(graph));
         CUDA_CHECK(cudaStreamDestroy(stream));
-        expected = argmax_oracle(logits, physical_rows, tokens, valid_rows);
+        expected = argmax_oracle(logits, physical_rows, tokens, valid_rows,
+                                  indexed ? &token_ids : nullptr);
     }
 
     const auto actual =
         from_device<std::int32_t>(device_output.data(), static_cast<std::size_t>(tokens));
     const auto logits_after = from_device<std::uint16_t>(device_logits.data(), logits.size());
-    const std::string label = "argmax rows=" + std::to_string(physical_rows) +
+    const std::string label = std::string(indexed ? "indexed argmax rows=" : "argmax rows=") + std::to_string(physical_rows) +
                               " valid=" + std::to_string(valid_rows) +
                               " T=" + std::to_string(tokens);
 
@@ -120,6 +134,9 @@ int run_case(std::int32_t physical_rows, std::int32_t valid_rows, std::int32_t t
     failures += verify_exact((label + " preserves logits").c_str(), logits_after, logits);
     failures += device_logits.verify_guards((label + " logits").c_str());
     failures += device_output.verify_guards((label + " output").c_str());
+    failures += verify_exact((label + " preserves token IDs").c_str(),
+        from_device<std::int32_t>(device_ids.data(), token_ids.size()), token_ids);
+    failures += device_ids.verify_guards((label + " token IDs").c_str());
     return failures;
 }
 
@@ -142,6 +159,12 @@ int main() {
     failures += run_case(131072, 131072, 1);
     failures += run_case(131072, 131072, 15);
     failures += run_case(131072, 131072, 120);
+    failures += run_case(64, 31, 15, true);
+    failures += run_case(65536, 65536, 1, true);
+    failures += run_case(65536, 65536, 15, true);
+    failures += run_case(131072, 131072, 1, true);
+    failures += run_case(131072, 131072, 15, true);
+    failures += run_case(248320, 248077, 2, true);
     std::cout << (failures ? "FAIL" : "OK") << " argmax\n";
     return failures ? 1 : 0;
 }

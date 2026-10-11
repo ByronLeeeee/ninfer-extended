@@ -92,15 +92,11 @@ std::int32_t causal_small_t_launch_capacity(CausalAttentionExecutionEnvelope env
     return capacity;
 }
 
-// Group-four BF16 rows need fewer split CTAs than the group-eight profile. Keep the
-// measured two-warp/128-output decomposition within its qualified token/envelope interval;
-// short single-column, single-row calls retain the lower-latency original decomposition.
+// Share one group-four BF16 decomposition across decode, verification and graph envelopes.
 bool compact_group_four_bf16(std::int32_t q_heads, std::int32_t width,
-                            KvCacheStorage storage, CausalAttentionExecutionEnvelope envelope,
-                            std::int32_t batch_size) {
-    return q_heads == 8 && storage == KvCacheStorage::BFloat16 && width <= 4 &&
-           envelope.max_visible_keys <= 8192 &&
-           (batch_size > 1 || width > 1 || envelope.max_visible_keys > 2048);
+                            KvCacheStorage storage, CausalAttentionExecutionEnvelope /*envelope*/,
+                            std::int32_t /*batch_size*/) {
+    return q_heads == 8 && storage == KvCacheStorage::BFloat16 && width <= 6;
 }
 
 template <typename Geometry, int TokenTile, int WarpsPerCta, bool MultiBatch, bool Masked,
@@ -261,8 +257,7 @@ std::int32_t causal_attention_split_capacity(std::int32_t q_heads, std::int32_t 
     }
     if (q_heads == CausalD256H8Kv2::QHeads) {
         if (compact_group_four_bf16(q_heads, tokens, cache_storage, envelope, batch_size))
-            return causal_small_t_launch_capacity<CausalD256H8Kv2Compact>(envelope, tokens,
-                                                                          cache_storage);
+            return CausalD256H8Kv2Compact::SmallTMaximumSplits;
         return causal_small_t_launch_capacity<CausalD256H8Kv2>(envelope, tokens, cache_storage);
     }
     throw std::invalid_argument(
@@ -278,8 +273,15 @@ void causal_attention_small_t_launch_for(const Tensor& q, CacheInput input, cons
                                          Tensor& out, cudaStream_t stream) {
     const auto logical_capacity      = static_cast<std::int32_t>(envelope.max_visible_keys);
     const auto implementation_window = static_cast<std::int32_t>(envelope.max_visible_keys);
-    const auto splits                = causal_attention_split_capacity(
+    auto splits                      = causal_attention_split_capacity(
         Geometry::QHeads, invocation.width, cache.storage, envelope, invocation.batch_size);
+    if constexpr (Geometry::QHeads == 8 && Geometry::SmallTSplitScale == 1) {
+        // The arena reserves the full interval bound; launch only partitions intersecting
+        // this graph envelope. Tile boundaries still depend solely on allocated KV pages.
+        const int keys = cache.block_tables.ne[0] * kPagedKVPageSize;
+        const int span = div_up(div_up(keys, Geometry::SmallTMaximumSplits), 32) * 32;
+        splits = std::min(splits, div_up(logical_capacity, span));
+    }
 
     // BF16 keeps its row-tile warp count; INT8 selects its producer/consumer
     // geometry inside launch_tc_partial_i8.

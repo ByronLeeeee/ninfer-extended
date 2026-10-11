@@ -20,4 +20,13 @@ namespace ninfer::ops {
  */
 void argmax(const Tensor& logits, Tensor& out, std::int32_t valid_rows, cudaStream_t stream);
 
+/**
+ * Returns row indices for an indexed vocabulary. Equal maxima select the lowest
+ * token_ids[row], then the lowest row if IDs are equal. The caller can remap the
+ * returned row through token_ids. Logits/output follow argmax's contract;
+ * token_ids is contiguous I32 [N], N >= valid_rows, and remains unchanged.
+ */
+void argmax_indexed(const Tensor& logits, const Tensor& token_ids, Tensor& out,
+                    std::int32_t valid_rows, cudaStream_t stream);
+
 } // namespace ninfer::ops

@@ -96,6 +96,11 @@ __device__ __forceinline__ int causal_small_t_default_splits(int window) {
 template <typename Geometry, bool Int8>
 __device__ __forceinline__ int causal_small_t_active_splits(int window, int launch_capacity,
                                                             int tokens) {
+    if constexpr (!Int8 && Geometry::QHeads == 8 && Geometry::SmallTSplitScale == 1) {
+        // Empty fixed partitions contribute neutral values. Query-window and graph-envelope
+        // changes must not alter the reduction tree for already-visible keys.
+        return launch_capacity;
+    }
     if (window <= 0) { return launch_capacity; }
     int splits = 0;
     if constexpr (Int8) {

@@ -166,6 +166,28 @@ int run_bf16_linear_case(DeviceWeight& weight, std::int32_t tokens, bool replay 
     failures += verify_reduction("BF16_A16 Linear [" + std::to_string(rows) + "," +
                                      std::to_string(hidden) + "]" + suffix,
                                  actual, expected, kA16Tolerance);
+    // Independent columns must retain the single-column result in the short
+    // verification profiles. FP64 above separately checks the mathematical dot.
+    if (tokens > 1 && tokens <= 32 &&
+        (hidden == 1024 || (rows == 1024 && (hidden == 2048 || hidden == 3584)))) {
+        GuardedDeviceBuffer single_output(static_cast<std::size_t>(rows) * sizeof(std::uint16_t));
+        Tensor single(single_output.data(), DType::BF16, {rows, 1});
+        for (int token = 0; token < tokens; ++token) {
+            Tensor column = x.slice(1, token, 1);
+            ops::linear(column, weight.view(), single, ops::LinearPolicy::A16Only, workspace,
+                        nullptr);
+            cuda_synchronize();
+            const auto bits = from_device<std::uint16_t>(single_output.data(), rows);
+            if (!std::equal(bits.begin(), bits.end(), output_bits.begin() +
+                            static_cast<std::size_t>(token) * rows)) {
+                std::cerr << "BF16_A16 Linear short-batch column differs from T=1" << suffix
+                          << " column " << token << '\n';
+                ++failures;
+                break;
+            }
+        }
+        failures += single_output.verify_guards("BF16 single-column output");
+    }
     const std::vector<std::uint16_t> activation_after =
         from_device<std::uint16_t>(device_activation, activation_bits.size());
     if (activation_after != activation_bits) {
@@ -278,7 +300,7 @@ int run_bf16_linear() {
         for (int tokens : {1, 2, 3, 4, 5, 8})
             failures += run_bf16_linear_case(weight, tokens, true);
     }
-    for (const auto rows : {65536, 131072}) {
+    for (const auto rows : {65536, 131072, 248320}) {
         DeviceWeight weight(make_patterned(rows, 1024, 419U));
         for (int tokens : {1, 2, 3, 4, 5, 8, 9, 16, 32})
             failures += run_bf16_linear_case(weight, tokens);

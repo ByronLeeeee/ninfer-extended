@@ -1,5 +1,56 @@
 # Changelog
 
+## BF16 MTP output consistency and 128K proposal head
+
+- Match short BF16 projection accumulation with single-token execution, including
+  small SwiGLU chunks and fused GDN input/snapshot projection.
+- Keep Q8/KV2/D256 BF16 cached-attention key spans and reduction order stable across
+  draft windows, request counts and CUDA Graph replay. Allocate for 256 key partitions
+  and launch only the partitions covering actual keys.
+- Add indexed argmax with ties resolved by original token ID, matching full-vocabulary
+  greedy selection even when proposal rows use frequency order.
+- Publish a 131,072-row BF16 proposal head. Original main/MTP tensors and processor
+  resources remain byte-identical; the proposal rows copy original weights.
+
+Both GPUs now pass **11/11 complete pages** for MTP1 and MTP3 versus ordinary decoding
+(previous release: 10/11), with **0/7,269 normalized character edits** (previously 3).
+Four-cycle mixed batches pass **36/36 requests per mode**, with **0/27,708 edits**;
+all nine fixtures are stable in ordinary/MTP1/MTP3 execution. Six labelled text
+fixtures retain CER 0% on 1,117 scored characters.
+
+In a controlled proposal-coverage comparison, complete classical-Chinese MTP1
+acceptance rises **56.25% → 78.57%** and Chinese-document acceptance rises
+**80.65% → 96.49%**. Classical-Chinese MTP3 acceptance rises **18.75% → 26.19%**.
+MTP3 still reuses one trained MTP layer; it is optional rather than the default.
+
+Latest paired performance against ordinary decoding on this build:
+
+| GPU | Input | Ordinary → MTP1 decode tok/s | Complete-request throughput change | Ordinary → MTP3 decode tok/s | Complete-request throughput change |
+| --- | --- | --- | --- | --- | --- |
+| RTX 5070 Ti | Chinese document | 435.1 → 682.8 | +25.8% | 462.9 → 646.5 | +19.1% |
+| RTX 5070 Ti | English contract | 434.2 → 688.1 | +26.7% | 454.0 → 660.2 | +22.7% |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 425.1 → 678.0 | +39.0% | 444.3 → 670.7 | +32.6% |
+| RTX 6000D | Chinese document | 586.3 → 909.1 | +30.9% | 588.8 → 807.6 | +22.7% |
+| RTX 6000D | English contract | 586.1 → 914.8 | +32.9% | 585.6 → 750.8 | +17.9% |
+| RTX 6000D | Dense formulas (256 tokens) | 580.8 → 913.8 | +41.3% | 581.3 → 845.4 | +33.3% |
+
+Four-request complete throughput:
+
+| GPU | Input | Ordinary → MTP1 output tok/s | Change | Ordinary → MTP3 output tok/s | Change |
+| --- | --- | --- | --- | --- | --- |
+| RTX 5070 Ti | Chinese document | 590.6 → 676.8 | +14.6% | 626.8 → 581.8 | -7.2% |
+| RTX 5070 Ti | English contract | 610.7 → 678.8 | +11.2% | 633.0 → 603.2 | -4.7% |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 818.9 → 952.3 | +16.3% | 817.0 → 765.6 | -6.3% |
+| RTX 6000D | Chinese document | 995.8 → 1164.3 | +16.9% | 817.0 → 841.0 | +2.9% |
+| RTX 6000D | English contract | 1002.8 → 1181.0 | +17.8% | 860.1 → 726.9 | -15.5% |
+| RTX 6000D | Dense formulas (256 tokens) | 1226.4 → 1509.1 | +23.1% | 1034.4 → 943.3 | -8.8% |
+
+MTP1 remains the default. The full draft head was evaluated and rejected: it gave
+little acceptance benefit while lowering decode speed in the tested complete pages.
+Independent FP64, guard/state-preservation and changed-input CUDA Graph checks pass
+on both GPUs. Exact single-token/packed attention tests reject the preceding
+batch-dependent schedule and pass the new schedule.
+
 ## BF16 Xiaomi OCR MTP1/MTP3 and indexed proposal heads
 
 - Export the checkpoint's MTP component and an optional 65,536/131,072-row BF16
