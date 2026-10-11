@@ -17,9 +17,13 @@ struct SpeechFeatures {
 };
 
 enum class SpeechLinearBackend : std::uint8_t { Cublas, Native };
+enum class SpeechDraftSource : std::uint8_t { ExternalModel, NGram };
 
 struct SpeechRunOptions {
     std::uint32_t max_new_tokens = 1024;
+    // Greedy block verification, single lane, K=1..5; zero disables it.
+    std::uint32_t draft_tokens = 0;
+    SpeechDraftSource draft_source = SpeechDraftSource::ExternalModel;
     SpeechLinearBackend linear = SpeechLinearBackend::Native;
     bool decode_graph = true;
     bool audio_graph = true;
@@ -36,6 +40,20 @@ struct SpeechResult {
     double language_prefill_ms = 0;
     double decode_ms = 0;
     double wall_seconds = 0;
+    double decode_wall_seconds = 0;
+    double draft_audio_ms = 0;
+    double draft_language_prefill_ms = 0;
+    // Includes a paired catch-up/first-proposal forward when used.
+    double draft_decode_ms = 0;
+    double verify_ms = 0;
+    // Standalone catch-up only; zero when catch-up is paired with drafting.
+    double draft_repair_ms = 0;
+    std::uint64_t proposed_tokens = 0;
+    std::uint64_t accepted_tokens = 0;
+    std::uint64_t verification_calls = 0;
+    std::uint64_t fully_accepted_blocks = 0;
+    std::uint64_t lookup_attempts = 0;
+    std::uint64_t lookup_matches = 0;
     std::uint64_t prompt_tokens = 0;
     std::uint64_t decode_tokens = 0;
     std::uint64_t weight_bytes = 0;

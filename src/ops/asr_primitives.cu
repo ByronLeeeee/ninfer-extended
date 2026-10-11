@@ -106,7 +106,7 @@ __global__ void swiglu_rounded_kernel(const BF* x,BF* out,int tokens,int width){
         float gate=f(x[t*width*2+d]),up=f(x[t*width*2+width+d]);out[i]=b(rounded(gate/(1.f+expf(-gate)))*up);}
 }
 
-template<int D,int Warps,bool Decode,bool Split=false>
+template<int D,int Warps,bool Decode,bool Split=false,bool SharedContext=false>
 __global__ void attention_kernel(const BF* q,const BF* key,const BF* value,BF* out,
     int queries,int keys,int qheads,int kvheads,int qstride,int kvstride,
     const int* begins,const int* ends,const int* positions,bool causal,int capacity,
@@ -118,8 +118,8 @@ __global__ void attention_kernel(const BF* q,const BF* key,const BF* value,BF* o
     if constexpr(Split){int length=end-begin;int start=begin;
         begin=start+length*blockIdx.z/splits;end=start+length*(blockIdx.z+1)/splits;}
     const BF* qrow=q+static_cast<long long>(qi)*qstride+h*D;
-    const BF* kbase=key+(Decode?static_cast<long long>(qi)*capacity*kvstride:0)+kvh*D;
-    const BF* vbase=value+(Decode?static_cast<long long>(qi)*capacity*kvstride:0)+kvh*D;
+    const BF* kbase=key+(Decode&&!SharedContext?static_cast<long long>(qi)*capacity*kvstride:0)+kvh*D;
+    const BF* vbase=value+(Decode&&!SharedContext?static_cast<long long>(qi)*capacity*kvstride:0)+kvh*D;
     float qv[D/32],acc[D/32];
     for(int d=0;d<D/32;++d){qv[d]=f(qrow[lane+d*32]);acc[d]=0;}
     float maximum=-INFINITY,denom=0;
@@ -256,5 +256,21 @@ void dense_bf16_decode_attention(const void* q,const void* k,const void* v,void*
     auto scope=ws.scope();auto partial=ws.alloc(DType::FP32,{d+2,splits,qh,batch},256);
     if(splits==16)split_decode<16>(q,k,v,o,batch,cap,qh,kh,pos,static_cast<float*>(partial.data),s);
     else split_decode<8>(q,k,v,o,batch,cap,qh,kh,pos,static_cast<float*>(partial.data),s);
+}
+std::size_t dense_bf16_verify_attention_workspace_capacity(int queries,int capacity){
+    if(queries<1||queries>6||capacity<1)throw std::invalid_argument("dense BF16 verification attention geometry");
+    return capacity<128?0:static_cast<std::size_t>(queries)*16*16*130*4;
+}
+void dense_bf16_verify_attention(const void* q,const void* k,const void* v,void* o,int queries,int capacity,const int* pos,WorkspaceArena& ws,cudaStream_t s){
+    dense_bf16_verify_attention_workspace_capacity(queries,capacity);
+    if(capacity<128){attention_kernel<128,4,true,false,true><<<dim3(queries,16),128,0,s>>>(
+        static_cast<const BF*>(q),static_cast<const BF*>(k),static_cast<const BF*>(v),static_cast<BF*>(o),
+        queries,capacity,16,8,2048,1024,nullptr,nullptr,pos,true,capacity,nullptr,1);}
+    else{auto scope=ws.scope();auto partial=ws.alloc(DType::FP32,{130,16,16,queries},256);
+        attention_kernel<128,8,true,true,true><<<dim3(queries,16,16),256,0,s>>>(
+            static_cast<const BF*>(q),static_cast<const BF*>(k),static_cast<const BF*>(v),static_cast<BF*>(o),
+            queries,capacity,16,8,2048,1024,nullptr,nullptr,pos,true,capacity,static_cast<float*>(partial.data),16);
+        attention_merge<128,16><<<dim3(queries,16),32,0,s>>>(static_cast<float*>(partial.data),static_cast<BF*>(o),16);}
+    CUDA_CHECK(cudaGetLastError());
 }
 } // namespace ninfer::ops

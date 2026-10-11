@@ -36,6 +36,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--artifact', required=True, type=Path)
     parser.add_argument('--engine', required=True, type=Path)
+    parser.add_argument('--draft-artifact', type=Path, help='Optional resident native ASR draft')
+    parser.add_argument('--draft-tokens', type=int, choices=range(6), default=0)
+    parser.add_argument('--draft-source', choices=['model', 'ngram'], default='model')
     parser.add_argument('--audio', required=True, nargs='+', type=Path)
     parser.add_argument('--out', required=True, type=Path)
     parser.add_argument('--backend', choices=['native', 'cublas'], default='native')
@@ -51,6 +54,10 @@ def main():
     args = parser.parse_args()
     if not 1 <= len(args.audio) <= 4:
         parser.error('Supply one to four WAV files.')
+    if args.draft_tokens and (len(args.audio) != 1 or (args.draft_source == 'model' and args.draft_artifact is None)):
+        parser.error('Draft decoding requires one audio file; model drafting also requires --draft-artifact.')
+    if args.draft_source == 'ngram' and args.draft_artifact is not None:
+        parser.error('Ngram mode loads only the target; omit --draft-artifact.')
     started = time.perf_counter()
     with tempfile.TemporaryDirectory(prefix='ninfer-asr-') as temporary:
         directory = Path(temporary)
@@ -75,6 +82,9 @@ def main():
         command = [str(args.engine.resolve()), '--artifact', str(args.artifact.resolve()), '--input', str(request),
                    '--out', str(args.out.resolve()), '--backend', args.backend, '--context', str(args.context),
                    '--max-new-tokens', str(args.max_new_tokens), '--repeats', str(args.repeats), '--warmups', str(args.warmups)]
+        command += ['--draft-source', args.draft_source, '--draft-tokens', str(args.draft_tokens)]
+        if args.draft_artifact is not None:
+            command += ['--draft-artifact', str(args.draft_artifact.resolve())]
         if args.no_graph:
             command.append('--no-graph')
         if args.tensorcore_prefill:

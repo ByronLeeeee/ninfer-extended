@@ -17,6 +17,7 @@ from tools.artifact.writer import ArtifactWriter
 p = argparse.ArgumentParser()
 p.add_argument('--model', required=True, type=Path)
 p.add_argument('--out', required=True, type=Path)
+p.add_argument('--source-id', default=None, help='Source model repository for artifact provenance')
 a = p.parse_args()
 config = json.loads((a.model / 'config.json').read_text())
 assert config['architectures'] == ['Qwen3ASRForConditionalGeneration']
@@ -73,11 +74,12 @@ resources = {name: (a.model / name).read_bytes() for name in ['tokenizer.json', 
 for name, data in resources.items():
     specs.append(ResourceSpec('resource/' + name, len(data)))
 components = {'text': {'config': config, 'resources': {name: 'resource/' + name for name in resources}}}
-report = {'source': 'Qwen/Qwen3-ASR-1.7B-hf', 'dtype': 'bf16', 'weight_quantization': False,
+variant = '1.7b' if config['text_config']['hidden_size'] == 2048 else '0.6b'
+report = {'source': a.source_id or f'Qwen/Qwen3-ASR-{variant.upper()}-hf', 'dtype': 'bf16', 'weight_quantization': False,
           'source_tensors': len(header), 'artifact_tensors': len(objects) + 2, 'lossless_row_concatenations': len(groups),
           'architecture': config['architectures'][0], 'source_bytes': source.stat().st_size}
 with source.open('rb') as stream, ArtifactWriter(a.out, specs, components=components, bindings=bindings,
-        metadata={'name': 'qwen3-asr-1.7b-bf16'}, provenance=report) as writer:
+        metadata={'name': f'qwen3-asr-{variant}-bf16'}, provenance=report) as writer:
     for name, names in objects.items():
         output_offset = 0
         for part in names:

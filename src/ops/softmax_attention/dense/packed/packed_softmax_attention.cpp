@@ -18,7 +18,7 @@ constexpr std::int32_t kHeads   = 16;
 constexpr float kExpectedScale  = 0.11785113019775792073f;
 
 void require_profile(AttentionHeadGeometry geometry, float scale, const char* op) {
-    if (!valid_attention_head_geometry(geometry) || !((geometry.head_dim==72&&geometry.query_heads==16&&geometry.kv_heads==16)||(geometry.head_dim==64&&(geometry.query_heads==12||geometry.query_heads==16)&&geometry.kv_heads==geometry.query_heads))) {
+    if (!valid_attention_head_geometry(geometry) || !((geometry.head_dim==72&&geometry.query_heads==16&&geometry.kv_heads==16)||(geometry.head_dim==64&&(geometry.query_heads==12||geometry.query_heads==14||geometry.query_heads==16)&&geometry.kv_heads==geometry.query_heads))) {
         throw std::invalid_argument(std::string(op) + ": unsupported head geometry");
     }
     if (!std::isfinite(scale) || std::abs(scale - (geometry.head_dim==64?0.125f:kExpectedScale)) > 1.0e-7f) {
@@ -44,7 +44,7 @@ Tensor allocate_workspace(Allocator& allocator, std::int32_t tokens, std::int32_
 }
 
 void require_qkv(const Tensor& tensor, std::int32_t tokens, const char* op, const char* name) {
-    if (tensor.dtype != DType::BF16 || !((tensor.ne[0]==72&&tensor.ne[1]==16)||(tensor.ne[0]==64&&(tensor.ne[1]==12||tensor.ne[1]==16))) ||
+    if (tensor.dtype != DType::BF16 || !((tensor.ne[0]==72&&tensor.ne[1]==16)||(tensor.ne[0]==64&&(tensor.ne[1]==12||tensor.ne[1]==14||tensor.ne[1]==16))) ||
         tensor.ne[2] != tokens || tensor.ne[3] != 1) {
         throw std::invalid_argument(std::string(op) + ": invalid " + name + " shape");
     }

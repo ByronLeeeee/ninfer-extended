@@ -153,6 +153,8 @@ struct ContextCostOptions {
 
 struct EngineOptions {
     std::filesystem::path artifact_path;
+    // Optional resident ASR draft. SpeechRecognition only; requests select K separately.
+    std::filesystem::path speech_draft_artifact_path;
     std::filesystem::path chat_template_path;
     EnginePurpose purpose              = EnginePurpose::Generation;
     int device                         = 0;

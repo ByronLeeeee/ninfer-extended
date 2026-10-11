@@ -67,6 +67,27 @@ bool decode(DeviceContext& device,int batch,int cap){int d=128,qh=16,kh=8,qw=qh*
         double sum=0;for(auto& score:scores){score=std::exp(score-maximum);sum+=score;}for(int z=0;z<d;++z){double result=0;for(int j=0;j<=positions[i];++j)result+=scores[j]*f(v[(static_cast<std::size_t>(i)*cap+j)*kw+(h/2)*d+z]);error.add(f(actual[i*qw+h*d+z]),result/sum);}}
     return error.report("decode_attention_B"+std::to_string(batch)+"_C"+std::to_string(cap));
 }
+bool verification(DeviceContext& device,int rows,int cap){constexpr int d=128,qh=16,kh=8,qw=qh*d,kw=kh*d;
+    auto q=random(rows*qw),k=random(static_cast<std::size_t>(cap)*kw),v=random(k.size());
+    std::vector<int> positions(rows);for(int i=0;i<rows;++i)positions[i]=i==0?cap-1:std::min(cap-1,i==1?0:i==2?37:211);
+    auto qb=upload(q),kb=upload(k),vb=upload(v),pb=upload(positions);DeviceBuffer out(rows*qw*2),separate(rows*qw*2);
+    auto bytes=std::max(ops::dense_bf16_verify_attention_workspace_capacity(rows,cap),ops::dense_bf16_decode_attention_workspace_capacity(1,cap,d,qh,kh));
+    WorkspaceArena ws(std::max<std::size_t>(256,bytes));
+    ops::dense_bf16_verify_attention(qb.p,kb.p,vb.p,out.p,rows,cap,static_cast<int*>(pb.p),ws,device.stream);
+    for(int i=0;i<rows;++i)ops::dense_bf16_decode_attention(static_cast<BF*>(qb.p)+i*qw,kb.p,vb.p,static_cast<BF*>(separate.p)+i*qw,
+        1,cap,d,qh,kh,static_cast<int*>(pb.p)+i,ws,device.stream);
+    device.synchronize();auto actual=read(out),serial=read(separate);Error error;
+    for(int i=0;i<rows;++i)for(int h=0;h<qh;++h){std::vector<double> scores(positions[i]+1);double maximum=-INFINITY;
+        for(int j=0;j<=positions[i];++j){double score=0;for(int z=0;z<d;++z)score+=f(q[i*qw+h*d+z])*f(k[static_cast<std::size_t>(j)*kw+(h/2)*d+z]);
+            score/=std::sqrt(double(d));scores[j]=score;maximum=std::max(maximum,score);}
+        double sum=0;for(auto& score:scores){score=std::exp(score-maximum);sum+=score;}
+        for(int z=0;z<d;++z){double value=0;for(int j=0;j<=positions[i];++j)value+=scores[j]*f(v[static_cast<std::size_t>(j)*kw+(h/2)*d+z]);
+            error.add(f(actual[i*qw+h*d+z]),value/sum);}}
+    bool pass=error.report("verify_attention_W"+std::to_string(rows)+"_C"+std::to_string(cap));
+    bool exact=std::equal(actual.begin(),actual.end(),serial.begin(),[](BF a,BF b){return f(a)==f(b);});
+    std::cout<<"{\"case\":\"verify_decode_arithmetic_W"<<rows<<"_C"<<cap<<"\",\"oracle\":\"decode_order_parity\",\"pass\":"<<(exact?"true":"false")<<"}\n"<<std::flush;
+    return pass&&exact;
+}
 bool norm_rope(DeviceContext& device){int t=17,d=128,qh=16,kh=8,qw=d*qh,kw=d*kh,stride=qw+kw*2;auto x=random(t*stride),qweight=random(d),kweight=random(d);std::vector<float> inv(d/2);std::vector<int> pos(t);
     for(int i=0;i<d/2;++i)inv[i]=1/std::pow(1000000.f,float(2*i)/d);for(int i=0;i<t;++i)pos[i]=i==t-1?65535:i*37;
     auto xb=upload(x),qwb=upload(qweight),kwb=upload(kweight),ib=upload(inv),pb=upload(pos);DeviceBuffer qb(t*qw*2),kb(t*kw*2),vb(t*kw*2);
@@ -81,9 +102,10 @@ bool rmsnorm(DeviceContext& device,int width){int rows=17;auto x=random(rows*wid
     for(int i=0;i<rows;++i){double sum=0;for(int z=0;z<width;++z)sum+=f(x[i*width+z])*f(x[i*width+z]);double r=1/std::sqrt(sum/width+1e-6);for(int z=0;z<width;++z)error.add(f(actual[i*width+z]),round_bf(round_bf(f(x[i*width+z])*r)*f(w[z])));}
     return error.report("rounded_rmsnorm_W"+std::to_string(width),.001);
 }
-bool linear(DeviceContext& device,int n,int k){auto weights=random(static_cast<std::size_t>(n)*k);auto wb=upload(weights);Weight w;w.qtype=QType::BF16;w.layout=QuantLayout::Contiguous;w.qdata=wb.p;w.n=n;w.k=k;bool pass=true;
+bool linear(DeviceContext& device,int n,int k,const std::vector<int>& selected_extents={}){auto weights=random(static_cast<std::size_t>(n)*k);auto wb=upload(weights);Weight w;w.qtype=QType::BF16;w.layout=QuantLayout::Contiguous;w.qdata=wb.p;w.n=n;w.k=k;bool pass=true;
     std::vector<int> extents{1,2,4,13,104};if(k==2048&&n!=151936)extents.insert(extents.end(),{64,65,128,129,191,192,193,211,256,257,407,512,513,805});
     if(n==2048&&k==6144)extents.insert(extents.end(),{256,257,407,512,513,805});
+    if(!selected_extents.empty())extents=selected_extents;
     for(int t:extents){auto x=random(t*k);auto xb=upload(x);DeviceBuffer ob(static_cast<std::size_t>(n)*t*2);Tensor input(xb.p,DType::BF16,{k,t}),out(ob.p,DType::BF16,{n,t});ops::linear(input,w,out,device.stream);device.synchronize();auto actual=read(ob);Error error;
         std::vector<int> rows{0,1,7,8,31,32,63,64,n/2-1,n/2,n-2,n-1};for(int i:queries(t))for(int row:rows){double sum=0;for(int z=0;z<k;++z)sum+=f(x[i*k+z])*f(weights[static_cast<std::size_t>(row)*k+z]);error.add(f(actual[static_cast<std::size_t>(i)*n+row]),sum);}
         pass&=error.report("linear_N"+std::to_string(n)+"_K"+std::to_string(k)+"_T"+std::to_string(t));}
@@ -236,7 +258,18 @@ bool linear_add(DeviceContext& device,int k){int n=2048;auto weights=random(stat
 }
 }
 int main(int argc,char** argv){try{DeviceContext device;bool pass=true;bool projections=argc>1&&std::string(argv[1])=="--linear";
-    if(argc>1&&std::string(argv[1])=="--transforms")pass&=transforms(device);
+    if(argc>1&&std::string(argv[1])=="--verify"){
+        for(int rows:{1,2,4,6})for(int cap:{1,37,127,128,211,4096})pass&=verification(device,rows,cap);
+    }
+    else if(argc>1&&std::string(argv[1])=="--draft-decode"){
+        for(auto shape:std::vector<std::pair<int,int>>{{1024,3072},{4096,1024}})
+            pass&=linear(device,shape.first,shape.second,{1,2,3,4,6,8});
+    }
+    else if(argc>1&&std::string(argv[1])=="--draft"){
+        for(auto shape:std::vector<std::pair<int,int>>{{151936,1024},{896,7680}})pass&=linear(device,shape.first,shape.second);
+        for(int t:{1,13,104,197,211})pass&=attention(device,64,14,14,t,false,true);
+    }
+    else if(argc>1&&std::string(argv[1])=="--transforms")pass&=transforms(device);
     else if(projections){for(auto shape:std::vector<std::pair<int,int>>{{2048,2048},{4096,2048},{12288,2048},{2048,6144},{151936,2048},{1024,1024},{3072,1024},{4096,1024},{1024,4096},{1024,7680},{2048,1024}})pass&=linear(device,shape.first,shape.second);pass&=swiglu(device);for(int k:{2048,6144})pass&=linear_add(device,k);}
     else{
         for(int t:{1,13,104,197,211}){pass&=attention(device,64,16,16,t,false,false);pass&=attention(device,64,16,16,t,false,true);}

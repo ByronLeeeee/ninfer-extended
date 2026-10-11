@@ -69,6 +69,9 @@ std::size_t current_free_device_bytes() {
 } // namespace
 
 EngineOptions normalize_engine_options(EngineOptions options) {
+    if (!options.speech_draft_artifact_path.empty() && options.purpose != EnginePurpose::SpeechRecognition) {
+        throw std::invalid_argument("speech_draft_artifact_path requires SpeechRecognition purpose");
+    }
     switch (options.purpose) {
     case EnginePurpose::Generation:
         break;

@@ -153,7 +153,7 @@ int main() {
     if (ninfer::test::cuda_unavailable()) return 77;
     try {
         int failures = 0;
-        for (int heads : {12, 16}) {
+        for (int heads : {12, 14, 16}) {
             for (int tokens : {63, 64, 65, 4095, 4096, 4097, 6655, 6656, 6657,
                                7144, 7167, 7168, 7169, 9184, 9216})
                 failures += run_case(tokens, heads, tokens % 2 != 0, 1);
