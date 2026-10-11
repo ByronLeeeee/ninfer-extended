@@ -1,0 +1,24 @@
+{
+  "artifact": "qwen3-embedding-0.6b-bf16.ninfer",
+  "artifact_version": 3,
+  "bytes": 1203049125,
+  "sha256": "3229813fdae278ab6871f712e8a943fc4c8949d5580567e89f27f2f18d4e6ae6",
+  "source_model": "Qwen/Qwen3-Embedding-0.6B",
+  "weights": "bf16",
+  "weight_quantization": false,
+  "verified_unchanged_source_parameters": 310,
+  "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
+  "runtime_branch": "main",
+  "purpose": "TextEmbedding",
+  "maximum_texts_per_batch": 8,
+  "maximum_total_tokens_per_batch": 32768,
+  "supported_dimensions": [
+    32,
+    128,
+    256,
+    512,
+    1024
+  ],
+  "license": "apache-2.0",
+  "runtime_revision": "a94c4f530e803b01a50a71261937e88824243515"
+}

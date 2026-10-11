@@ -15,6 +15,7 @@ OpenAI/Anthropic 的 HTTP 服务。视觉、音频和语言推理共用 CUDA 算
   模型文件包含图像处理配置和 tokenizer，支持 MTP1/MTP3、接受前缀状态恢复及 BF16 草稿输出头。
 - **语音识别：** 原生音频编码器和 Qwen3 解码器，提供 `transcribe_features()`
   接口和 `ninfer-asr`。音频编码、语言 prefill 和 decode 均使用 CUDA Graph。
+  支持 0.6B、1.7B 两个尺寸，也可以用 0.6B 草拟、1.7B 验证，加速单路转写。
 - **词级时间戳：** Qwen3-ForcedAligner 通过一次音频与语言前向生成时间戳，
   支持独立批处理和 CUDA Graph 重放。
 - **文本向量：** 在 GPU 上完成分段 causal attention、末 token 池化、维度截取
@@ -31,6 +32,7 @@ OpenAI/Anthropic 的 HTTP 服务。视觉、音频和语言推理共用 CUDA 算
 |---|---|---|---|
 | Xiaomi-OCR-0 BF16 | [OCR](docs/xiaomi-ocr.md) | [模型](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) | [模型](https://modelscope.cn/models/ByronLeeee/Xiaomi-OCR-0-Ninfer) |
 | Qwen3-ASR-1.7B-hf BF16 | [ASR](docs/qwen3-asr.md) | [模型](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [模型](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
+| Qwen3-ASR-0.6B-hf BF16 | [ASR](docs/qwen3-asr.md) | [ASR / draft](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [ASR / draft](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
 | Qwen3-ForcedAligner-0.6B BF16 | [时间戳对齐](docs/qwen3-forced-aligner.md) | [ASR 与对齐模型](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [ASR 与对齐模型](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
 | Qwen3-Embedding-0.6B BF16 | [向量模型](docs/qwen3-embedding.md) | [模型](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) | [模型](https://modelscope.cn/models/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) |
 
@@ -124,6 +126,26 @@ MTP3、四路吞吐和草稿接受率见 [完整 OCR 实测](docs/xiaomi-ocr-per
 | RTX 6000D | 3.5652% | 3.5652% | 97.26% | 100.00% |
 
 [ASR 结果与使用方法](model-cards/Qwen3-ASR-1.7B-hf-NInfer/README.md)。
+
+#### 单路草稿加速
+
+同一组短录音对照 Transformer，使用各 GPU 已通过正确率验证的草稿配置：
+
+| GPU | 输入 | K | TF 音频秒/秒 | NInfer 音频秒/秒 | 推理倍数 |
+|---|---|---:|---:|---:|---:|
+| RTX 5070 Ti | 英文 15.05 秒 | 5 | 18.9 | **92.9** | 4.93× |
+| RTX 5070 Ti | 中文 4.20 秒 | 5 | 20.0 | **98.0** | 4.89× |
+| RTX 6000D | 英文 15.05 秒 | 3 | 27.7 | **102.8** | 3.71× |
+| RTX 6000D | 中文 4.20 秒 | 3 | 33.7 | **108.9** | 3.23× |
+
+原始 BF16 0.6B 草稿与 1.7B 主模型一起运行，完整 prefill 包括两份模型的音频编码和语言前向。
+
+| GPU | K | 60 秒非循环音频推理 s | 音频秒/秒 | 完整 prefill ms | Decode tok/s | 输出与普通解码一致 |
+|---|---:|---:|---:|---:|---:|---:|
+| RTX 5070 Ti | 5 | 0.5518 | **108.7** | 99.40 | 345.5 | 73/73 |
+| RTX 6000D | 3 | 0.5958 | **100.7** | 84.55 | 327.8 | 73/73 |
+
+6000D 采用已验证的 K=3 版本；运行版本、单路 Transformer 对比和接受率见 [ASR 模型卡](model-cards/Qwen3-ASR-1.7B-hf-NInfer/README_zh-CN.md)。
 
 ### Qwen3-Embedding-0.6B
 

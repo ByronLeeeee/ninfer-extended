@@ -1,0 +1,93 @@
+{
+  "result": "No confirmed output or performance regression",
+  "scope": "Local full implementation A/B; server shared BF16 dispatch A/B, other runtime objects identical",
+  "ocr": {
+    "gpu": "RTX 5070 Ti",
+    "formal_requests": 768,
+    "quality": {
+      "0": {
+        "full_pages": 11,
+        "formal_requests": 44,
+        "before_after_exact_pages": 11,
+        "ordinary_exact_pages": 11,
+        "all_finished_eos": true,
+        "text_gold_pages": 6,
+        "gold_characters": 1117,
+        "character_edits": 0,
+        "cer": 0.0,
+        "character_accuracy": 1.0
+      },
+      "1": {
+        "full_pages": 11,
+        "formal_requests": 44,
+        "before_after_exact_pages": 11,
+        "ordinary_exact_pages": 11,
+        "all_finished_eos": true,
+        "text_gold_pages": 6,
+        "gold_characters": 1117,
+        "character_edits": 0,
+        "cer": 0.0,
+        "character_accuracy": 1.0
+      },
+      "3": {
+        "full_pages": 11,
+        "formal_requests": 44,
+        "before_after_exact_pages": 11,
+        "ordinary_exact_pages": 11,
+        "all_finished_eos": true,
+        "text_gold_pages": 6,
+        "gold_characters": 1117,
+        "character_edits": 0,
+        "cer": 0.0,
+        "character_accuracy": 1.0
+      }
+    }
+  },
+  "embedding": {
+    "gpu": "RTX 5070 Ti",
+    "quality": {
+      "vector_count": 258,
+      "all_vectors_exact": true,
+      "retrieval_top1": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "retrieval_correct": 8,
+      "retrieval_queries": 8,
+      "semantic_pairs": 100,
+      "semantic_pearson": 0.9256294687415356
+    }
+  },
+  "forced_alignment": {
+    "gpu": "RTX 5070 Ti",
+    "quality": {
+      "all_timestamp_classes_exact": true,
+      "cases": 6,
+      "timestamps_per_formal_cycle": 700
+    }
+  },
+  "server_text_models": [
+    {
+      "model": "qwen3_8_27b",
+      "all_outputs_exact": true,
+      "graph_eager_outputs_exact": true
+    },
+    {
+      "model": "qwen3_6_35b_a3b",
+      "all_outputs_exact": true,
+      "graph_eager_outputs_exact": true
+    }
+  ],
+  "server_timing": "Controlled two-resident ABBA; sequential heat-drift timings excluded.",
+  "unchanged_paths": [
+    "VAD",
+    "CAM++",
+    "ComfyUI INT8"
+  ]
+}

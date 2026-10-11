@@ -3015,5 +3015,48 @@
     "matched_proposal_rows": 131072,
     "exact_outputs": true,
     "matched_draft_counts_and_acceptance": true
+  },
+  "current_regression": {
+    "gpu": "RTX 5070 Ti",
+    "formal_requests": 768,
+    "quality": {
+      "0": {
+        "full_pages": 11,
+        "formal_requests": 44,
+        "before_after_exact_pages": 11,
+        "ordinary_exact_pages": 11,
+        "all_finished_eos": true,
+        "text_gold_pages": 6,
+        "gold_characters": 1117,
+        "character_edits": 0,
+        "cer": 0.0,
+        "character_accuracy": 1.0
+      },
+      "1": {
+        "full_pages": 11,
+        "formal_requests": 44,
+        "before_after_exact_pages": 11,
+        "ordinary_exact_pages": 11,
+        "all_finished_eos": true,
+        "text_gold_pages": 6,
+        "gold_characters": 1117,
+        "character_edits": 0,
+        "cer": 0.0,
+        "character_accuracy": 1.0
+      },
+      "3": {
+        "full_pages": 11,
+        "formal_requests": 44,
+        "before_after_exact_pages": 11,
+        "ordinary_exact_pages": 11,
+        "all_finished_eos": true,
+        "text_gold_pages": 6,
+        "gold_characters": 1117,
+        "character_edits": 0,
+        "cer": 0.0,
+        "character_accuracy": 1.0
+      }
+    },
+    "performance_regression": false
   }
 }

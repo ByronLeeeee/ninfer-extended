@@ -200,3 +200,7 @@ single-token execution.
 - One file supports ordinary decoding, MTP1 and MTP3. The non-MTP BF16 artifact
   remains available separately.
 - License: Apache-2.0, following [Xiaomi-OCR-0](https://huggingface.co/SeerRay-Lab/Xiaomi-OCR-0).
+
+## Current-main regression check
+
+On 5070 Ti, all 11 complete pages match the preceding qualified build under ordinary, MTP1 and MTP3 decoding. Six labelled text pages contain 1,117 scored characters with CER 0%. All 768 formal single-request, four-lane and mixed-batch requests pass, with no confirmed performance regression.

@@ -1,0 +1,11 @@
+{
+  "source": "Qwen/Qwen3-ASR-0.6B-hf",
+  "dtype": "bf16",
+  "weight_quantization": false,
+  "source_tensors": 611,
+  "artifact_tensors": 457,
+  "lossless_row_concatenations": 92,
+  "architecture": "Qwen3ASRForConditionalGeneration",
+  "source_bytes": 1564928088,
+  "artifact_bytes": 1576443937
+}

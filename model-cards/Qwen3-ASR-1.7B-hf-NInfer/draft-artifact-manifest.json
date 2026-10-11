@@ -1,0 +1,26 @@
+{
+  "file": "qwen3-asr-0.6b-bf16.ninfer",
+  "artifact_format": "ninfer-v3",
+  "source_model": "Qwen/Qwen3-ASR-0.6B-hf",
+  "bytes": 1576443937,
+  "sha256": "5c400ffb5c7a0855aef91997c0cb0587fb845e96bd04d6585c4be82d08c623ca",
+  "weights": "BF16",
+  "weight_quantization": false,
+  "source_parameters": 611,
+  "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
+  "runtime_revision": "a94c4f530e803b01a50a71261937e88824243515",
+  "runtime_branch": "main",
+  "purpose": "SpeechRecognition",
+  "target_artifact": "qwen3-asr-1.7b-bf16.ninfer",
+  "qualified_recipes": {
+    "RTX 5070 Ti": {
+      "draft_tokens": 5,
+      "runtime_revision": "a94c4f530e803b01a50a71261937e88824243515"
+    },
+    "RTX 6000D": {
+      "draft_tokens": 3,
+      "runtime_revision": "64395f477fa8e5134f11edc5eb97697c47656d82"
+    }
+  },
+  "license": "apache-2.0"
+}

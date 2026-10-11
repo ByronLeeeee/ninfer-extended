@@ -10,5 +10,7 @@
   "source_weight_bytes_preserved": true,
   "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
   "runtime_branch": "main",
-  "license": "apache-2.0"
+  "license": "apache-2.0",
+  "runtime_revision": "a94c4f530e803b01a50a71261937e88824243515",
+  "optional_draft": "draft-artifact-manifest.json"
 }

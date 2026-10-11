@@ -20,6 +20,8 @@ shared CUDA operators for vision, audio and language processing.
 - **Speech recognition:** a native audio encoder and Qwen3 decoder, the
   `SpeechRecognition` Engine purpose, `transcribe_features()` API and
   `ninfer-asr` CLI. Audio encoding, language prefill and decode use CUDA Graphs.
+  Both 0.6B and 1.7B ASR variants are supported, with optional native 0.6B
+  draft decoding verified by the 1.7B target for single-audio requests.
 - **Word alignment:** native Qwen3-ForcedAligner inference, independent batches
   and reusable CUDA Graphs. It produces word timestamps in one audio/language
   forward pass.
@@ -41,6 +43,7 @@ shared CUDA operators for vision, audio and language processing.
 |---|---|---|---|
 | Xiaomi-OCR-0 BF16 | [OCR](docs/xiaomi-ocr.md) | [Model](https://huggingface.co/ByronLeeee/Xiaomi-OCR-0-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Xiaomi-OCR-0-Ninfer) |
 | Qwen3-ASR-1.7B-hf BF16 | [ASR](docs/qwen3-asr.md) | [Model](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
+| Qwen3-ASR-0.6B-hf BF16 | [ASR](docs/qwen3-asr.md) | [ASR / draft](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [ASR / draft](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
 | Qwen3-ForcedAligner-0.6B BF16 | [Alignment](docs/qwen3-forced-aligner.md) | [ASR and alignment](https://huggingface.co/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) | [ASR and alignment](https://modelscope.cn/models/ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer) |
 | Qwen3-Embedding-0.6B BF16 | [Embedding](docs/qwen3-embedding.md) | [Model](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) | [Model](https://modelscope.cn/models/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer) |
 
@@ -141,6 +144,26 @@ Single-lane recognition quality on 73 labelled English recordings, totaling 1,15
 | RTX 6000D | 3.5652% | 3.5652% | 97.26% | 100.00% |
 
 [ASR results and usage](model-cards/Qwen3-ASR-1.7B-hf-NInfer/README.md).
+
+#### Single-audio draft decoding
+
+The same short recordings versus Transformers, using the output-qualified draft configuration on each GPU:
+
+| GPU | Input | K | TF audio s/s | NInfer audio s/s | Inference speedup |
+|---|---|---:|---:|---:|---:|
+| RTX 5070 Ti | English 15.05 s | 5 | 18.9 | **92.9** | 4.93× |
+| RTX 5070 Ti | Chinese 4.20 s | 5 | 20.0 | **98.0** | 4.89× |
+| RTX 6000D | English 15.05 s | 3 | 27.7 | **102.8** | 3.71× |
+| RTX 6000D | Chinese 4.20 s | 3 | 33.7 | **108.9** | 3.23× |
+
+The original BF16 0.6B draft runs alongside the 1.7B target. Full prefill includes both audio encoders and both language forwards.
+
+| GPU | K | Nonrepeating 60 s inference | Audio s/s | Full prefill ms | Decode tok/s | Exact output vs ordinary |
+|---|---:|---:|---:|---:|---:|---:|
+| RTX 5070 Ti | 5 | 0.5518 | **108.7** | 99.40 | 345.5 | 73/73 |
+| RTX 6000D | 3 | 0.5958 | **100.7** | 84.55 | 327.8 | 73/73 |
+
+The 6000D row uses the verified K=3 source revision. [ASR card: runtime recipes, single-audio Transformer comparisons and acceptance](model-cards/Qwen3-ASR-1.7B-hf-NInfer/README.md).
 
 ### Qwen3-Embedding-0.6B
 

@@ -1,7 +1,8 @@
-# Qwen3-ASR-1.7B BF16
+# Qwen3-ASR BF16
 
 NInfer runs the audio encoder and Qwen3 language decoder from
 [Qwen/Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf)
+and [Qwen/Qwen3-ASR-0.6B-hf](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf)
 through the native C++ `Engine`. The converted file contains the original BF16
 weights, tokenizer, processor configuration, and chat template. Matrix and bias
 row concatenation preserves all original weight bytes.
@@ -74,8 +75,78 @@ Set `EngineOptions::max_context = 4096`, `max_concurrency = 4`, and
 `kv_cache = KvCacheStorage::BFloat16` for the configuration measured below.
 Each record supplies CPU FP32 log-mel features `[128,frames]`, a binary I32
 valid-frame mask, and the original processor's audio-token prompt. Frames are
-padded to a multiple of 100. The API supports the qualified 1.7B configuration
-with 28 text layers, a 2,048-wide text decoder, and a 24-layer audio encoder.
+padded to a multiple of 100. Both variants have 28 text layers. The 1.7B model
+has a 2,048-wide text decoder and 24 audio layers; the 0.6B model has a
+1,024-wide text decoder and 18 audio layers with 14 attention heads.
+
+## Single-audio drafting: best qualified configurations
+
+Use the same BF16 1.7B target and BF16 0.6B draft: K=5 on 5070 Ti and K=3 on 6000D.
+Both configurations match ordinary decoding token for token on all 73 labelled recordings. Four-lane batches use the single 1.7B model.
+
+| GPU | Input | K | TF inference ms | NInfer inference ms | TF audio s/s | NInfer audio s/s | Inference speedup |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| RTX 5070 Ti | English 15.05 s | 5 | 798.0 | **162.0** | 18.9 | **92.9** | 4.93× |
+| RTX 5070 Ti | Chinese 4.20 s | 5 | 210.0 | **42.9** | 20.0 | **98.0** | 4.89× |
+| RTX 6000D | English 15.05 s | 3 | 543.1 | **146.4** | 27.7 | **102.8** | 3.71× |
+| RTX 6000D | Chinese 4.20 s | 3 | 124.8 | **38.6** | 33.7 | **108.9** | 3.23× |
+
+Prefill below includes both audio encoders and both language forwards. Decode includes drafting, target verification and KV catch-up.
+
+| GPU | Input | TF prefill ms | NInfer prefill ms | TF decode tok/s | NInfer decode tok/s | Decode speedup |
+|---|---:|---:|---:|---:|---:|---:|
+| RTX 5070 Ti | English 15.05 s | 39.416 | 26.193 | 68.2 | **331.0** | 4.86× |
+| RTX 5070 Ti | Chinese 4.20 s | 41.861 | 13.187 | 66.1 | **318.7** | 4.82× |
+| RTX 6000D | English 15.05 s | 13.487 | 16.646 | 93.3 | **375.4** | 4.02× |
+| RTX 6000D | Chinese 4.20 s | 10.779 | 9.984 | 92.3 | **356.0** | 3.86× |
+
+### Nonrepeating 60-second audio
+
+Seven distinct recordings with silence gaps. Audio s/s is input duration divided by complete inference time; values are formal-run medians.
+
+| GPU | K | Inference seconds | Audio seconds/s | Full prefill ms | Decode tok/s | Draft acceptance |
+|---|---:|---:|---:|---:|---:|---:|
+| RTX 5070 Ti | 5 | 0.5518 | **108.7** | 99.40 | 345.5 | 98.57% |
+| RTX 6000D | 3 | 0.5958 | **100.7** | 84.55 | 327.8 | 99.21% |
+
+This input differs from the repeated-clip Transformer comparison below and is listed separately.
+
+### Quality, acceptance and memory
+
+Draft acceptance counts proposed tokens accepted by the target. WER and CER compare the transcript with gold labels.
+
+| GPU | K | WER | CER | Full-token agreement with ordinary | Draft acceptance on 73 clips | Engine allocation |
+|---|---:|---:|---:|---:|---:|---:|
+| RTX 5070 Ti | 5 | 3.8261% | 1.3166% | 73/73 (100%) | 85.53% | 7.17 GiB |
+| RTX 6000D | 3 | 3.5652% | 1.2585% | 73/73 (100%) | 88.58% | 7.17 GiB |
+
+For the 60-second input, the dual-model Engine allocates about 7.17 GiB versus 4.77 GiB for the single model. K=5 changed transcripts on 6000D; use K=3 there.
+
+### Download and enable
+
+```bash
+hf download ByronLeeee/Qwen3-ASR-1.7B-hf-Ninfer \
+  qwen3-asr-1.7b-bf16.ninfer qwen3-asr-0.6b-bf16.ninfer --local-dir models
+python tools/qwen3_asr/transcribe.py \
+  --artifact models/qwen3-asr-1.7b-bf16.ninfer --engine build/apps/ninfer-asr \
+  --draft-artifact models/qwen3-asr-0.6b-bf16.ninfer --draft-tokens 5 \
+  --audio recording.wav --out transcription.json
+```
+
+Use current `main` with `--draft-tokens 5` on 5070 Ti. The measured 6000D recipe uses verified revision [`64395f47`](https://github.com/ByronLeeeee/ninfer-extended/commit/64395f477fa8e5134f11edc5eb97697c47656d82) and `--draft-tokens 3`; run `git checkout 64395f477fa8e5134f11edc5eb97697c47656d82` before building.
+Omit the two draft arguments to load only 1.7B. The CPU transcription and timestamp frontends share one Python environment.
+
+[Draft measurements](results/qwen3-asr-draft.json) · [Draft artifact manifest](../model-cards/Qwen3-ASR-1.7B-hf-NInfer/draft-artifact-manifest.json)
+
+### Single-model ngram proposals
+
+`--draft-source ngram --draft-tokens 5` proposes repeated token sequences from
+the target history and loads only 1.7B. The 73 natural-speech recordings had no
+accepted ngram candidates, so external drafting is the measured fast path.
+Ordinary decoding remains the default; external drafting accepts one audio
+request, while ordinary ASR supports batches of up to four.
+
+## Execution details
 
 `SpeechRunOptions` selects the native BF16 projection Ops or a cuBLAS reference
 route. Audio convolution uses cuDNN; biased audio projections use cuBLAS with

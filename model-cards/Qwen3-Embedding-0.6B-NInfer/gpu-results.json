@@ -1,0 +1,272 @@
+{
+  "source_model": "Qwen/Qwen3-Embedding-0.6B",
+  "runtime_repository": "https://github.com/ByronLeeeee/ninfer-extended",
+  "measurement_date": "2026-10-07",
+  "weights": "bf16",
+  "dimensions": 1024,
+  "timing_scope": "Warm complete language forward and vector pooling on GPU; tokenization, loading and graph capture excluded",
+  "reference_policy": "Faster audited eager or fullgraph-compiled Transformers path for each input",
+  "ninfer_method": "A-B-B-A, 30 measured forwards per version; local long-input cases have 62",
+  "reference_audit": {
+    "cuda_bf16_parameters": 310,
+    "cpu_offload": false,
+    "math_sdpa_disabled": true,
+    "fast_cuda_attention_observed": true,
+    "compiled_graph_breaks": 0,
+    "suppress_errors": false
+  },
+  "provenance": "Audited baseline and accepted NInfer measurements on the same GPU/settings, from separate measurement windows. RTX 6000D 2048 reference refreshed on 2026-10-07.",
+  "decode": "not applicable to text embedding",
+  "hosts": {
+    "local": {
+      "gpu": "RTX 5070 Ti 16 GB",
+      "compute_capability": "12.0",
+      "sm_count": 70,
+      "cuda_toolkit": "13.3",
+      "torch": "2.14.0+cu132",
+      "transformers_version": "5.17.0",
+      "performance": [
+        {
+          "id": "b1_t128",
+          "batch": 1,
+          "tokens_per_text": 128,
+          "total_tokens": 128,
+          "transformers": {
+            "backend": "compiled",
+            "gpu_ms": 3.2655999660491943,
+            "tokens_per_second": 39196.4727249975
+          },
+          "ninfer_extended": {
+            "gpu_ms": 2.5777279138565063,
+            "tokens_per_second": 49656.13295023865
+          },
+          "throughput_ratio_vs_transformers": 1.2668520787221376,
+          "throughput_gain_pct_vs_transformers": 26.685207872213756,
+          "measurement_date": "2026-10-07"
+        },
+        {
+          "id": "b1_t512",
+          "batch": 1,
+          "tokens_per_text": 512,
+          "total_tokens": 512,
+          "transformers": {
+            "backend": "compiled",
+            "gpu_ms": 8.780927658081055,
+            "tokens_per_second": 58308.19019774161
+          },
+          "ninfer_extended": {
+            "gpu_ms": 8.149503707885742,
+            "tokens_per_second": 62825.91165699711
+          },
+          "throughput_ratio_vs_transformers": 1.0774800494396148,
+          "throughput_gain_pct_vs_transformers": 7.748004943961484,
+          "measurement_date": "2026-10-07"
+        },
+        {
+          "id": "b1_t2048",
+          "batch": 1,
+          "tokens_per_text": 2048,
+          "total_tokens": 2048,
+          "transformers": {
+            "backend": "eager",
+            "gpu_ms": 42.16057586669922,
+            "tokens_per_second": 48576.186588988814
+          },
+          "ninfer_extended": {
+            "gpu_ms": 37.60988807678223,
+            "tokens_per_second": 54453.76481362876
+          },
+          "throughput_ratio_vs_transformers": 1.1209971106701133,
+          "throughput_gain_pct_vs_transformers": 12.09971106701133,
+          "measurement_date": "2026-10-07"
+        },
+        {
+          "id": "b4_t128",
+          "batch": 4,
+          "tokens_per_text": 128,
+          "total_tokens": 512,
+          "transformers": {
+            "backend": "compiled",
+            "gpu_ms": 7.418208122253418,
+            "tokens_per_second": 69019.36310792943
+          },
+          "ninfer_extended": {
+            "gpu_ms": 7.340224027633667,
+            "tokens_per_second": 69752.63943886165
+          },
+          "throughput_ratio_vs_transformers": 1.0106242117851125,
+          "throughput_gain_pct_vs_transformers": 1.0624211785112525,
+          "measurement_date": "2026-10-07"
+        },
+        {
+          "id": "b8_t512",
+          "batch": 8,
+          "tokens_per_text": 512,
+          "total_tokens": 4096,
+          "transformers": {
+            "backend": "compiled",
+            "gpu_ms": 62.45929718017578,
+            "tokens_per_second": 65578.70781325485
+          },
+          "ninfer_extended": {
+            "gpu_ms": 56.905487060546875,
+            "tokens_per_second": 71978.99906632723
+          },
+          "throughput_ratio_vs_transformers": 1.0975970931189765,
+          "throughput_gain_pct_vs_transformers": 9.759709311897646,
+          "measurement_date": "2026-10-07"
+        }
+      ],
+      "quality": [
+        {
+          "transformers_backend": "eager",
+          "vectors": 249,
+          "mean_cosine": 0.9998016771711664,
+          "minimum_cosine": 0.998896586620192,
+          "semantic_pairs": 100,
+          "transformers_stsb_spearman": 0.9462546313312211,
+          "ninfer_stsb_spearman": 0.9464167506832604,
+          "retrieval_queries": 8,
+          "transformers_top1_correct": 8,
+          "ninfer_top1_correct": 8,
+          "retrieval_top1_agreement": 1.0,
+          "retrieval_top3_set_agreement": 1.0
+        },
+        {
+          "transformers_backend": "compiled",
+          "vectors": 249,
+          "mean_cosine": 0.9997923803434786,
+          "minimum_cosine": 0.9981302947982097,
+          "semantic_pairs": 100,
+          "transformers_stsb_spearman": 0.9462065959676538,
+          "ninfer_stsb_spearman": 0.9464167506832604,
+          "retrieval_queries": 8,
+          "transformers_top1_correct": 8,
+          "ninfer_top1_correct": 8,
+          "retrieval_top1_agreement": 1.0,
+          "retrieval_top3_set_agreement": 1.0
+        }
+      ],
+      "independent_embedding_fp64_checks": 164,
+      "verified_current_vectors": 249
+    },
+    "server": {
+      "gpu": "RTX 6000D",
+      "compute_capability": "12.0",
+      "sm_count": 156,
+      "cuda_toolkit": "13.2",
+      "torch": "2.14.0+cu132",
+      "transformers_version": "5.17.0",
+      "performance": [
+        {
+          "id": "b1_t128",
+          "batch": 1,
+          "tokens_per_text": 128,
+          "total_tokens": 128,
+          "transformers": {
+            "backend": "compiled",
+            "gpu_ms": 2.7970240116119385,
+            "tokens_per_second": 45762.92497619031
+          },
+          "ninfer_extended": {
+            "gpu_ms": 1.9796800017356873,
+            "tokens_per_second": 64656.914192079435
+          },
+          "throughput_ratio_vs_transformers": 1.4128667305623352,
+          "throughput_gain_pct_vs_transformers": 41.286673056233525,
+          "measurement_date": "2026-10-07"
+        },
+        {
+          "id": "b1_t512",
+          "batch": 1,
+          "tokens_per_text": 512,
+          "total_tokens": 512,
+          "transformers": {
+            "backend": "compiled",
+            "gpu_ms": 6.186751842498779,
+            "tokens_per_second": 82757.48131400844
+          },
+          "ninfer_extended": {
+            "gpu_ms": 4.61627197265625,
+            "tokens_per_second": 110912.00930810625
+          },
+          "throughput_ratio_vs_transformers": 1.340205230355797,
+          "throughput_gain_pct_vs_transformers": 34.0205230355797,
+          "measurement_date": "2026-10-07"
+        },
+        {
+          "id": "b1_t2048",
+          "batch": 1,
+          "tokens_per_text": 2048,
+          "total_tokens": 2048,
+          "transformers": {
+            "backend": "eager",
+            "gpu_ms": 21.2511043548584,
+            "tokens_per_second": 96371.4621980005
+          },
+          "ninfer_extended": {
+            "gpu_ms": 21.2981595993042,
+            "tokens_per_second": 96158.54320421691
+          },
+          "throughput_ratio_vs_transformers": 0.9977906426972527,
+          "throughput_gain_pct_vs_transformers": -0.22093573027472946,
+          "measurement_date": "2026-10-07"
+        }
+      ],
+      "quality": [
+        {
+          "transformers_backend": "eager",
+          "vectors": 249,
+          "mean_cosine": 0.9998000484150424,
+          "minimum_cosine": 0.998896586620192,
+          "semantic_pairs": 100,
+          "transformers_stsb_spearman": 0.9462546313312211,
+          "ninfer_stsb_spearman": 0.9464167506832604,
+          "retrieval_queries": 8,
+          "transformers_top1_correct": 8,
+          "ninfer_top1_correct": 8,
+          "retrieval_top1_agreement": 1.0,
+          "retrieval_top3_set_agreement": 1.0
+        },
+        {
+          "transformers_backend": "compiled",
+          "vectors": 249,
+          "mean_cosine": 0.9997816335865246,
+          "minimum_cosine": 0.9987273464951549,
+          "semantic_pairs": 100,
+          "transformers_stsb_spearman": 0.9465608567739621,
+          "ninfer_stsb_spearman": 0.9464167506832604,
+          "retrieval_queries": 8,
+          "transformers_top1_correct": 8,
+          "ninfer_top1_correct": 8,
+          "retrieval_top1_agreement": 1.0,
+          "retrieval_top3_set_agreement": 1.0
+        }
+      ],
+      "independent_embedding_fp64_checks": 164,
+      "verified_current_vectors": 249
+    }
+  },
+  "current_regression": {
+    "gpu": "RTX 5070 Ti",
+    "quality": {
+      "vector_count": 258,
+      "all_vectors_exact": true,
+      "retrieval_top1": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "retrieval_correct": 8,
+      "retrieval_queries": 8,
+      "semantic_pairs": 100,
+      "semantic_pearson": 0.9256294687415356
+    },
+    "performance_regression": false
+  }
+}

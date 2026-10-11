@@ -1,5 +1,45 @@
 # Changelog
 
+## Native ASR drafting and shared-operator regression
+
+- Add native BF16 Qwen3-ASR-0.6B conversion and optional 0.6B draft / 1.7B target
+  decoding. Single-audio greedy verification supports K=1..5, accepted-prefix KV
+  recovery, reusable CUDA Graphs and separate target/draft timing and acceptance.
+- Make draft prefill cache-only; skip its unused final-layer tail and first output
+  head. Pair fully accepted-block catch-up with the next first proposal, predict
+  only the second row, and pass token slots directly on the GPU.
+- Increase CTA parallelism for single-token BF16 N1024/K3072 and N4096/K1024
+  projections while preserving the existing accumulation order. Other token
+  extents keep their qualified schedules.
+- Publish the 0.6B draft alongside ASR/ForcedAligner and the BF16 MTP OCR artifact.
+
+RTX 5070 Ti, 60-second nonrepeating audio, formal A-B-B-A medians:
+
+| Draft K | Previous native inference s | Updated native inference s | Latency reduction | Updated audio s/s | Updated decode tok/s |
+|---|---:|---:|---:|---:|---:|
+| 1 | 0.8601 | 0.7047 | 18.1% | 85.1 | 266.8 |
+| 3 | 0.6575 | 0.5821 | 11.5% | 103.1 | 327.4 |
+| 5 | 0.6006 | 0.5518 | 8.1% | 108.7 | 345.5 |
+
+All K settings match ordinary decoding on 73/73 labelled recordings:
+WER 3.8261%, CER 1.3166%. K=5 accepts 85.53% of proposals on that corpus;
+the separate 60-second speed input accepts 98.57%. RTX 6000D's output-qualified
+K=3 revision takes 0.5958 s for the same 60-second input, with WER 3.5652%,
+CER 1.2585% and 73/73 full-token agreement. K=5 on 6000D is not recommended
+because two labelled recordings change.
+
+Regression: OCR passes 768 formal requests across ordinary/MTP1/MTP3, single
+and four-lane batches, and 11 complete pages; 1,117 labelled text characters
+retain CER 0%. Embedding vectors and ForcedAligner timestamps remain exact.
+Qwen3.8-27B and Qwen3.6-35B-A3B text/translation outputs and Graph/eager results
+remain exact on 6000D. Controlled long/short prefill and decode confirmation
+shows no material regression. Independent BF16 projection and shared-KV
+attention FP64 checks pass. Ordinary ASR GPU decode is unchanged; the measured
+gain is in the native draft execution path.
+
+[Hardware recipes and full speed/quality data](docs/qwen3-asr.md) ·
+[Regression evidence](docs/results/asr-shared-ops-regression.json).
+
 ## Matched Transformers MTP reference
 
 - Add a compiled PyTorch MTP benchmark using the checkpoint's original BF16 MTP

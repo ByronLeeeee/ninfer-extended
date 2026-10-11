@@ -91,6 +91,10 @@ Tracked GPU weight storage is about 1.110 GiB, with no KV cache. Explicit runtim
 
 SHA256: `3229813fdae278ab6871f712e8a943fc4c8949d5580567e89f27f2f18d4e6ae6`
 
-[Measurements](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer/blob/main/gpu-results.json) · [Artifact manifest](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer/blob/main/artifact-manifest.json) · [Conversion record](https://huggingface.co/ByronLeeee/Qwen3-Embedding-0.6B-Ninfer/blob/main/conversion.json)
+[Measurements](gpu-results.json) · [Artifact manifest](artifact-manifest.json) · [Conversion record](conversion.json)
 
 [Qwen3-Embedding](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) · [STS-B](https://huggingface.co/datasets/sentence-transformers/stsb)
+
+## Current-main regression check
+
+Inputs cover 1–8,192 tokens, batches of 1/4/8 and ragged lengths. All 258 vector positions are bit-identical between builds and eager execution; retrieval remains 8/8 correct, and Pearson correlation on 100 STS-B pairs is 0.92563. No confirmed performance regression.
