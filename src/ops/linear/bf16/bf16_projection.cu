@@ -245,6 +245,7 @@ template <class Output>
 void dispatch_projection(const Tensor& x, const Weight& w, Output output, cudaStream_t stream) {
 #define SHAPE(N, K) if (w.n == N && w.k == K) { projection<N, K>(x, w, output, stream); return; }
     SHAPE(8192, 1024) SHAPE(5120, 1024) SHAPE(7168, 1024) SHAPE(6144, 1024) SHAPE(248320, 1024)
+    SHAPE(65536, 1024) SHAPE(131072, 1024)
     SHAPE(1024, 2048) SHAPE(1024, 3584) SHAPE(1024, 3072)
     SHAPE(768, 1536) SHAPE(768, 768) SHAPE(768, 3072)
     SHAPE(2304, 768) SHAPE(3072, 768) SHAPE(3072, 3072)
@@ -405,7 +406,8 @@ __global__ void gating_kernel(const __nv_bfloat16* x, const __nv_bfloat16* w,
 } // namespace
 
 bool bf16_projection_shape(int n, int k) {
-    return (k == 1024 && (n == 8192 || n == 5120 || n == 7168 || n == 6144 || n == 248320)) ||
+    return (k == 1024 && (n == 8192 || n == 5120 || n == 7168 || n == 6144 ||
+                         n == 65536 || n == 131072 || n == 248320)) ||
         (n == 1024 && (k == 2048 || k == 3584 || k == 3072)) ||
         (n == 768 && (k == 1536 || k == 768 || k == 3072)) ||
         (n == 2304 && k == 768) || (n == 3072 && (k == 768 || k == 3072)) ||

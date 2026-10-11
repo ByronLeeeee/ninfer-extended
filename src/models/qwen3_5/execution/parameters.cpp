@@ -136,7 +136,9 @@ public:
         out.post_attention_norm = tensor(w.layer.post_attention_norm);
         out.final_norm          = tensor(w.final_norm);
         out.projection.packed   = ops::prepare_linear_weight(inputs);
-        if (model_.config().text.architecture == Architecture::Qwen3_5) {
+        // BF16 uses the shared packed Q/K/gate/V projection, including the 0.8B geometry.
+        if (model_.config().text.architecture == Architecture::Qwen3_5 &&
+            out.projection.packed.weight.qtype != QType::BF16) {
             out.projection.rows = {linear(a.query), linear(a.key), linear(a.gate), linear(a.value)};
         }
         out.query_norm  = tensor(a.query_norm);

@@ -274,6 +274,11 @@ int main() {
     }
 
     int failures = 0;
+    for (int width = 2; width <= 16; ++width) {
+        failures += run_case(16, width, 1, {}, 1600U + width);
+    }
+    failures += run_case(16, 4, 4, {4, 3, 2, 1}, 1621U);
+    failures += run_case(16, 16, 8, {16, 8, 7, 6, 4, 3, 2, 1}, 1623U);
     failures += run_case(32, 2, 1, {}, 1701U);
     failures += run_case(32, 16, 1, {7}, 1711U);
     failures += run_case(32, 6, 8, {6, 5, 4, 3, 2, 1, 6, 2}, 1721U);

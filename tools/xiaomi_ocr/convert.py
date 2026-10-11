@@ -10,7 +10,13 @@ from transformers import AutoTokenizer
 p = argparse.ArgumentParser()
 p.add_argument('--model', required=True, type=Path)
 p.add_argument('--out', required=True, type=Path)
+p.add_argument('--mtp', action='store_true',
+               help='Include the checkpoint MTP head for speculative decoding')
+p.add_argument('--draft-head-rows', type=int, choices=[65536, 131072],
+               help='Add an indexed BF16 proposal head using the upstream token ranking')
 args = p.parse_args()
+if args.draft_head_rows and not args.mtp:
+    p.error('--draft-head-rows requires --mtp')
 model = args.model.resolve()
 out = args.out.resolve()
 repo = Path(__file__).resolve().parents[2]
@@ -31,8 +37,12 @@ with tempfile.TemporaryDirectory(prefix='xiaomi-ocr-resources-') as directory:
     (resources / 'tokenizer_config.json').write_text(json.dumps(tc, ensure_ascii=False), encoding='utf-8')
     command = [sys.executable, '-m', 'tools.convert', '--model', str(model),
                '--recipe', str(Path(__file__).with_name('recipe_bf16.py')),
-               '--components', 'text,vision', '--device', 'cpu', '--name', 'xiaomi-ocr-0',
+               '--components', 'text,vision,mtp' if args.mtp else 'text,vision',
+               '--device', 'cpu', '--name', 'xiaomi-ocr-0',
                '--out', str(out)]
+    if args.draft_head_rows:
+        command.extend(['--proposal', '--proposal-rows', str(args.draft_head_rows),
+                        '--override', str(Path(__file__).with_name('recipe_bf16.py'))])
     for name in ['tokenizer.json', 'tokenizer_config.json', 'generation_config.json',
                  'preprocessor_config.json', 'video_preprocessor_config.json']:
         command.extend(['--resource', name + '=' + str(resources / name)])

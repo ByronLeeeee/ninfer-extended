@@ -59,12 +59,14 @@ hf download ByronLeeee/Xiaomi-OCR-0-Ninfer xiaomi-ocr-0-bf16.ninfer --local-dir 
 ./build/apps/ninfer-serve models/xiaomi-ocr-0-bf16.ninfer \
   --host 127.0.0.1 --port 8080 --model-id ocr --vision \
   --max-context 32768 --kv-capacity 131072 --max-concurrency 4 \
-  --kv-dtype bf16 --prefill-chunk 1024 --no-thinking --greedy
+  --kv-dtype bf16 --prefill-chunk 1024 --no-thinking --greedy \
+  --spec mtp --draft-tokens 1 --lm-head-draft
 ```
 
 The command starts a service with a 32K context and four concurrent requests.
 The Transformers comparison uses a 4K context and one request on both engines.
-The latest local operator comparison also measures two and four concurrent requests.
+MTP1 is the recommended draft window; MTP3 is available with `--draft-tokens 3`.
+On RTX 6000D, use `--prefill-chunk 2048`. Both GPUs also have four-lane measurements.
 Image token counts depend on resolution. BF16 KV works well for this OCR setup;
 FP8 KV is available to reduce cache memory at longer contexts.
 
@@ -74,12 +76,63 @@ FP8 KV is available to reduce cache memory at longer contexts.
 hf download SeerRay-Lab/Xiaomi-OCR-0 --revision e4d1c4a6804bd9ef342b93d705a73af003e2ef4e \
   --local-dir models/Xiaomi-OCR-0
 python tools/xiaomi_ocr/convert.py --model models/Xiaomi-OCR-0 \
-  --out models/xiaomi-ocr-0-bf16.ninfer
+  --mtp --draft-head-rows 65536 --out models/xiaomi-ocr-0-bf16.ninfer
 ```
 
 The converter also requires upstream conversion dependencies described in
-[weight conversion](weight-conversion.md). The output artifact contains 1,726,110,464
-bytes and retains BF16 projection weights.
+[weight conversion](weight-conversion.md). The published artifact contains 1,901,499,904
+bytes, including the original BF16 text/vision weights, the checkpoint's MTP layer,
+and a BF16 indexed proposal head.
+
+## Optional MTP drafting
+
+The original checkpoint includes one MTP layer. `--mtp` exports it;
+`--draft-head-rows 65536` adds a BF16 proposal head containing original output-head
+rows selected by upstream token-frequency ranking. The target model still verifies
+the full vocabulary. The converter also supports a 131,072-row proposal head.
+
+```bash
+python tools/xiaomi_ocr/convert.py --model models/Xiaomi-OCR-0 \
+  --mtp --draft-head-rows 65536 --out models/xiaomi-ocr-0-bf16-mtp.ninfer
+./build/apps/ninfer-serve models/xiaomi-ocr-0-bf16-mtp.ninfer \
+  --host 127.0.0.1 --port 8080 --model-id ocr --vision \
+  --max-context 4096 --kv-capacity 4096 --max-concurrency 1 \
+  --kv-dtype bf16 --prefill-chunk 1024 --no-thinking --greedy \
+  --spec mtp --draft-tokens 1 --lm-head-draft
+```
+
+The MTP component adds 39 MiB of tensors; the 65,536-row BF16 proposal head adds
+128 MiB plus token IDs. All 564 original parameter bindings retain their values;
+the proposal rows are bit-identical to the original head. Omitting `--mtp` keeps
+text/vision-only conversion. Omitting `--spec mtp` selects ordinary decoding;
+omitting `--lm-head-draft` uses the full BF16 head for drafting.
+
+MTP3 reuses the same trained MTP layer for three successive proposals. The engine
+supports Xiaomi's 16-head GDN state record/fold and 1,024-wide MTP packing, including
+mixed accepted-prefix lengths and CUDA Graph replay. MTP1 performs best across
+the measured text pages and four-lane throughput. MTP3 can improve formula-page
+single-request decode, with lower acceptance on the later draft positions.
+
+The eleven complete-page single-lane comparisons have 10/11 raw output agreement
+with ordinary BF16 decoding and three `P`/`p` changes. Mixed long-page batches also
+show formula superscript/prime differences. Six annotated text fixtures retain
+CER 0%. See [complete measurements](xiaomi-ocr-performance.md#bf16-mtp1-and-mtp3).
+
+To reproduce ordinary/MTP and MTP1/MTP3 comparisons with your own images:
+
+```bash
+python tools/xiaomi_ocr/benchmark_mtp.py \
+  --fixtures-root /path/to/ocr-fixtures --artifact models/xiaomi-ocr-0-bf16.ninfer \
+  --optimized-binary build/apps/ninfer-serve --output-root results \
+  --lanes 1 --cycles 3 --draft-window 1 --lm-head-draft --label mtp1-
+```
+
+The fixture directory contains `manifest.json` and its image files, as described
+below. Use `--lanes 4` for four-request bursts, `--draft-window 3` for MTP3,
+or `--baseline-draft-window 1 --baseline-lm-head-draft` for a direct MTP1/MTP3 pair.
+Add `--allow-output-differences --context 16384 --max-tokens 4096` for complete
+documents. The report includes accepted/drafted tokens, per-position acceptance,
+stage timings, complete-request throughput and output hashes.
 
 ## Compiled Transformers reference
 

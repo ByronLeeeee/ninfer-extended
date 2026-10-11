@@ -15,7 +15,8 @@ shared CUDA operators for vision, audio and language processing.
 
 - **OCR and document parsing:** native BF16 vision encoding, language prefill
   and decode for Xiaomi-OCR-0, with image processing and tokenizer resources
-  included in the model artifact.
+  included in the model artifact. MTP1/MTP3 use native accepted-prefix state recovery
+  and an optional indexed BF16 proposal head.
 - **Speech recognition:** a native audio encoder and Qwen3 decoder, the
   `SpeechRecognition` Engine purpose, `transcribe_features()` API and
   `ninfer-asr` CLI. Audio encoding, language prefill and decode use CUDA Graphs.
@@ -54,22 +55,24 @@ alignment uses the official eager Transformers reference. Tables report medians.
 
 ### Xiaomi-OCR-0
 
-Single request, 4K context, BF16 KV and a 256-token output cap. Prefill includes
-vision encoding and language prefill; decode starts after the first token.
-Transformers stages use synchronized timing and NInfer uses CUDA events. NInfer chunk size is 1,024 on 5070 Ti and 2,048 on 6000D.
+BF16 MTP1 with a 65,536-row BF16 proposal head, full-vocabulary target verification,
+one request, 4K context, BF16 KV and a 256-token output cap. Prefill includes vision
+encoding and language prefill. NInfer chunks are 1,024 on 5070 Ti and 2,048 on 6000D.
 
-| GPU | Input | TF prefill tok/s | NInfer prefill tok/s | Prefill change | TF decode tok/s | NInfer decode tok/s | Decode speedup |
-|---|---|---:|---:|---:|---:|---:|---:|
-| RTX 5070 Ti | Chinese document | 20,983 | 24,125 | +15.0% | 148.6 | 438.6 | 2.95× |
-| RTX 5070 Ti | English contract | 21,402 | 23,830 | +11.3% | 143.6 | 439.5 | 3.06× |
-| RTX 5070 Ti | Dense formulas (256 tokens) | 20,971 | 22,710 | +8.3% | 147.7 | 435.8 | 2.95× |
-| RTX 6000D | Chinese document | 36,263 | 40,404 | +11.4% | 232.2 | 540.5 | 2.33× |
-| RTX 6000D | English contract | 36,247 | 40,541 | +11.8% | 231.7 | 540.6 | 2.33× |
-| RTX 6000D | Dense formulas (256 tokens) | 36,174 | 36,842 | +1.8% | 234.0 | 537.4 | 2.30× |
+| GPU | Input | TF prefill tok/s | MTP1 prefill tok/s | Prefill change | TF decode tok/s | MTP1 decode tok/s | Decode speedup |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| RTX 5070 Ti | Chinese document | 21,238 | 23,553 | +10.9% | 162.7 | 707.5 | 4.35× |
+| RTX 5070 Ti | English contract | 21,003 | 23,812 | +13.4% | 155.2 | 728.1 | 4.69× |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 21,937 | 21,350 | -2.7% | 159.6 | 748.5 | 4.69× |
+| RTX 6000D | Chinese document | 36,299 | 40,061 | +10.4% | 233.8 | 872.6 | 3.73× |
+| RTX 6000D | English contract | 36,311 | 40,212 | +10.7% | 233.4 | 926.6 | 3.97× |
+| RTX 6000D | Dense formulas (256 tokens) | 36,366 | 36,450 | +0.2% | 235.6 | 950.4 | 4.03× |
 
-Both engines score **100% character accuracy (CER 0%)** on the two annotated
-text pages. Raw output agreement is **3/3 (100%)**, covering both complete text
-outputs and the same 256-token formula prefix. [Full OCR results](docs/xiaomi-ocr-performance.md).
+The three speed-test outputs match compiled Transformers. The two complete labelled
+text pages score CER 0%. Eleven complete-page MTP/ordinary comparisons have 10/11
+raw agreement and a 0.0414% character difference; six labelled text fixtures score
+CER 0%. MTP3, four-lane throughput and mixed-batch output differences are in the
+[full OCR results](docs/xiaomi-ocr-performance.md#bf16-mtp1-and-mtp3).
 
 ### Qwen3-ASR-1.7B
 

@@ -12,7 +12,7 @@ OpenAI/Anthropic 的 HTTP 服务。视觉、音频和语言推理共用 CUDA 算
 ## 功能
 
 - **OCR 与文档解析：** Xiaomi-OCR-0 的视觉编码、语言 prefill 和 decode 均原生运行，
-  模型文件包含图像处理配置和 tokenizer。
+  模型文件包含图像处理配置和 tokenizer，支持 MTP1/MTP3、接受前缀状态恢复及 BF16 草稿输出头。
 - **语音识别：** 原生音频编码器和 Qwen3 解码器，提供 `transcribe_features()`
   接口和 `ninfer-asr`。音频编码、语言 prefill 和 decode 均使用 CUDA Graph。
 - **词级时间戳：** Qwen3-ForcedAligner 通过一次音频与语言前向生成时间戳，
@@ -43,21 +43,23 @@ Transformers，Embedding 取 eager 和编译版中更快的结果，ForcedAligne
 
 ### Xiaomi-OCR-0
 
-单路、4K 上下文、BF16 KV，输出上限 256 token。Prefill 包含视觉编码和语言
-prefill，decode 从首 token 之后统计。Transformers 采用同步计时，NInfer 使用 CUDA events。NInfer 的 chunk 在 5070 Ti 上为 1,024，在 6000D 上为 2,048。
+BF16 MTP1 使用 65,536 行 BF16 草稿输出头，目标模型验证完整词表。
+单路、4K 上下文、BF16 KV、256-token 输出上限；prefill 包含视觉编码与语言 prefill。
+NInfer chunk 在 5070 Ti 上为 1,024，在 6000D 上为 2,048。
 
-| 显卡 | 输入 | TF prefill tok/s | NInfer prefill tok/s | Prefill 变化 | TF decode tok/s | NInfer decode tok/s | Decode 倍数 |
-|---|---|---:|---:|---:|---:|---:|---:|
-| RTX 5070 Ti | 中文文书 | 20,983 | 24,125 | +15.0% | 148.6 | 438.6 | 2.95× |
-| RTX 5070 Ti | 英文合同 | 21,402 | 23,830 | +11.3% | 143.6 | 439.5 | 3.06× |
-| RTX 5070 Ti | 密集公式（256 token） | 20,971 | 22,710 | +8.3% | 147.7 | 435.8 | 2.95× |
-| RTX 6000D | 中文文书 | 36,263 | 40,404 | +11.4% | 232.2 | 540.5 | 2.33× |
-| RTX 6000D | 英文合同 | 36,247 | 40,541 | +11.8% | 231.7 | 540.6 | 2.33× |
-| RTX 6000D | 密集公式（256 token） | 36,174 | 36,842 | +1.8% | 234.0 | 537.4 | 2.30× |
+| 显卡 | 输入 | TF prefill tok/s | MTP1 prefill tok/s | Prefill 变化 | TF decode tok/s | MTP1 decode tok/s | Decode 倍数 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| RTX 5070 Ti | 中文文书 | 21,238 | 23,553 | +10.9% | 162.7 | 707.5 | 4.35× |
+| RTX 5070 Ti | 英文合同 | 21,003 | 23,812 | +13.4% | 155.2 | 728.1 | 4.69× |
+| RTX 5070 Ti | 密集公式（256 token） | 21,937 | 21,350 | -2.7% | 159.6 | 748.5 | 4.69× |
+| RTX 6000D | 中文文书 | 36,299 | 40,061 | +10.4% | 233.8 | 872.6 | 3.73× |
+| RTX 6000D | 英文合同 | 36,311 | 40,212 | +10.7% | 233.4 | 926.6 | 3.97× |
+| RTX 6000D | 密集公式（256 token） | 36,366 | 36,450 | +0.2% | 235.6 | 950.4 | 4.03× |
 
-两张有标注的文字页，双方均为 **100% 字符正确率（CER 0%）**。三组输出
-**100% 一致（3/3）**，包括两页完整文字和相同的公式页 256-token 输出。
-[完整 OCR 实测](docs/xiaomi-ocr-performance.md)。
+三项测速输出与编译版 Transformers 相同，两张完整标注文字页均为 CER 0%。
+十一页完整文档的 MTP/普通解码对比为 10/11 原始输出一致，字符差异率 0.0414%；
+六张标注文字图片均为 CER 0%。MTP3、四路吞吐与混合并发差异见
+[完整 OCR 实测](docs/xiaomi-ocr-performance.md#bf16-mtp1-and-mtp3)。
 
 ### Qwen3-ASR-1.7B
 

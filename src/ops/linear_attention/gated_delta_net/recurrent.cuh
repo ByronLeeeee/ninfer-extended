@@ -452,6 +452,7 @@ struct FoldGeometry {
 
 using FoldGeometry48x48 = FoldGeometry<48, 16, 48, 10240>;
 using FoldGeometry30x32 = FoldGeometry<30, 16, 32, 8192>;
+using FoldGeometry18x16 = FoldGeometry<18, 16, 16, 6144>;
 
 template <class Geometry>
 struct FoldAccess {

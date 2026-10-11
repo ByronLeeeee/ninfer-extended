@@ -642,6 +642,11 @@ int run_record_fold_rounds() {
                  device_destinations = to_device(destination_steps);
 
     int failures = 0;
+    failures += run_case({18, 16, 6144}, 2, 1, {2}, 1501U, true);
+    failures += run_case({18, 16, 6144}, 4, 4, {0, 1, 2, 4}, 1511U);
+    failures += run_case({18, 16, 6144}, 6, 8, {0, 1, 2, 3, 6, 4, 1, 5}, 1521U);
+    failures += run_case({18, 16, 6144}, 16, 8, {0, 1, 2, 3, 7, 13, 15, 16}, 1523U, true);
+    failures += run_case({18, 16, 6144}, 16, 1, {0}, 1525U, true);
     for (std::int32_t round = 0; round < 3; ++round) {
         const std::int32_t commit = round == 0 ? 1 : round == 1 ? kWidth - 1 : kWidth;
         std::vector<float> g_host(static_cast<std::size_t>(kProfile.value_heads) * kWidth);

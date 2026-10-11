@@ -278,6 +278,13 @@ int run_bf16_linear() {
         for (int tokens : {1, 2, 3, 4, 5, 8})
             failures += run_bf16_linear_case(weight, tokens, true);
     }
+    for (const auto rows : {65536, 131072}) {
+        DeviceWeight weight(make_patterned(rows, 1024, 419U));
+        for (int tokens : {1, 2, 3, 4, 5, 8, 9, 16, 32})
+            failures += run_bf16_linear_case(weight, tokens);
+        for (int tokens : {1, 2, 4, 8, 16})
+            failures += run_bf16_linear_case(weight, tokens, true);
+    }
     failures += run_selector_linear();
     return failures;
 }

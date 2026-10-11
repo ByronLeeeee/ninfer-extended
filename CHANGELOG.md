@@ -1,5 +1,50 @@
 # Changelog
 
+## BF16 Xiaomi OCR MTP1/MTP3 and indexed proposal heads
+
+- Export the checkpoint's MTP component and an optional 65,536/131,072-row BF16
+  proposal head. Preserve all main text/vision weights; verify proposals against
+  the full target vocabulary. Keep the full BF16 draft head as an option.
+- Extend native GDN record/fold to 16 value heads and the 18-layer, 6,144-channel
+  state geometry. Qualify 1,024-wide MTP packing and mixed accepted-prefix coverage.
+- Use packed BF16 MTP attention projections and qualify shared BF16 projection
+  routes for 65,536/131,072 × 1,024, including changed-input CUDA Graph replays.
+- Add a paired OCR benchmark reporting stage times, complete-request throughput,
+  acceptance by position and output agreement.
+
+The following change compares the same MTP window with a full BF16 draft head
+and the indexed BF16 head. These are NInfer Extended pairs, with BF16 KV and
+no weight quantization:
+
+| GPU | Window | Input | Full-head decode tok/s | Indexed-head decode tok/s | Decode change | Complete-request throughput change |
+| --- | --- | --- | --- | --- | --- | --- |
+| RTX 5070 Ti | MTP1 | Chinese document | 689.2 | 719.5 | +4.4% | +2.0% |
+| RTX 5070 Ti | MTP1 | English contract | 678.3 | 756.5 | +11.5% | +5.7% |
+| RTX 5070 Ti | MTP1 | Dense formulas (256 tokens) | 676.8 | 777.9 | +14.9% | +10.2% |
+| RTX 5070 Ti | MTP3 | Chinese document | 536.5 | 697.8 | +30.1% | +16.3% |
+| RTX 5070 Ti | MTP3 | English contract | 564.6 | 721.6 | +27.8% | +12.2% |
+| RTX 5070 Ti | MTP3 | Dense formulas (256 tokens) | 582.6 | 770.0 | +32.2% | +17.0% |
+| RTX 6000D | MTP1 | Chinese document | 851.1 | 873.3 | +2.6% | +2.4% |
+| RTX 6000D | MTP1 | English contract | 843.6 | 921.3 | +9.2% | +6.2% |
+| RTX 6000D | MTP1 | Dense formulas (256 tokens) | 843.2 | 950.7 | +12.7% | +9.1% |
+| RTX 6000D | MTP3 | Chinese document | 686.2 | 838.2 | +22.1% | +13.6% |
+| RTX 6000D | MTP3 | English contract | 707.0 | 863.8 | +22.2% | +13.7% |
+| RTX 6000D | MTP3 | Dense formulas (256 tokens) | 732.6 | 958.0 | +30.8% | +21.8% |
+
+MTP1 is recommended for the measured text workloads and four-lane throughput.
+Direct MTP1/MTP3 comparisons show a 2.8% single-lane decode gain on the local
+dense-formula prefix and 0.4% on 6000D, with slower text/four-lane results.
+The complete classical-Chinese example has 18.8% MTP3 acceptance on 6000D and
+1.6% lower complete-request throughput than ordinary decoding.
+
+Six labelled OCR text fixtures retain CER 0%. Eleven complete pages have 10/11
+MTP/ordinary raw agreement, with three P/p edits (0.0414%). Mixed long-document
+batches also contain formula superscript/prime variants; full tables are in
+[OCR results](docs/xiaomi-ocr-performance.md#bf16-mtp1-and-mtp3).
+Eleven MTP1 pages match eager/Graph execution on both GPUs. Affected public Ops
+pass independent FP64/copy-state checks. Ordinary-decoding regression keeps
+all measured outputs identical with no material end-to-end slowdown.
+
 ## Shared ASR and forced-alignment CPU frontend
 
 Use native Transformers 5.17.0 for both speech frontends with one shared

@@ -146,6 +146,9 @@ int main() {
     }
 
     int failures = 0;
+    for (const int tokens : {1, 4, 16, 48, 1024}) {
+        failures += pack_case(1024, tokens);
+    }
     failures += pack_case(5120, 1);
     failures += pack_case(5120, 6);
     failures += pack_case(5120, 48);

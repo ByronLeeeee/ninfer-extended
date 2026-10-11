@@ -1,0 +1,4159 @@
+{
+  "weights": "bf16",
+  "kv": "bf16",
+  "proposal": {
+    "rows": 65536,
+    "format": "bf16",
+    "exact_original_rows": true,
+    "selection": "upstream frequency ranking; full-vocabulary target verification"
+  },
+  "recommended_draft_window": 1,
+  "methods": {
+    "speed": "4K context; two warmups; three alternating A-B-B-A/B-A-A-B cycles; six formal requests per engine/fixture; medians",
+    "full_quality": "16K context, complete pages, max_tokens=4096, two measured requests per engine/fixture",
+    "mixed_quality": "32K context, groups of 4/2/3 different pages, two repetitions, 18 formal requests per mode/GPU",
+    "decode": "(completion_tokens - 1) / decode_seconds",
+    "prefill": "prompt_tokens / (vision_seconds + language_prefill_seconds)",
+    "four_lane_throughput": "sum(completion_tokens) / wall time of the complete four-request burst"
+  },
+  "gpus": {
+    "RTX 5070 Ti": {
+      "prefill_chunk": 1024,
+      "transformers_mtp1": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 162.6651548624012,
+            "prefill_tps": 21238.440687274175,
+            "total_tps": 130.45132314664966,
+            "burst_ms": 866.233094499961,
+            "vision_ms": 45.69038500000033,
+            "language_ms": 38.78866800002356,
+            "prefill_ms": 85.09773000000109,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 707.4787803376754,
+            "prefill_tps": 23553.322740904776,
+            "total_tps": 350.25994461429707,
+            "burst_ms": 322.629087499962,
+            "vision_ms": 40.74529457092285,
+            "language_ms": 36.534769368408206,
+            "prefill_ms": 76.72483600000001,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 372,
+              "accepted_tokens": 300,
+              "rounds": 372,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [
+                300
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            334.9295218979954,
+            325.20713458514905,
+            336.5499637807757
+          ],
+          "decode_tps_gain_pct": 334.9295218979954,
+          "prefill_tps_gain_pct": 10.899491576223163,
+          "total_tps_gain_pct": 168.4985756875343
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 155.23096849601882,
+            "prefill_tps": 21002.65526788425,
+            "total_tps": 118.35657090472058,
+            "burst_ms": 963.2007725000165,
+            "vision_ms": 47.9058385000144,
+            "language_ms": 38.202745000006644,
+            "prefill_ms": 86.04448350004645,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 728.1454397905368,
+            "prefill_tps": 23812.151770689128,
+            "total_tps": 344.470024580082,
+            "burst_ms": 330.9584529999938,
+            "vision_ms": 40.685903549194336,
+            "language_ms": 34.91383640014649,
+            "prefill_ms": 75.8865575,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 354,
+              "accepted_tokens": 330,
+              "rounds": 354,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [
+                330
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            402.3085400801759,
+            369.4147343549165,
+            361.9991675248608
+          ],
+          "decode_tps_gain_pct": 369.0722778098311,
+          "prefill_tps_gain_pct": 13.376863386892612,
+          "total_tps_gain_pct": 191.04427573977895
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 159.64312855511676,
+            "prefill_tps": 21937.01194616733,
+            "total_tps": 140.36661548043577,
+            "burst_ms": 1823.806270499972,
+            "vision_ms": 63.23749649993715,
+            "language_ms": 43.18455799997878,
+            "prefill_ms": 108.04153499998392,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 748.5086646042009,
+            "prefill_tps": 21350.01288453958,
+            "total_tps": 451.90125125296925,
+            "burst_ms": 566.5111639999623,
+            "vision_ms": 61.76911926269531,
+            "language_ms": 49.2291292800293,
+            "prefill_ms": 110.9142985,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 774,
+              "accepted_tokens": 756,
+              "rounds": 774,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [
+                756
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            415.300983584481,
+            351.4328328042877,
+            367.9653623814698
+          ],
+          "decode_tps_gain_pct": 368.86369076999046,
+          "prefill_tps_gain_pct": -2.67583872894005,
+          "total_tps_gain_pct": 221.94354028287805
+        }
+      ],
+      "ordinary_mtp1": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 434.9756970679297,
+            "prefill_tps": 23078.55382214496,
+            "total_tps": 257.9114382255983,
+            "burst_ms": 438.15697900000214,
+            "vision_ms": 40.72118377685547,
+            "language_ms": 37.388178543823244,
+            "prefill_ms": 78.29804899999999,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 662.546935408691,
+            "prefill_tps": 22602.213694684935,
+            "total_tps": 325.4588348126629,
+            "burst_ms": 347.27541049999644,
+            "vision_ms": 40.350318908691406,
+            "language_ms": 39.1814754260254,
+            "prefill_ms": 79.94950750000001,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 372,
+              "accepted_tokens": 300,
+              "rounds": 372,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [
+                300
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            52.03919189726396,
+            52.734649320705444,
+            52.53322232508679
+          ],
+          "decode_tps_gain_pct": 52.318150157529764,
+          "prefill_tps_gain_pct": -2.0639946988487368,
+          "total_tps_gain_pct": 26.19015156977258
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 434.52663092131434,
+            "prefill_tps": 22821.071599496823,
+            "total_tps": 255.5623289780715,
+            "burst_ms": 446.08524950000117,
+            "vision_ms": 40.64273643493652,
+            "language_ms": 38.675623417358395,
+            "prefill_ms": 79.22823,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 701.0682975833735,
+            "prefill_tps": 22787.403995909866,
+            "total_tps": 330.127139802468,
+            "burst_ms": 345.3302375000007,
+            "vision_ms": 40.31195068359375,
+            "language_ms": 38.023253844726554,
+            "prefill_ms": 79.29826299999999,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 354,
+              "accepted_tokens": 330,
+              "rounds": 354,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [
+                330
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            61.27474419481267,
+            61.98059093721153,
+            60.932823596904704
+          ],
+          "decode_tps_gain_pct": 61.34069759934357,
+          "prefill_tps_gain_pct": -0.14752858313498152,
+          "total_tps_gain_pct": 29.176761349202817
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 432.08461018732646,
+            "prefill_tps": 21950.774073397035,
+            "total_tps": 310.46151176238834,
+            "burst_ms": 824.5825575000013,
+            "vision_ms": 60.33227348327637,
+            "language_ms": 47.52922054895019,
+            "prefill_ms": 107.8777465,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 721.0440972430322,
+            "prefill_tps": 21336.043847353914,
+            "total_tps": 440.3556851459149,
+            "burst_ms": 581.5536905000016,
+            "vision_ms": 61.39168167114258,
+            "language_ms": 49.51284784289551,
+            "prefill_ms": 110.986414,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 774,
+              "accepted_tokens": 756,
+              "rounds": 774,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [
+                756
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            67.13476462999435,
+            66.80278339822459,
+            67.38005725688959
+          ],
+          "decode_tps_gain_pct": 66.87567208895264,
+          "prefill_tps_gain_pct": -2.8004945246470125,
+          "total_tps_gain_pct": 41.8390584540286
+        }
+      ],
+      "ordinary_mtp3": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 450.7766012259463,
+            "prefill_tps": 24277.783496876265,
+            "total_tps": 276.25988804772715,
+            "burst_ms": 409.03539249998744,
+            "vision_ms": 40.44726371765137,
+            "language_ms": 33.986093782348625,
+            "prefill_ms": 74.4333575,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 674.0224070316681,
+            "prefill_tps": 23883.060314432714,
+            "total_tps": 343.2375500305349,
+            "burst_ms": 329.2676450000016,
+            "vision_ms": 40.34230422973633,
+            "language_ms": 35.28954176440429,
+            "prefill_ms": 75.66050200000001,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 936,
+              "accepted_tokens": 372,
+              "rounds": 312,
+              "acceptance_rate": 0.3974358974358974,
+              "tokens_per_round": 2.1923076923076925,
+              "accepted_per_position": [
+                258,
+                102,
+                12
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            49.12340650608351,
+            49.5247102885499,
+            48.740107335628146
+          ],
+          "decode_tps_gain_pct": 49.5247102885499,
+          "prefill_tps_gain_pct": -1.6258616957117944,
+          "total_tps_gain_pct": 24.24443970354342
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 446.902763750092,
+            "prefill_tps": 23204.703294543855,
+            "total_tps": 269.42246501951286,
+            "burst_ms": 423.1940945000048,
+            "vision_ms": 40.97995185852051,
+            "language_ms": 37.357154479248045,
+            "prefill_ms": 77.87270699999999,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 680.8379298459431,
+            "prefill_tps": 22910.454849330057,
+            "total_tps": 336.86184727850923,
+            "burst_ms": 338.4629945000057,
+            "vision_ms": 40.621856689453125,
+            "language_ms": 38.424583719848634,
+            "prefill_ms": 78.87282400000001,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 918,
+              "accepted_tokens": 372,
+              "rounds": 306,
+              "acceptance_rate": 0.40522875816993464,
+              "tokens_per_round": 2.215686274509804,
+              "accepted_per_position": [
+                276,
+                78,
+                18
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            48.24293967700739,
+            53.048608675127596,
+            53.81663664379366
+          ],
+          "decode_tps_gain_pct": 52.34587589766342,
+          "prefill_tps_gain_pct": -1.2680551932891304,
+          "total_tps_gain_pct": 25.031090950085442
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 443.5528626023564,
+            "prefill_tps": 21950.901563101623,
+            "total_tps": 319.4883750365972,
+            "burst_ms": 801.2827879999946,
+            "vision_ms": 61.48886299133301,
+            "language_ms": 46.08093852685546,
+            "prefill_ms": 107.8870985,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 761.6488292804793,
+            "prefill_tps": 21266.824880190732,
+            "total_tps": 457.62229930147714,
+            "burst_ms": 559.4739020000077,
+            "vision_ms": 60.70172691345215,
+            "language_ms": 50.265737565063475,
+            "prefill_ms": 111.3502705,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 1842,
+              "accepted_tokens": 912,
+              "rounds": 618,
+              "acceptance_rate": 0.495114006514658,
+              "tokens_per_round": 2.475728155339806,
+              "accepted_per_position": [
+                600,
+                234,
+                78
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            72.27338920517461,
+            71.88627617686922,
+            71.71371094110957
+          ],
+          "decode_tps_gain_pct": 71.7154579528201,
+          "prefill_tps_gain_pct": -3.1163944722015002,
+          "total_tps_gain_pct": 43.235978225829605
+        }
+      ],
+      "direct_mtp1_mtp3": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 719.1428519373003,
+            "prefill_tps": 24313.602061633195,
+            "total_tps": 346.55041106977933,
+            "burst_ms": 326.07313249998526,
+            "vision_ms": 40.36619186401367,
+            "language_ms": 34.090147150756835,
+            "prefill_ms": 74.321602,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 372,
+              "accepted_tokens": 300,
+              "rounds": 372,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 705.1993867906461,
+            "prefill_tps": 24593.882034402628,
+            "total_tps": 346.4534289956317,
+            "burst_ms": 326.2762239999972,
+            "vision_ms": 40.56465530395508,
+            "language_ms": 33.10286829797363,
+            "prefill_ms": 73.473716,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 936,
+              "accepted_tokens": 372,
+              "rounds": 312,
+              "acceptance_rate": 0.3974358974358974,
+              "tokens_per_round": 2.1923076923076925,
+              "accepted_per_position": [
+                258,
+                102,
+                12
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -2.8747249339242,
+            -2.293637290465378,
+            -1.9389006105103856
+          ],
+          "decode_tps_gain_pct": -1.9389006105103856,
+          "prefill_tps_gain_pct": 1.1527702561674902,
+          "total_tps_gain_pct": -0.027984983150997067
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 759.6117064753148,
+            "prefill_tps": 25186.468780132072,
+            "total_tps": 359.20225970898065,
+            "burst_ms": 317.37266350000937,
+            "vision_ms": 40.77646446228027,
+            "language_ms": 31.06442123425293,
+            "prefill_ms": 71.7453015,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 354,
+              "accepted_tokens": 330,
+              "rounds": 354,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 723.1150330509331,
+            "prefill_tps": 24801.8193102372,
+            "total_tps": 351.11139606434085,
+            "burst_ms": 324.6967070000011,
+            "vision_ms": 40.587934494018555,
+            "language_ms": 32.081435394287105,
+            "prefill_ms": 72.860579,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 918,
+              "accepted_tokens": 372,
+              "rounds": 306,
+              "acceptance_rate": 0.40522875816993464,
+              "tokens_per_round": 2.215686274509804,
+              "accepted_per_position": [
+                276,
+                78,
+                18
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -5.0017883586182315,
+            -4.6719125415695455,
+            -5.0516975873436065
+          ],
+          "decode_tps_gain_pct": -4.804648626826779,
+          "prefill_tps_gain_pct": -1.5272068238414538,
+          "total_tps_gain_pct": -2.2524534370120253
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 780.9054158437414,
+            "prefill_tps": 23482.99836721121,
+            "total_tps": 467.7856793727392,
+            "burst_ms": 547.2704155000088,
+            "vision_ms": 60.549631118774414,
+            "language_ms": 39.62203321545411,
+            "prefill_ms": 100.839697,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 774,
+              "accepted_tokens": 756,
+              "rounds": 774,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 803.0734987532145,
+            "prefill_tps": 23237.02788542598,
+            "total_tps": 478.2431920113378,
+            "burst_ms": 535.5394675000014,
+            "vision_ms": 60.691951751708984,
+            "language_ms": 40.75156498193358,
+            "prefill_ms": 101.90653599999999,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 1842,
+              "accepted_tokens": 912,
+              "rounds": 618,
+              "acceptance_rate": 0.495114006514658,
+              "tokens_per_round": 2.475728155339806,
+              "accepted_per_position": [
+                600,
+                234,
+                78
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            2.639859047484605,
+            2.2733284727333825,
+            7.153365367354869
+          ],
+          "decode_tps_gain_pct": 2.838766700768902,
+          "prefill_tps_gain_pct": -1.0474406970477523,
+          "total_tps_gain_pct": 2.235535010952283
+        }
+      ],
+      "ordinary_mtp1_four": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 386.3899050325574,
+            "prefill_tps": 24385.53481895524,
+            "total_tps": 620.5961698217188,
+            "burst_ms": 728.3477914999992,
+            "vision_ms": 40.75448036193848,
+            "language_ms": 33.17721664324951,
+            "prefill_ms": 74.148512,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 584.8234326841603,
+            "prefill_tps": 23908.628415533494,
+            "total_tps": 703.0301040597569,
+            "burst_ms": 643.0928154999975,
+            "vision_ms": 40.614824295043945,
+            "language_ms": 35.11489063781738,
+            "prefill_ms": 75.65582225,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 1488,
+              "accepted_tokens": 1200,
+              "rounds": 1488,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [
+                1200
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            44.86018033850445,
+            52.09514456964557,
+            44.75432690535879
+          ],
+          "decode_tps_gain_pct": 51.355774327200066,
+          "prefill_tps_gain_pct": -1.9556938445780436,
+          "total_tps_gain_pct": 13.283023364729951
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 396.3741329343259,
+            "prefill_tps": 23360.81338904091,
+            "total_tps": 599.9207543166319,
+            "burst_ms": 760.1007924999976,
+            "vision_ms": 40.74460029602051,
+            "language_ms": 36.50172974108887,
+            "prefill_ms": 77.378803,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 608.5978469739111,
+            "prefill_tps": 23151.837156585236,
+            "total_tps": 698.1183121303884,
+            "burst_ms": 653.3179309999966,
+            "vision_ms": 40.65532875061035,
+            "language_ms": 37.23091487402344,
+            "prefill_ms": 78.0532605,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 1416,
+              "accepted_tokens": 1320,
+              "rounds": 1416,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [
+                1320
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            52.59987220796975,
+            53.541262258591416,
+            53.39886094880262
+          ],
+          "decode_tps_gain_pct": 53.541262258591416,
+          "prefill_tps_gain_pct": -0.8945588878926269,
+          "total_tps_gain_pct": 16.368421513540234
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 389.944198675288,
+            "prefill_tps": 22346.41555511166,
+            "total_tps": 817.70235939983,
+            "burst_ms": 1252.312504999992,
+            "vision_ms": 60.80965518951416,
+            "language_ms": 45.048821517700205,
+            "prefill_ms": 105.96953875,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 614.208738272179,
+            "prefill_tps": 21670.38802373667,
+            "total_tps": 988.464097797985,
+            "burst_ms": 1036.1821604999973,
+            "vision_ms": 60.830416679382324,
+            "language_ms": 48.2172404451294,
+            "prefill_ms": 109.29349725,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 3096,
+              "accepted_tokens": 3024,
+              "rounds": 3096,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [
+                3024
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            57.61756629351884,
+            57.511956930955435,
+            57.60512431690359
+          ],
+          "decode_tps_gain_pct": 57.511956930955435,
+          "prefill_tps_gain_pct": -3.025216861772506,
+          "total_tps_gain_pct": 20.883116752101483
+        }
+      ],
+      "ordinary_mtp3_four": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 404.8748392036559,
+            "prefill_tps": 23500.26950369055,
+            "total_tps": 617.4965465541926,
+            "burst_ms": 731.9880005000243,
+            "vision_ms": 40.81515979766846,
+            "language_ms": 36.06026678692626,
+            "prefill_ms": 76.906343,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 528.7732748082288,
+            "prefill_tps": 23258.58071988669,
+            "total_tps": 674.4858189819216,
+            "burst_ms": 670.189018500011,
+            "vision_ms": 40.72979927062988,
+            "language_ms": 36.761783155090335,
+            "prefill_ms": 77.69528199999999,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 3708,
+              "accepted_tokens": 1500,
+              "rounds": 1236,
+              "acceptance_rate": 0.4045307443365696,
+              "tokens_per_round": 2.2135922330097086,
+              "accepted_per_position": [
+                1032,
+                420,
+                48
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            30.899739092624866,
+            30.64963669949632,
+            31.9551523891187
+          ],
+          "decode_tps_gain_pct": 30.60166342968298,
+          "prefill_tps_gain_pct": -1.028451115277229,
+          "total_tps_gain_pct": 9.229083586903508
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 403.3893377000754,
+            "prefill_tps": 23458.320564089467,
+            "total_tps": 618.6533465226314,
+            "burst_ms": 737.2701580000296,
+            "vision_ms": 40.86407947540283,
+            "language_ms": 36.12802783178711,
+            "prefill_ms": 77.03334175,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 538.1985595355602,
+            "prefill_tps": 22926.966492872038,
+            "total_tps": 660.1109122659086,
+            "burst_ms": 690.9337794999999,
+            "vision_ms": 40.723623275756836,
+            "language_ms": 37.788888485046385,
+            "prefill_ms": 78.8424645,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 3672,
+              "accepted_tokens": 1488,
+              "rounds": 1224,
+              "acceptance_rate": 0.40522875816993464,
+              "tokens_per_round": 2.215686274509804,
+              "accepted_per_position": [
+                1104,
+                312,
+                72
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            29.581796048076868,
+            33.702922898984134,
+            33.644387657264495
+          ],
+          "decode_tps_gain_pct": 33.41913363503848,
+          "prefill_tps_gain_pct": -2.265098517030406,
+          "total_tps_gain_pct": 6.70125943330051
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 398.29792700484643,
+            "prefill_tps": 22366.59912933648,
+            "total_tps": 816.7953074287087,
+            "burst_ms": 1253.7106314999846,
+            "vision_ms": 60.91254425048828,
+            "language_ms": 44.86485850372314,
+            "prefill_ms": 105.88961875000001,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 588.6698955869991,
+            "prefill_tps": 21404.94738890928,
+            "total_tps": 957.5626421084179,
+            "burst_ms": 1069.3821920000062,
+            "vision_ms": 60.95342445373535,
+            "language_ms": 49.90319943157959,
+            "prefill_ms": 110.68489,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 7368,
+              "accepted_tokens": 3648,
+              "rounds": 2472,
+              "acceptance_rate": 0.495114006514658,
+              "tokens_per_round": 2.475728155339806,
+              "accepted_per_position": [
+                2400,
+                930,
+                318
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            47.86199855729054,
+            46.78391137242481,
+            47.50600434204644
+          ],
+          "decode_tps_gain_pct": 47.79637444104405,
+          "prefill_tps_gain_pct": -4.299499154370212,
+          "total_tps_gain_pct": 17.2341017877353
+        }
+      ],
+      "direct_mtp1_mtp3_four": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 579.7091211284151,
+            "prefill_tps": 23593.554730701824,
+            "total_tps": 692.7833086295574,
+            "burst_ms": 652.4419860000137,
+            "vision_ms": 41.03763198852539,
+            "language_ms": 35.278419836547855,
+            "prefill_ms": 76.593428,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 1488,
+              "accepted_tokens": 1200,
+              "rounds": 1488,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 524.9841822291444,
+            "prefill_tps": 23767.649674133874,
+            "total_tps": 669.0513524931084,
+            "burst_ms": 675.5836055000088,
+            "vision_ms": 40.82052040100098,
+            "language_ms": 35.161491210693356,
+            "prefill_ms": 76.02773224999999,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 3708,
+              "accepted_tokens": 1500,
+              "rounds": 1236,
+              "acceptance_rate": 0.4045307443365696,
+              "tokens_per_round": 2.2135922330097086,
+              "accepted_per_position": [
+                1032,
+                420,
+                48
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -9.769938657819532,
+            -9.193715365482936,
+            -8.989032166035182
+          ],
+          "decode_tps_gain_pct": -9.440068631790288,
+          "prefill_tps_gain_pct": 0.7378919599830613,
+          "total_tps_gain_pct": -3.4255958307359946
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 617.5718120768004,
+            "prefill_tps": 23832.766422276083,
+            "total_tps": 716.022501142934,
+            "burst_ms": 636.8515989999963,
+            "vision_ms": 40.850279808044434,
+            "language_ms": 34.870111698242184,
+            "prefill_ms": 75.82526475,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 1416,
+              "accepted_tokens": 1320,
+              "rounds": 1416,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 542.494779588751,
+            "prefill_tps": 23959.08988345619,
+            "total_tps": 672.4891354338808,
+            "burst_ms": 678.1629709999919,
+            "vision_ms": 40.61939239501953,
+            "language_ms": 34.55325581726074,
+            "prefill_ms": 75.42677325,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 3672,
+              "accepted_tokens": 1488,
+              "rounds": 1224,
+              "acceptance_rate": 0.40522875816993464,
+              "tokens_per_round": 2.215686274509804,
+              "accepted_per_position": [
+                1104,
+                312,
+                72
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -13.188895857876803,
+            -13.403965010596664,
+            -12.156810110159766
+          ],
+          "decode_tps_gain_pct": -12.156810110159766,
+          "prefill_tps_gain_pct": 0.5300411162593166,
+          "total_tps_gain_pct": -6.079887942007966
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 619.8325632796812,
+            "prefill_tps": 22059.177012624186,
+            "total_tps": 1005.3278842108816,
+            "burst_ms": 1018.6757805000042,
+            "vision_ms": 61.10709571838379,
+            "language_ms": 46.0409461737671,
+            "prefill_ms": 107.38349274999999,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 3096,
+              "accepted_tokens": 3024,
+              "rounds": 3096,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 574.4127987345408,
+            "prefill_tps": 21405.259230673146,
+            "total_tps": 951.3677205704291,
+            "burst_ms": 1076.5736304999932,
+            "vision_ms": 61.23184013366699,
+            "language_ms": 49.28205502911377,
+            "prefill_ms": 110.6396705,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 7368,
+              "accepted_tokens": 3648,
+              "rounds": 2472,
+              "acceptance_rate": 0.495114006514658,
+              "tokens_per_round": 2.475728155339806,
+              "accepted_per_position": [
+                2400,
+                930,
+                318
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -6.21026701618953,
+            -6.2558890879022115,
+            -8.356335798636271
+          ],
+          "decode_tps_gain_pct": -7.3277474008163646,
+          "prefill_tps_gain_pct": -2.9643797752600287,
+          "total_tps_gain_pct": -5.367419375103455
+        }
+      ],
+      "full_page_quality": {
+        "mtp1": {
+          "context": 16384,
+          "output_cap": 4096,
+          "formal_requests": 44,
+          "full_pages": 11,
+          "output_exact_pages": 10,
+          "normalized_character_edits": 3,
+          "normalized_character_count": 7242,
+          "normalized_character_difference": 0.00041425020712510354,
+          "synthetic_text_accuracy": {
+            "baseline": {
+              "edits": 0,
+              "gold_characters": 1117,
+              "fixtures": 6,
+              "cer": 0.0,
+              "character_accuracy": 1.0
+            },
+            "optimized": {
+              "edits": 0,
+              "gold_characters": 1117,
+              "fixtures": 6,
+              "cer": 0.0,
+              "character_accuracy": 1.0
+            }
+          },
+          "rows": [
+            {
+              "id": "zh_legal",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_skew",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_blur",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_small",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "en_contract",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 325,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "mixed_numbers",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 180,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "formula",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 131,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "qianziwen",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 26,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "dense-equations",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 3696,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "handwrite-formula",
+              "output_exact": false,
+              "normalized_edits": 3,
+              "normalized_denominator": 1850,
+              "changes": [
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                },
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                },
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                }
+              ],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "receipt",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 422,
+              "changes": [],
+              "finish_reason": "stop"
+            }
+          ]
+        },
+        "mtp3": {
+          "context": 16384,
+          "output_cap": 4096,
+          "formal_requests": 44,
+          "full_pages": 11,
+          "output_exact_pages": 10,
+          "normalized_character_edits": 3,
+          "normalized_character_count": 7242,
+          "normalized_character_difference": 0.00041425020712510354,
+          "synthetic_text_accuracy": {
+            "baseline": {
+              "edits": 0,
+              "gold_characters": 1117,
+              "fixtures": 6,
+              "cer": 0.0,
+              "character_accuracy": 1.0
+            },
+            "optimized": {
+              "edits": 0,
+              "gold_characters": 1117,
+              "fixtures": 6,
+              "cer": 0.0,
+              "character_accuracy": 1.0
+            }
+          },
+          "rows": [
+            {
+              "id": "zh_legal",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_skew",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_blur",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_small",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "en_contract",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 325,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "mixed_numbers",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 180,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "formula",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 131,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "qianziwen",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 26,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "dense-equations",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 3696,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "handwrite-formula",
+              "output_exact": false,
+              "normalized_edits": 3,
+              "normalized_denominator": 1850,
+              "changes": [
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                },
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                },
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                }
+              ],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "receipt",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 422,
+              "changes": [],
+              "finish_reason": "stop"
+            }
+          ]
+        }
+      },
+      "mixed_page_quality": {
+        "max_concurrency": 4,
+        "context_per_request": 32768,
+        "batch_sizes": [
+          4,
+          2,
+          3
+        ],
+        "formal_requests": 54,
+        "fixtures": 9,
+        "stable_fixture_counts": {
+          "none": 9,
+          "mtp1": 8,
+          "mtp3": 9
+        },
+        "exact_variant_sets": {
+          "mtp1": 8,
+          "mtp3": 9
+        },
+        "request_agreement": {
+          "mtp1": {
+            "exact_requests": 16,
+            "total_requests": 18,
+            "raw_exact_rate": 0.8888888888888888,
+            "normalized_edits": 15,
+            "normalized_characters": 13872,
+            "character_difference_rate": 0.0010813148788927337
+          },
+          "mtp3": {
+            "exact_requests": 18,
+            "total_requests": 18,
+            "raw_exact_rate": 1.0,
+            "normalized_edits": 0,
+            "normalized_characters": 13872,
+            "character_difference_rate": 0.0
+          }
+        },
+        "rows": [
+          {
+            "fixture": "zh_legal",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "en_contract",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 325,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 325,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 325,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "dense-equations",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "dad154f8f32a4d8aa42f7cae2f06990bcd44ae10e0b528a3659763d2385d1ffb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 3696,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "dad154f8f32a4d8aa42f7cae2f06990bcd44ae10e0b528a3659763d2385d1ffb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 3696,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "dad154f8f32a4d8aa42f7cae2f06990bcd44ae10e0b528a3659763d2385d1ffb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 3696,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "handwrite-formula",
+            "stable": {
+              "none": true,
+              "mtp1": false,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": false,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "2650a74882eee16ac94ed2e9627951e502185deb88ec608fd0337c11d97c9f00",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 1850,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "e50271b86caa7324bb55529a95dcda4ab74f2c9ff9653052a69bb1c7841e0d8f",
+                  "count": 1,
+                  "normalized_changes": [
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    },
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    },
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    }
+                  ],
+                  "characters": 1850,
+                  "normalized_edits": 3
+                },
+                {
+                  "sha256": "ec18b976d2916c65ebaecc22e27421001244b9d8bd3dfa1ad0ff2fac915df357",
+                  "count": 1,
+                  "normalized_changes": [
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    },
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    },
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    },
+                    {
+                      "baseline": "^{\\prime}",
+                      "optimized": ""
+                    }
+                  ],
+                  "characters": 1841,
+                  "normalized_edits": 12
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "2650a74882eee16ac94ed2e9627951e502185deb88ec608fd0337c11d97c9f00",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 1850,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "mixed_numbers",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "35ed8ebd67a8ed611b08ae651dc35ed4385d5947cc61c4e308c675783c492672",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 180,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "35ed8ebd67a8ed611b08ae651dc35ed4385d5947cc61c4e308c675783c492672",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 180,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "35ed8ebd67a8ed611b08ae651dc35ed4385d5947cc61c4e308c675783c492672",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 180,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "receipt",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "95a9a79d52c0fa73087d082d1dc0a61670e741779e035a94df4087e32febfd37",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 422,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "95a9a79d52c0fa73087d082d1dc0a61670e741779e035a94df4087e32febfd37",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 422,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "95a9a79d52c0fa73087d082d1dc0a61670e741779e035a94df4087e32febfd37",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 422,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "qianziwen",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "a418da36ec135fcc505554cb7fed4eca76f8e84d0b268097b836e34dfb6d3263",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 26,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "a418da36ec135fcc505554cb7fed4eca76f8e84d0b268097b836e34dfb6d3263",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 26,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "a418da36ec135fcc505554cb7fed4eca76f8e84d0b268097b836e34dfb6d3263",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 26,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "zh_legal_skew",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "formula",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "7e9ac8b36170297ad51444ca2a47eefec1b3ba47d15dbcddf54a2c5245686399",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 131,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "7e9ac8b36170297ad51444ca2a47eefec1b3ba47d15dbcddf54a2c5245686399",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 131,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "7e9ac8b36170297ad51444ca2a47eefec1b3ba47d15dbcddf54a2c5245686399",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 131,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "graph_eager": {
+        "fixtures": 11,
+        "exact_pages": 11
+      },
+      "resident_memory": [
+        {
+          "backend": "none",
+          "lanes": 1,
+          "resident_delta_mib": 2071,
+          "peak_delta_mib": 2071,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "mtp1",
+          "lanes": 1,
+          "resident_delta_mib": 2249,
+          "peak_delta_mib": 2249,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "mtp3",
+          "lanes": 1,
+          "resident_delta_mib": 2249,
+          "peak_delta_mib": 2249,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "none",
+          "lanes": 4,
+          "resident_delta_mib": 2275,
+          "peak_delta_mib": 2275,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "mtp1",
+          "lanes": 4,
+          "resident_delta_mib": 2483,
+          "peak_delta_mib": 2483,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "mtp3",
+          "lanes": 4,
+          "resident_delta_mib": 2491,
+          "peak_delta_mib": 2491,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        }
+      ]
+    },
+    "RTX 6000D": {
+      "prefill_chunk": 2048,
+      "transformers_mtp1": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 233.82828835134376,
+            "prefill_tps": 36298.74267046084,
+            "total_tps": 196.1822385238333,
+            "burst_ms": 575.9980150032789,
+            "vision_ms": 29.506682534702122,
+            "language_ms": 20.274656475521624,
+            "prefill_ms": 49.781339010223746,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 872.5844288342646,
+            "prefill_tps": 40061.10697775226,
+            "total_tps": 515.5039233168729,
+            "burst_ms": 219.2030259175226,
+            "vision_ms": 24.935440063476562,
+            "language_ms": 20.170656436523437,
+            "prefill_ms": 45.10609649999999,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 372,
+              "accepted_tokens": 300,
+              "rounds": 372,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [
+                300
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            271.94097382618844,
+            275.36502238399294,
+            274.96851317959283
+          ],
+          "decode_tps_gain_pct": 273.1731669365616,
+          "prefill_tps_gain_pct": 10.364998979298413,
+          "total_tps_gain_pct": 162.7678872439039
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 233.4225008371016,
+            "prefill_tps": 36311.119666043276,
+            "total_tps": 197.7609229071122,
+            "burst_ms": 576.4537130016834,
+            "vision_ms": 29.484771424904466,
+            "language_ms": 20.269897067919374,
+            "prefill_ms": 49.76442258339375,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 926.611894344927,
+            "prefill_tps": 40211.739895281054,
+            "total_tps": 540.9828552189683,
+            "burst_ms": 210.72779409587383,
+            "vision_ms": 25.34278392791748,
+            "language_ms": 19.588449139404297,
+            "prefill_ms": 44.93713149999999,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 354,
+              "accepted_tokens": 330,
+              "rounds": 354,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [
+                330
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            292.41704040541765,
+            299.38131374687697,
+            298.84759430044465
+          ],
+          "decode_tps_gain_pct": 296.9676835017636,
+          "prefill_tps_gain_pct": 10.742219642666328,
+          "total_tps_gain_pct": 173.55396974611946
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 235.61694457079392,
+            "prefill_tps": 36366.425211873284,
+            "total_tps": 213.73166379128338,
+            "burst_ms": 1197.7749454090372,
+            "vision_ms": 40.38923000916839,
+            "language_ms": 24.74912500474602,
+            "prefill_ms": 65.11508545372635,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 950.4345126071864,
+            "prefill_tps": 36450.315658813284,
+            "total_tps": 679.0684285575666,
+            "burst_ms": 376.99077650904655,
+            "vision_ms": 38.13360023498535,
+            "language_ms": 26.844628895996088,
+            "prefill_ms": 64.965161,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 774,
+              "accepted_tokens": 756,
+              "rounds": 774,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [
+                756
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            302.5113465367307,
+            301.57951118157837,
+            305.90669306618895
+          ],
+          "decode_tps_gain_pct": 303.3812230009701,
+          "prefill_tps_gain_pct": 0.23068103738888013,
+          "total_tps_gain_pct": 217.7200871933983
+        }
+      ],
+      "ordinary_mtp1": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 583.2723878533299,
+            "prefill_tps": 40779.905658831696,
+            "total_tps": 400.8920243241239,
+            "burst_ms": 281.8763629766181,
+            "vision_ms": 25.183344841003418,
+            "language_ms": 19.034736667236327,
+            "prefill_ms": 44.3110645,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 872.8375888196026,
+            "prefill_tps": 40317.13995588635,
+            "total_tps": 513.909313801127,
+            "burst_ms": 219.88324250560254,
+            "vision_ms": 25.083359718322754,
+            "language_ms": 19.785936281677245,
+            "prefill_ms": 44.819652,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 372,
+              "accepted_tokens": 300,
+              "rounds": 372,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [
+                300
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            49.4253749657156,
+            48.909332479431654,
+            49.5862494708974
+          ],
+          "decode_tps_gain_pct": 49.64493553894875,
+          "prefill_tps_gain_pct": -1.1347885569350957,
+          "total_tps_gain_pct": 28.191453713139445
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 582.6260330388459,
+            "prefill_tps": 40659.645543387494,
+            "total_tps": 403.10202485174295,
+            "burst_ms": 282.8068209346384,
+            "vision_ms": 24.939680099487305,
+            "language_ms": 19.481336131530764,
+            "prefill_ms": 44.44213450000001,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 923.4058111961833,
+            "prefill_tps": 40219.13058988789,
+            "total_tps": 539.8143571504099,
+            "burst_ms": 211.1837149132043,
+            "vision_ms": 25.31152057647705,
+            "language_ms": 19.71014585894775,
+            "prefill_ms": 44.92887,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 354,
+              "accepted_tokens": 330,
+              "rounds": 354,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [
+                330
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            58.06344666736729,
+            58.15044365663906,
+            58.93537067853918
+          ],
+          "decode_tps_gain_pct": 58.490310908338074,
+          "prefill_tps_gain_pct": -1.0834205453894907,
+          "total_tps_gain_pct": 33.91506960277575
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 580.2142282720413,
+            "prefill_tps": 36886.02344082723,
+            "total_tps": 468.03821593192447,
+            "burst_ms": 546.9786280300468,
+            "vision_ms": 37.66007995605469,
+            "language_ms": 26.704104078125006,
+            "prefill_ms": 64.197758,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 956.4960118430167,
+            "prefill_tps": 36580.88745540999,
+            "total_tps": 683.2457369585879,
+            "burst_ms": 374.696925515309,
+            "vision_ms": 37.78452682495117,
+            "language_ms": 26.827174874023434,
+            "prefill_ms": 64.733259,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 774,
+              "accepted_tokens": 756,
+              "rounds": 774,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [
+                756
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            65.20966474332243,
+            63.410859482330004,
+            64.55403150141163
+          ],
+          "decode_tps_gain_pct": 64.85221582579852,
+          "prefill_tps_gain_pct": -0.8272401222830128,
+          "total_tps_gain_pct": 45.980758344306885
+        }
+      ],
+      "ordinary_mtp3": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 582.9170663152667,
+            "prefill_tps": 40492.32489067611,
+            "total_tps": 399.680970621456,
+            "burst_ms": 282.7262000646442,
+            "vision_ms": 25.333999633789062,
+            "language_ms": 19.333044866210937,
+            "prefill_ms": 44.625742,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 838.3411320585393,
+            "prefill_tps": 39880.861719480265,
+            "total_tps": 503.46763606128525,
+            "burst_ms": 224.44342414382845,
+            "vision_ms": 25.2335205078125,
+            "language_ms": 19.95203143231202,
+            "prefill_ms": 45.309959,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 936,
+              "accepted_tokens": 372,
+              "rounds": 312,
+              "acceptance_rate": 0.3974358974358974,
+              "tokens_per_round": 2.1923076923076925,
+              "accepted_per_position": [
+                258,
+                102,
+                12
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            43.37103946747642,
+            44.231409035284265,
+            43.77882618693623
+          ],
+          "decode_tps_gain_pct": 43.81825142946292,
+          "prefill_tps_gain_pct": -1.5100717798909091,
+          "total_tps_gain_pct": 25.96737725052394
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 583.4704523911487,
+            "prefill_tps": 40446.43197761873,
+            "total_tps": 403.59658993595485,
+            "burst_ms": 282.4602657929063,
+            "vision_ms": 25.292816162109375,
+            "language_ms": 19.26230259790039,
+            "prefill_ms": 44.6763985,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 863.7405479775904,
+            "prefill_tps": 39863.21083416651,
+            "total_tps": 516.2913969041123,
+            "burst_ms": 220.8055719966069,
+            "vision_ms": 25.302016258239746,
+            "language_ms": 19.94038428149414,
+            "prefill_ms": 45.330025500000005,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 918,
+              "accepted_tokens": 372,
+              "rounds": 306,
+              "acceptance_rate": 0.40522875816993464,
+              "tokens_per_round": 2.215686274509804,
+              "accepted_per_position": [
+                276,
+                78,
+                18
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            47.64263392663268,
+            48.36025139709734,
+            47.897234323942286
+          ],
+          "decode_tps_gain_pct": 48.03501093120537,
+          "prefill_tps_gain_pct": -1.4419594385357781,
+          "total_tps_gain_pct": 27.92263606242078
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 579.05659573633,
+            "prefill_tps": 36929.4432265841,
+            "total_tps": 467.0527829707564,
+            "burst_ms": 548.1212800368667,
+            "vision_ms": 37.7913932800293,
+            "language_ms": 26.36468527319336,
+            "prefill_ms": 64.122349,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 960.0490889668381,
+            "prefill_tps": 36238.16892326633,
+            "total_tps": 684.1670645077087,
+            "burst_ms": 374.1868990473449,
+            "vision_ms": 37.87595176696777,
+            "language_ms": 27.470068594726555,
+            "prefill_ms": 65.345467,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 1842,
+              "accepted_tokens": 912,
+              "rounds": 618,
+              "acceptance_rate": 0.495114006514658,
+              "tokens_per_round": 2.475728155339806,
+              "accepted_per_position": [
+                600,
+                234,
+                78
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            65.88501398834177,
+            65.33226168905702,
+            66.39872045037617
+          ],
+          "decode_tps_gain_pct": 65.79538097585038,
+          "prefill_tps_gain_pct": -1.8718784875157657,
+          "total_tps_gain_pct": 46.48602673041913
+        }
+      ],
+      "direct_mtp1_mtp3": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 873.1009493418151,
+            "prefill_tps": 40215.819568605206,
+            "total_tps": 518.0928966867687,
+            "burst_ms": 218.11071212869138,
+            "vision_ms": 25.17084789276123,
+            "language_ms": 19.741993522705076,
+            "prefill_ms": 44.9325685,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 372,
+              "accepted_tokens": 300,
+              "rounds": 372,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 839.4768497301952,
+            "prefill_tps": 39879.72492549944,
+            "total_tps": 501.76279583915857,
+            "burst_ms": 225.20653996616602,
+            "vision_ms": 25.354496002197266,
+            "language_ms": 19.976476497802736,
+            "prefill_ms": 45.3112855,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 936,
+              "accepted_tokens": 372,
+              "rounds": 312,
+              "acceptance_rate": 0.3974358974358974,
+              "tokens_per_round": 2.1923076923076925,
+              "accepted_per_position": [
+                258,
+                102,
+                12
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -4.725949579165101,
+            -3.367814712010486,
+            -3.5216890380983523
+          ],
+          "decode_tps_gain_pct": -3.8511124786850037,
+          "prefill_tps_gain_pct": -0.8357274493247968,
+          "total_tps_gain_pct": -3.1519638566832153
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 927.7437948165923,
+            "prefill_tps": 40288.227781686495,
+            "total_tps": 539.0474508708228,
+            "burst_ms": 211.48431207984686,
+            "vision_ms": 25.312591552734375,
+            "language_ms": 19.56336206451416,
+            "prefill_ms": 44.8518545,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 354,
+              "accepted_tokens": 330,
+              "rounds": 354,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 863.7820203548586,
+            "prefill_tps": 39908.88569308958,
+            "total_tps": 516.401452348016,
+            "burst_ms": 220.7585935248062,
+            "vision_ms": 25.28524875640869,
+            "language_ms": 20.037422743591314,
+            "prefill_ms": 45.278138,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 918,
+              "accepted_tokens": 372,
+              "rounds": 306,
+              "acceptance_rate": 0.40522875816993464,
+              "tokens_per_round": 2.215686274509804,
+              "accepted_per_position": [
+                276,
+                78,
+                18
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -6.592472782772651,
+            -7.20583661688069,
+            -6.4675280419950525
+          ],
+          "decode_tps_gain_pct": -6.894336003010237,
+          "prefill_tps_gain_pct": -0.941570551706794,
+          "total_tps_gain_pct": -4.201114110867699
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 955.0291675762771,
+            "prefill_tps": 36505.760990823794,
+            "total_tps": 681.7257588009356,
+            "burst_ms": 375.5191080272198,
+            "vision_ms": 37.95963096618652,
+            "language_ms": 26.941445068847663,
+            "prefill_ms": 64.8664985,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 774,
+              "accepted_tokens": 756,
+              "rounds": 774,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 958.749986410131,
+            "prefill_tps": 36216.047660292665,
+            "total_tps": 684.8203335607429,
+            "burst_ms": 373.8259804667905,
+            "vision_ms": 37.931087493896484,
+            "language_ms": 27.528044072998043,
+            "prefill_ms": 65.38539750000001,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 1842,
+              "accepted_tokens": 912,
+              "rounds": 618,
+              "acceptance_rate": 0.495114006514658,
+              "tokens_per_round": 2.475728155339806,
+              "accepted_per_position": [
+                600,
+                234,
+                78
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            0.30365139501444816,
+            0.20839624617776664,
+            1.1160032384780916
+          ],
+          "decode_tps_gain_pct": 0.38960263834628694,
+          "prefill_tps_gain_pct": -0.7936098924330115,
+          "total_tps_gain_pct": 0.45393249702787575
+        }
+      ],
+      "ordinary_mtp1_four": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 514.7617552177196,
+            "prefill_tps": 40645.93257172081,
+            "total_tps": 1007.4090674971537,
+            "burst_ms": 448.67607892956585,
+            "vision_ms": 25.34111213684082,
+            "language_ms": 18.99546845013428,
+            "prefill_ms": 44.45712175,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 730.4059369789311,
+            "prefill_tps": 40243.369186033204,
+            "total_tps": 1167.756072548571,
+            "burst_ms": 387.06714706495404,
+            "vision_ms": 25.55507183074951,
+            "language_ms": 19.248904463714602,
+            "prefill_ms": 44.90211775,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 1488,
+              "accepted_tokens": 1200,
+              "rounds": 1488,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [
+                1200
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            42.10764647350429,
+            41.86319287837576,
+            41.75322283421883
+          ],
+          "decode_tps_gain_pct": 41.892036379043795,
+          "prefill_tps_gain_pct": -0.9904149326067868,
+          "total_tps_gain_pct": 15.916772066563745
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 513.1939414285342,
+            "prefill_tps": 40553.630512443444,
+            "total_tps": 1016.6595473809107,
+            "burst_ms": 448.5291804885492,
+            "vision_ms": 25.46122407913208,
+            "language_ms": 19.06327078076172,
+            "prefill_ms": 44.55886975,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 773.618584574573,
+            "prefill_tps": 40195.680263698676,
+            "total_tps": 1210.3205303570476,
+            "burst_ms": 376.75993354059756,
+            "vision_ms": 25.444168090820312,
+            "language_ms": 19.30924423526001,
+            "prefill_ms": 44.95530625,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 1416,
+              "accepted_tokens": 1320,
+              "rounds": 1416,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [
+                1320
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            50.33082751586304,
+            50.97898556353404,
+            50.42117052654041
+          ],
+          "decode_tps_gain_pct": 50.745853004639315,
+          "prefill_tps_gain_pct": -0.8826589487097469,
+          "total_tps_gain_pct": 19.04875466669651
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 502.17482294618753,
+            "prefill_tps": 36891.43903507294,
+            "total_tps": 1249.17080143071,
+            "burst_ms": 819.7471649618819,
+            "vision_ms": 37.687599182128906,
+            "language_ms": 26.492974112487794,
+            "prefill_ms": 64.18834225,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 779.5234876565264,
+            "prefill_tps": 36636.18206178471,
+            "total_tps": 1592.8855637608403,
+            "burst_ms": 642.8611620794982,
+            "vision_ms": 37.671664237976074,
+            "language_ms": 26.93248059063721,
+            "prefill_ms": 64.6355795,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 3096,
+              "accepted_tokens": 3024,
+              "rounds": 3096,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [
+                3024
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            55.40258901784245,
+            54.896007183811136,
+            55.48083670220627
+          ],
+          "decode_tps_gain_pct": 55.22950415617696,
+          "prefill_tps_gain_pct": -0.6919138422482041,
+          "total_tps_gain_pct": 27.51543359294535
+        }
+      ],
+      "ordinary_mtp3_four": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 512.9697478823354,
+            "prefill_tps": 40592.90436159684,
+            "total_tps": 1007.1297283524913,
+            "burst_ms": 448.8004751037806,
+            "vision_ms": 25.433616161346436,
+            "language_ms": 18.947274187683103,
+            "prefill_ms": 44.515415250000004,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 645.7832536882019,
+            "prefill_tps": 39843.79709413663,
+            "total_tps": 1103.947188471595,
+            "burst_ms": 409.4398784218356,
+            "vision_ms": 25.455511569976807,
+            "language_ms": 19.765191615478514,
+            "prefill_ms": 45.35225575,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 3690,
+              "accepted_tokens": 1506,
+              "rounds": 1230,
+              "acceptance_rate": 0.408130081300813,
+              "tokens_per_round": 2.2243902439024392,
+              "accepted_per_position": [
+                1026,
+                432,
+                48
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            25.98414602482486,
+            26.36846356718092,
+            25.536789662676583
+          ],
+          "decode_tps_gain_pct": 25.891099105581404,
+          "prefill_tps_gain_pct": -1.8454143137609735,
+          "total_tps_gain_pct": 9.613206461245284
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 512.6596028425163,
+            "prefill_tps": 40646.02559830711,
+            "total_tps": 1017.7771117349674,
+            "burst_ms": 448.0358154978603,
+            "vision_ms": 25.42024040222168,
+            "language_ms": 18.994455011352535,
+            "prefill_ms": 44.45715475,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 652.9603680949294,
+            "prefill_tps": 39819.460321624545,
+            "total_tps": 1118.2354043222517,
+            "burst_ms": 407.7853384660557,
+            "vision_ms": 25.579040050506592,
+            "language_ms": 19.712812779876707,
+            "prefill_ms": 45.38018325,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 3672,
+              "accepted_tokens": 1488,
+              "rounds": 1224,
+              "acceptance_rate": 0.40522875816993464,
+              "tokens_per_round": 2.215686274509804,
+              "accepted_per_position": [
+                1104,
+                312,
+                72
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            27.022970308721206,
+            27.403950241165333,
+            27.838556839299766
+          ],
+          "decode_tps_gain_pct": 27.36723636395282,
+          "prefill_tps_gain_pct": -2.0335697390226337,
+          "total_tps_gain_pct": 9.870362717828929
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 501.3870472584118,
+            "prefill_tps": 36938.373363584426,
+            "total_tps": 1249.259561955923,
+            "burst_ms": 819.6871110703796,
+            "vision_ms": 37.75092124938965,
+            "language_ms": 26.430509141601565,
+            "prefill_ms": 64.10678225000001,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 0,
+              "accepted_tokens": 0,
+              "rounds": 0,
+              "acceptance_rate": null,
+              "tokens_per_round": null,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 713.0206663266588,
+            "prefill_tps": 36382.906657559164,
+            "total_tps": 1510.619170554447,
+            "burst_ms": 677.8711805818602,
+            "vision_ms": 37.731712341308594,
+            "language_ms": 27.385281444091802,
+            "prefill_ms": 65.08570950000001,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 7368,
+              "accepted_tokens": 3648,
+              "rounds": 2472,
+              "acceptance_rate": 0.495114006514658,
+              "tokens_per_round": 2.475728155339806,
+              "accepted_per_position": [
+                2400,
+                936,
+                312
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            42.316098760951995,
+            42.06826728692374,
+            42.152120838532944
+          ],
+          "decode_tps_gain_pct": 42.20963030965024,
+          "prefill_tps_gain_pct": -1.5037660174090584,
+          "total_tps_gain_pct": 20.921161346911955
+        }
+      ],
+      "direct_mtp1_mtp3_four": [
+        {
+          "fixture": "zh_legal",
+          "baseline": {
+            "decode_tps": 728.5919839903264,
+            "prefill_tps": 40265.158640608766,
+            "total_tps": 1168.5410948246345,
+            "burst_ms": 386.8071084143594,
+            "vision_ms": 25.587936401367188,
+            "language_ms": 19.366516025115967,
+            "prefill_ms": 44.87782775,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 1488,
+              "accepted_tokens": 1200,
+              "rounds": 1488,
+              "acceptance_rate": 0.8064516129032258,
+              "tokens_per_round": 1.8064516129032258,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 645.5008225615799,
+            "prefill_tps": 39739.78006446621,
+            "total_tps": 1102.1839196935211,
+            "burst_ms": 410.09624139405787,
+            "vision_ms": 25.791336059570312,
+            "language_ms": 19.638327993103026,
+            "prefill_ms": 45.4708155,
+            "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+            "completion_tokens": [
+              113,
+              113,
+              113,
+              113
+            ],
+            "speculative": {
+              "drafted_tokens": 3690,
+              "accepted_tokens": 1506,
+              "rounds": 1230,
+              "acceptance_rate": 0.408130081300813,
+              "tokens_per_round": 2.2243902439024392,
+              "accepted_per_position": [
+                1026,
+                432,
+                48
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -11.050094758633566,
+            -11.501713204504526,
+            -11.099634086054522
+          ],
+          "decode_tps_gain_pct": -11.404347461205354,
+          "prefill_tps_gain_pct": -1.304796985482859,
+          "total_tps_gain_pct": -5.678634275251715
+        },
+        {
+          "fixture": "en_contract",
+          "baseline": {
+            "decode_tps": 771.812065484869,
+            "prefill_tps": 40165.98072272728,
+            "total_tps": 1209.0014162415005,
+            "burst_ms": 377.17107799835503,
+            "vision_ms": 25.772319793701172,
+            "language_ms": 19.22584384292603,
+            "prefill_ms": 44.98852425,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 1416,
+              "accepted_tokens": 1320,
+              "rounds": 1416,
+              "acceptance_rate": 0.9322033898305084,
+              "tokens_per_round": 1.9322033898305084,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 652.1251816634895,
+            "prefill_tps": 39805.34547006451,
+            "total_tps": 1118.1788775186474,
+            "burst_ms": 407.8059525927529,
+            "vision_ms": 25.630367755889893,
+            "language_ms": 19.74492254940796,
+            "prefill_ms": 45.396018749999996,
+            "output_sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+            "completion_tokens": [
+              114,
+              114,
+              114,
+              114
+            ],
+            "speculative": {
+              "drafted_tokens": 3672,
+              "accepted_tokens": 1488,
+              "rounds": 1224,
+              "acceptance_rate": 0.40522875816993464,
+              "tokens_per_round": 2.215686274509804,
+              "accepted_per_position": [
+                1104,
+                312,
+                72
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -15.152232044635717,
+            -15.552276935664388,
+            -15.75819238275631
+          ],
+          "decode_tps_gain_pct": -15.507257423630671,
+          "prefill_tps_gain_pct": -0.8978624352590892,
+          "total_tps_gain_pct": -7.512194568406616
+        },
+        {
+          "fixture": "dense-equations",
+          "baseline": {
+            "decode_tps": 779.7141240137705,
+            "prefill_tps": 36630.77793291617,
+            "total_tps": 1594.7178443493185,
+            "burst_ms": 642.1248015249148,
+            "vision_ms": 37.66267108917236,
+            "language_ms": 26.99490856933594,
+            "prefill_ms": 64.64510325,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 3096,
+              "accepted_tokens": 3024,
+              "rounds": 3096,
+              "acceptance_rate": 0.9767441860465116,
+              "tokens_per_round": 1.9767441860465116,
+              "accepted_per_position": [],
+              "fallback_steps": 0
+            }
+          },
+          "optimized": {
+            "decode_tps": 713.3667480607558,
+            "prefill_tps": 36387.92071713485,
+            "total_tps": 1511.4968082053429,
+            "burst_ms": 677.47660249006,
+            "vision_ms": 37.791744232177734,
+            "language_ms": 27.30125375500488,
+            "prefill_ms": 65.07658775,
+            "output_sha256": "748af8ed58139b2f171f63481bbaca8f5dab10ec462c532fc795968508989517",
+            "completion_tokens": [
+              256,
+              256,
+              256,
+              256
+            ],
+            "speculative": {
+              "drafted_tokens": 7368,
+              "accepted_tokens": 3648,
+              "rounds": 2472,
+              "acceptance_rate": 0.495114006514658,
+              "tokens_per_round": 2.475728155339806,
+              "accepted_per_position": [
+                2400,
+                936,
+                312
+              ],
+              "fallback_steps": 0
+            }
+          },
+          "output_exact": true,
+          "paired_cycle_decode_gain_pct": [
+            -8.443075413134626,
+            -8.589783177984467,
+            -8.437962408426102
+          ],
+          "decode_tps_gain_pct": -8.509192524495424,
+          "prefill_tps_gain_pct": -0.6629867818425117,
+          "total_tps_gain_pct": -5.218542981685371
+        }
+      ],
+      "full_page_quality": {
+        "mtp1": {
+          "context": 16384,
+          "output_cap": 4096,
+          "formal_requests": 44,
+          "full_pages": 11,
+          "output_exact_pages": 10,
+          "normalized_character_edits": 3,
+          "normalized_character_count": 7242,
+          "normalized_character_difference": 0.00041425020712510354,
+          "synthetic_text_accuracy": {
+            "baseline": {
+              "edits": 0,
+              "gold_characters": 1117,
+              "fixtures": 6,
+              "cer": 0.0,
+              "character_accuracy": 1.0
+            },
+            "optimized": {
+              "edits": 0,
+              "gold_characters": 1117,
+              "fixtures": 6,
+              "cer": 0.0,
+              "character_accuracy": 1.0
+            }
+          },
+          "rows": [
+            {
+              "id": "zh_legal",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_skew",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_blur",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_small",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "en_contract",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 325,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "mixed_numbers",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 180,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "formula",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 131,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "qianziwen",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 26,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "dense-equations",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 3696,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "handwrite-formula",
+              "output_exact": false,
+              "normalized_edits": 3,
+              "normalized_denominator": 1850,
+              "changes": [
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                },
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                },
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                }
+              ],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "receipt",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 422,
+              "changes": [],
+              "finish_reason": "stop"
+            }
+          ]
+        },
+        "mtp3": {
+          "context": 16384,
+          "output_cap": 4096,
+          "formal_requests": 44,
+          "full_pages": 11,
+          "output_exact_pages": 10,
+          "normalized_character_edits": 3,
+          "normalized_character_count": 7242,
+          "normalized_character_difference": 0.00041425020712510354,
+          "synthetic_text_accuracy": {
+            "baseline": {
+              "edits": 0,
+              "gold_characters": 1117,
+              "fixtures": 6,
+              "cer": 0.0,
+              "character_accuracy": 1.0
+            },
+            "optimized": {
+              "edits": 0,
+              "gold_characters": 1117,
+              "fixtures": 6,
+              "cer": 0.0,
+              "character_accuracy": 1.0
+            }
+          },
+          "rows": [
+            {
+              "id": "zh_legal",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_skew",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_blur",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "zh_legal_small",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 153,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "en_contract",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 325,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "mixed_numbers",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 180,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "formula",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 131,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "qianziwen",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 26,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "dense-equations",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 3696,
+              "changes": [],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "handwrite-formula",
+              "output_exact": false,
+              "normalized_edits": 3,
+              "normalized_denominator": 1850,
+              "changes": [
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                },
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                },
+                {
+                  "baseline": "P",
+                  "optimized": "p"
+                }
+              ],
+              "finish_reason": "stop"
+            },
+            {
+              "id": "receipt",
+              "output_exact": true,
+              "normalized_edits": 0,
+              "normalized_denominator": 422,
+              "changes": [],
+              "finish_reason": "stop"
+            }
+          ]
+        }
+      },
+      "mixed_page_quality": {
+        "max_concurrency": 4,
+        "context_per_request": 32768,
+        "batch_sizes": [
+          4,
+          2,
+          3
+        ],
+        "formal_requests": 54,
+        "fixtures": 9,
+        "stable_fixture_counts": {
+          "none": 9,
+          "mtp1": 8,
+          "mtp3": 9
+        },
+        "exact_variant_sets": {
+          "mtp1": 7,
+          "mtp3": 9
+        },
+        "request_agreement": {
+          "mtp1": {
+            "exact_requests": 15,
+            "total_requests": 18,
+            "raw_exact_rate": 0.8333333333333334,
+            "normalized_edits": 30,
+            "normalized_characters": 13872,
+            "character_difference_rate": 0.0021626297577854673
+          },
+          "mtp3": {
+            "exact_requests": 18,
+            "total_requests": 18,
+            "raw_exact_rate": 1.0,
+            "normalized_edits": 0,
+            "normalized_characters": 13872,
+            "character_difference_rate": 0.0
+          }
+        },
+        "rows": [
+          {
+            "fixture": "zh_legal",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "en_contract",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 325,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 325,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "5947d6efa40f46a99e00b86c51dc957871c9989214a575b602c0c3fba56eaecb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 325,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "dense-equations",
+            "stable": {
+              "none": true,
+              "mtp1": false,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": false,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "dad154f8f32a4d8aa42f7cae2f06990bcd44ae10e0b528a3659763d2385d1ffb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 3696,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "dad154f8f32a4d8aa42f7cae2f06990bcd44ae10e0b528a3659763d2385d1ffb",
+                  "count": 1,
+                  "normalized_changes": [],
+                  "characters": 3696,
+                  "normalized_edits": 0
+                },
+                {
+                  "sha256": "4c5bb133c3daeef431d8f84160aacdfde63821e3025959093ae063d09327b4b8",
+                  "count": 1,
+                  "normalized_changes": [
+                    {
+                      "baseline": "^{",
+                      "optimized": ""
+                    },
+                    {
+                      "baseline": "}",
+                      "optimized": ""
+                    },
+                    {
+                      "baseline": "^{",
+                      "optimized": ""
+                    },
+                    {
+                      "baseline": "}",
+                      "optimized": ""
+                    }
+                  ],
+                  "characters": 3690,
+                  "normalized_edits": 6
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "dad154f8f32a4d8aa42f7cae2f06990bcd44ae10e0b528a3659763d2385d1ffb",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 3696,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "handwrite-formula",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": false,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "2650a74882eee16ac94ed2e9627951e502185deb88ec608fd0337c11d97c9f00",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 1850,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "ec18b976d2916c65ebaecc22e27421001244b9d8bd3dfa1ad0ff2fac915df357",
+                  "count": 2,
+                  "normalized_changes": [
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    },
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    },
+                    {
+                      "baseline": "p",
+                      "optimized": "P"
+                    },
+                    {
+                      "baseline": "^{\\prime}",
+                      "optimized": ""
+                    }
+                  ],
+                  "characters": 1841,
+                  "normalized_edits": 12
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "2650a74882eee16ac94ed2e9627951e502185deb88ec608fd0337c11d97c9f00",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 1850,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "mixed_numbers",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "35ed8ebd67a8ed611b08ae651dc35ed4385d5947cc61c4e308c675783c492672",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 180,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "35ed8ebd67a8ed611b08ae651dc35ed4385d5947cc61c4e308c675783c492672",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 180,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "35ed8ebd67a8ed611b08ae651dc35ed4385d5947cc61c4e308c675783c492672",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 180,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "receipt",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "95a9a79d52c0fa73087d082d1dc0a61670e741779e035a94df4087e32febfd37",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 422,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "95a9a79d52c0fa73087d082d1dc0a61670e741779e035a94df4087e32febfd37",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 422,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "95a9a79d52c0fa73087d082d1dc0a61670e741779e035a94df4087e32febfd37",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 422,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "qianziwen",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "a418da36ec135fcc505554cb7fed4eca76f8e84d0b268097b836e34dfb6d3263",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 26,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "a418da36ec135fcc505554cb7fed4eca76f8e84d0b268097b836e34dfb6d3263",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 26,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "a418da36ec135fcc505554cb7fed4eca76f8e84d0b268097b836e34dfb6d3263",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 26,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "zh_legal_skew",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 153,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          },
+          {
+            "fixture": "formula",
+            "stable": {
+              "none": true,
+              "mtp1": true,
+              "mtp3": true
+            },
+            "exact_variant_sets": {
+              "mtp1": true,
+              "mtp3": true
+            },
+            "variants": {
+              "none": [
+                {
+                  "sha256": "7e9ac8b36170297ad51444ca2a47eefec1b3ba47d15dbcddf54a2c5245686399",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 131,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp1": [
+                {
+                  "sha256": "7e9ac8b36170297ad51444ca2a47eefec1b3ba47d15dbcddf54a2c5245686399",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 131,
+                  "normalized_edits": 0
+                }
+              ],
+              "mtp3": [
+                {
+                  "sha256": "7e9ac8b36170297ad51444ca2a47eefec1b3ba47d15dbcddf54a2c5245686399",
+                  "count": 2,
+                  "normalized_changes": [],
+                  "characters": 131,
+                  "normalized_edits": 0
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "graph_eager": {
+        "fixtures": 11,
+        "exact_pages": 11
+      },
+      "resident_memory": [
+        {
+          "backend": "none",
+          "lanes": 1,
+          "resident_delta_mib": 2317,
+          "peak_delta_mib": 2317,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "mtp1",
+          "lanes": 1,
+          "resident_delta_mib": 2497,
+          "peak_delta_mib": 2497,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "mtp3",
+          "lanes": 1,
+          "resident_delta_mib": 2497,
+          "peak_delta_mib": 2497,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "none",
+          "lanes": 4,
+          "resident_delta_mib": 2523,
+          "peak_delta_mib": 2523,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "mtp1",
+          "lanes": 4,
+          "resident_delta_mib": 2731,
+          "peak_delta_mib": 2731,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        },
+        {
+          "backend": "mtp3",
+          "lanes": 4,
+          "resident_delta_mib": 2739,
+          "peak_delta_mib": 2739,
+          "output_sha256": "d72885526be39b31cb0e3bc313c18f274543586de788e145409dc631e300b71a"
+        }
+      ]
+    }
+  }
+}
