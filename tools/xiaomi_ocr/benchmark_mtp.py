@@ -28,6 +28,7 @@ p.add_argument('--optimized-chunk', type=int, default=1024)
 p.add_argument('--max-tokens', type=int, default=256)
 p.add_argument('--context', type=int, default=4096)
 p.add_argument('--transformers-baseline', action='store_true')
+p.add_argument('--custom-transformers-mtp', action='store_true', help='Use the custom compiled PyTorch MTP1 reference')
 p.add_argument('--allow-output-differences', action='store_true')
 p.add_argument('--artifact', required=True, type=Path)
 p.add_argument('--draft-window', type=int, choices=range(1, 6), default=1)
@@ -41,6 +42,8 @@ p.add_argument('--baseline-draft-window', type=int, choices=range(1, 6))
 p.add_argument('--baseline-lm-head-draft', action='store_true')
 p.add_argument('--nvidia-smi', default='/usr/lib/wsl/lib/nvidia-smi' if Path('/usr/lib/wsl/lib/nvidia-smi').exists() else 'nvidia-smi')
 a = p.parse_args()
+if a.custom_transformers_mtp and (not a.transformers_baseline or a.compare_none or a.draft_window != 1):
+    p.error('--custom-transformers-mtp requires --transformers-baseline, MTP1 and no --compare-none')
 root = Path(__file__).resolve().parent
 base = a.fixtures_root.resolve()
 out = (a.output_root or root) / f'{a.label}paired{a.lanes}'
@@ -73,7 +76,8 @@ if a.transformers_baseline:
     assert a.lanes == 1 and a.context == 4096
     if not a.hf_model:
         p.error('--transformers-baseline requires --hf-model')
-    targets['baseline'] = (19500, (a.hf_app_dir or root) / 'baseline_server.py')
+    baseline_module = 'mtp_baseline_server' if a.custom_transformers_mtp else 'baseline_server'
+    targets['baseline'] = (19500, (a.hf_app_dir or root) / f'{baseline_module}.py')
     targets['optimized'] = (19501, targets['optimized'][1])
 
 def opener():
@@ -114,8 +118,13 @@ try:
                 XIAOMI_REQUIRE_FUSED_LINEAR='1', XIAOMI_COMPILE_DECODE='1',
                 XIAOMI_COMPILE_PREFILL='1', XIAOMI_COMPILE_CACHE_FLOOR='4096',
                 TORCHINDUCTOR_COMPILE_THREADS='1')
+            if a.custom_transformers_mtp:
+                env['XIAOMI_TF_MTP_WINDOW'] = '1'
+                env.pop('XIAOMI_TF_PROPOSAL_ARTIFACT', None)
+                if a.lm_head_draft:
+                    env['XIAOMI_TF_PROPOSAL_ARTIFACT'] = str(a.artifact.resolve())
             command = [str(a.hf_python or sys.executable)] + [
-                '-m', 'uvicorn', 'baseline_server:app', '--app-dir', str(a.hf_app_dir or root),
+                '-m', 'uvicorn', f'{baseline_module}:app', '--app-dir', str(a.hf_app_dir or root),
                 '--host', '127.0.0.1', '--port', str(port)]
         processes[name] = subprocess.Popen(command, stdout=logs[name], stderr=logs[name], env=environment)
         for _ in range(300):
@@ -167,6 +176,7 @@ try:
             assert stage['prefill_compiler_stats']['compiled_language_calls'] > 0
             assert stage['prefill_compiler_stats']['actual_cache_max_length'] == 4096
             done = [{'event': 'request_done', 'result': result['usage'],
+                'speculative': result.get('speculative', {}),
                 'compiled_decode_active': stage['compiled_decode_active'],
                 'prefill_compiler_stats': stage['prefill_compiler_stats'], 'timings_seconds': {
                 'vision': stage['vision_ms'] / 1000, 'prefill': stage['text_prefill_ms'] / 1000,
@@ -231,7 +241,7 @@ try:
                 'tokens_per_round': 1 + accepted / rounds if rounds else None,
                 'accepted_per_position': [sum(s['accepted_per_position'][i] for s in specs)
                     for i in range(a.draft_window)] if name == 'optimized' and not a.compare_none else [],
-                'fallback_steps': sum(s['fallback_steps'] for s in specs)}
+                'fallback_steps': sum(s.get('fallback_steps', 0) for s in specs)}
         output_exact = values['baseline']['output_sha256'] == values['optimized']['output_sha256']
         assert output_exact or a.allow_output_differences
         pairs = []
@@ -249,7 +259,7 @@ try:
                      'top_p': 1, 'top_k': 0, 'min_p': 0, 'seed': 123},
         'method': f'Both real servers stay resident; two warmups per input and engine; {a.cycles} short cycles per fixture with alternating A-B-B-A/B-A-A-B order, {2 * a.cycles} measured bursts per engine',
         'binary_sha256': {name: hashlib.sha256(binary.read_bytes()).hexdigest() for name, (_, binary) in targets.items()},
-                'baseline_kind': 'compiled Transformers BF16' if a.transformers_baseline else
+                'baseline_kind': 'compiled Transformers + custom PyTorch MTP1' if a.custom_transformers_mtp else 'compiled Transformers BF16' if a.transformers_baseline else
             f'MTP{a.baseline_draft_window}' if a.baseline_draft_window else 'ordinary decode, same NInfer binary and artifact',
         'optimized_kind': 'ordinary decode regression' if a.compare_none else f'MTP{a.draft_window}',
         'proposal_head': 'optimized' if a.lm_head_draft else 'full BF16',

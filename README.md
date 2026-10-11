@@ -55,6 +55,8 @@ alignment uses the official eager Transformers reference. Tables report medians.
 
 ### Xiaomi-OCR-0
 
+Official compiled Transformers ordinary decoding versus NInfer MTP1.
+This comparison includes both engine and MTP gains.
 BF16 MTP1 with a 131,072-row BF16 proposal head and full-vocabulary target verification.
 One request, 4K context, BF16 KV and a 256-token output cap. Prefill includes vision
 encoding and language prefill. NInfer chunks are 1,024 on 5070 Ti and 2,048 on 6000D.
@@ -72,6 +74,28 @@ All three speed-test outputs match compiled Transformers on both GPUs. Six label
 text images, 1,117 scored characters, retain CER 0%. Both MTP1 and MTP3 match ordinary
 decoding on all 11 complete pages and all 36 mixed-batch requests across four cycles,
 with 0% character difference. [MTP3, four-lane throughput and draft acceptance](docs/xiaomi-ocr-performance.md#bf16-mtp1-and-mtp3).
+
+#### Both engines with MTP1
+
+**TF MTP1 is Transformers + a custom compiled PyTorch MTP adapter**;
+Transformers 5.17.0 does not support native MTP for this stateful Qwen3.5 model.
+Both engines use the same 131,072 BF16 proposal rows and full-vocabulary target verification.
+
+| GPU | Input | TF prefill tok/s | NInfer prefill tok/s | TF decode tok/s | NInfer decode tok/s | Decode speedup |
+| --- | --- | --- | --- | --- | --- | --- |
+| RTX 5070 Ti | Chinese document | 19,697 | 23,100 | 265.5 | 712.6 | 2.68× |
+| RTX 5070 Ti | English contract | 19,264 | 24,175 | 278.6 | 717.3 | 2.57× |
+| RTX 5070 Ti | Dense formulas (256 tokens) | 19,427 | 22,041 | 283.1 | 703.9 | 2.49× |
+| RTX 6000D | Chinese document | 32,722 | 40,214 | 366.2 | 905.5 | 2.47× |
+| RTX 6000D | English contract | 32,657 | 40,065 | 380.0 | 914.1 | 2.41× |
+| RTX 6000D | Dense formulas (256 tokens) | 32,918 | 36,506 | 380.0 | 914.9 | 2.41× |
+
+All three outputs match exactly on both GPUs. The Chinese and English pages
+finish naturally at 113 and 114 tokens; formulas compare the same 256-token
+prefix. Drafted counts, accepted counts and acceptance rates match between the
+two engines: **96.49%, 100.00%, 99.22%** for the three inputs.
+
+[Prefill/request latency, full-head controls and PyTorch MTP1/MTP3](docs/xiaomi-ocr-transformers-mtp.md).
 
 ### Qwen3-ASR-1.7B
 

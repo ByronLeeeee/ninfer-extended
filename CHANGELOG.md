@@ -1,5 +1,23 @@
 # Changelog
 
+## Matched Transformers MTP reference
+
+- Add a compiled PyTorch MTP benchmark using the checkpoint's original BF16 MTP
+  tensors and upstream Qwen3.5 modules, with convolution/recurrent-state recovery
+  and accepted-prefix replay on rejection. Keep it separate from native `use_mtp`,
+  which Transformers 5.17.0 does not support for this model.
+- Read the exact indexed proposal token IDs from the NInfer artifact for an equal-head
+  comparison. Both engines use 131,072 original BF16 rows and full target verification.
+- Publish paired prefill, decode, complete-request latency and acceptance results on
+  RTX 5070 Ti and RTX 6000D, plus full-head and ordinary-decoding controls.
+
+With MTP1 on both sides, NInfer decode is **2.49–2.68×** faster on 5070 Ti and
+**2.41–2.47×** on 6000D. All three tested outputs match exactly; drafted/accepted
+counts and acceptance also match. In the same PyTorch loop, MTP1 improves decode
+by **40.3–43.6%**, while MTP3 slows it by **11.6–19.4%**. MTP1 remains the default.
+This update publishes the reference and measurements; it does not change runtime
+operators or model weights. [Complete comparison](docs/xiaomi-ocr-transformers-mtp.md).
+
 ## BF16 MTP output consistency and 128K proposal head
 
 - Match short BF16 projection accumulation with single-token execution, including

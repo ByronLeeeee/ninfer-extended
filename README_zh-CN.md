@@ -43,6 +43,7 @@ Transformers，Embedding 取 eager 和编译版中更快的结果，ForcedAligne
 
 ### Xiaomi-OCR-0
 
+下表对比官方编译版 Transformers 普通解码与 NInfer MTP1，倍数包含引擎和 MTP 的共同收益。
 BF16 MTP1 使用 131,072 行 BF16 草稿输出头，目标模型验证完整词表。
 单路、4K 上下文、BF16 KV、256-token 输出上限；prefill 包含视觉编码与语言 prefill。
 NInfer chunk 在 5070 Ti 上为 1,024，在 6000D 上为 2,048。
@@ -59,6 +60,27 @@ NInfer chunk 在 5070 Ti 上为 1,024，在 6000D 上为 2,048。
 两张显卡的三项测速输出均与编译版 Transformers 相同。六张标注文字图片、1,117 个计分字符均为 CER 0%。
 MTP1 和 MTP3 的 11 张完整页面、四轮混合并发的 36 次输出均与普通解码完全一致，字符差异率 0%。
 MTP3、四路吞吐和草稿接受率见 [完整 OCR 实测](docs/xiaomi-ocr-performance.md#bf16-mtp1-and-mtp3)。
+
+#### 双方均启用 MTP1
+
+**TF MTP1 为 Transformers + 自定义编译版 PyTorch MTP 适配**；Transformers 5.17.0
+尚未原生支持这个有状态的 Qwen3.5 模型。双方使用相同的 131,072 行 BF16 草稿输出头，
+主模型验证完整词表。
+
+| 显卡 | 输入 | TF prefill tok/s | NInfer prefill tok/s | TF decode tok/s | NInfer decode tok/s | Decode 倍数 |
+| --- | --- | --- | --- | --- | --- | --- |
+| RTX 5070 Ti | 中文文书 | 19,697 | 23,100 | 265.5 | 712.6 | 2.68× |
+| RTX 5070 Ti | 英文合同 | 19,264 | 24,175 | 278.6 | 717.3 | 2.57× |
+| RTX 5070 Ti | 密集公式（256 token） | 19,427 | 22,041 | 283.1 | 703.9 | 2.49× |
+| RTX 6000D | 中文文书 | 32,722 | 40,214 | 366.2 | 905.5 | 2.47× |
+| RTX 6000D | 英文合同 | 32,657 | 40,065 | 380.0 | 914.1 | 2.41× |
+| RTX 6000D | 密集公式（256 token） | 32,918 | 36,506 | 380.0 | 914.9 | 2.41× |
+
+两张显卡的三项输出均逐字一致。中文、英文页自然结束，分别输出 113、114 token；
+公式页比较相同的 256-token 前缀。两边草稿数、接受数、接受率也一致，三项接受率分别为
+**96.49%、100.00%、99.22%**。
+
+[Prefill、请求耗时、完整输出头与 PyTorch MTP1/MTP3](docs/xiaomi-ocr-transformers-mtp.zh-CN.md)。
 
 ### Qwen3-ASR-1.7B
 

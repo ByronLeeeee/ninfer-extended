@@ -1,5 +1,7 @@
 # Xiaomi-OCR-0 test results
 
+Current matched reference: [Transformers and NInfer with MTP1](xiaomi-ocr-transformers-mtp.md). Both use the same 128K BF16 proposal head; NInfer decode is 2.49–2.68× faster on 5070 Ti and 2.41–2.47× on 6000D, with identical tested outputs and draft acceptance.
+
 ## Fused vision projection and resource-aware prefill
 
 New BF16 `linear_bias_add` and `linear_bias_gelu` Ops fuse vision projection,
