@@ -17,8 +17,8 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCUDNN_ROOT=/path/to/cudnn -DCUBLAS_ROOT=/path/to/cublas
 cmake --build build --target ninfer-serve -j
 pip install modelscope-hub
-ms-hub download ByronLeeee/Xiaomi-OCR-0-Ninfer xiaomi-ocr-0-bf16.ninfer --local-dir models
-./build/apps/ninfer-serve models/xiaomi-ocr-0-bf16.ninfer \
+ms-hub download ByronLeeee/Xiaomi-OCR-0-Ninfer xiaomi-ocr-0-bf16-MTP.ninfer --local-dir models
+./build/apps/ninfer-serve models/xiaomi-ocr-0-bf16-MTP.ninfer \
   --host 127.0.0.1 --port 8080 --model-id ocr --vision \
   --max-context 32768 --kv-capacity 131072 --max-concurrency 4 \
   --kv-dtype bf16 --prefill-chunk 1024 --no-thinking --greedy \
@@ -168,7 +168,7 @@ GDN 接受前缀状态恢复、MTP packing 和 BF16 草稿投影均通过独立�
 
 ## 模型文件与许可证
 
-`xiaomi-ocr-0-bf16.ninfer` · **1,901,499,904 bytes** · BF16 · Apache-2.0
+`xiaomi-ocr-0-bf16-MTP.ninfer` · **1,901,499,904 bytes** · BF16 · Apache-2.0
 
 SHA256：`c0d0e1ec96e45661657fb9ac31753a46dac5545f35a4ebc993345c5f0e9e2472`
 

@@ -386,7 +386,7 @@ original output head, selected with upstream token-frequency ranking.
 
 ## Artifact and license
 
-`xiaomi-ocr-0-bf16.ninfer` · **1,901,499,904 bytes** · BF16 · Apache-2.0
+`xiaomi-ocr-0-bf16-MTP.ninfer` · **1,901,499,904 bytes** · BF16 · Apache-2.0
 
 SHA256: `c0d0e1ec96e45661657fb9ac31753a46dac5545f35a4ebc993345c5f0e9e2472`
 

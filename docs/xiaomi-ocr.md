@@ -55,8 +55,8 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCUDNN_ROOT=/path/to/cudnn -DCUBLAS_ROOT=/path/to/cublas
 cmake --build build -j
 
-hf download ByronLeeee/Xiaomi-OCR-0-Ninfer xiaomi-ocr-0-bf16.ninfer --local-dir models
-./build/apps/ninfer-serve models/xiaomi-ocr-0-bf16.ninfer \
+hf download ByronLeeee/Xiaomi-OCR-0-Ninfer xiaomi-ocr-0-bf16-MTP.ninfer --local-dir models
+./build/apps/ninfer-serve models/xiaomi-ocr-0-bf16-MTP.ninfer \
   --host 127.0.0.1 --port 8080 --model-id ocr --vision \
   --max-context 32768 --kv-capacity 131072 --max-concurrency 4 \
   --kv-dtype bf16 --prefill-chunk 1024 --no-thinking --greedy \
@@ -76,7 +76,7 @@ FP8 KV is available to reduce cache memory at longer contexts.
 hf download SeerRay-Lab/Xiaomi-OCR-0 --revision e4d1c4a6804bd9ef342b93d705a73af003e2ef4e \
   --local-dir models/Xiaomi-OCR-0
 python tools/xiaomi_ocr/convert.py --model models/Xiaomi-OCR-0 \
-  --mtp --draft-head-rows 65536 --out models/xiaomi-ocr-0-bf16.ninfer
+  --mtp --draft-head-rows 65536 --out models/xiaomi-ocr-0-bf16-MTP.ninfer
 ```
 
 The converter also requires upstream conversion dependencies described in
@@ -122,7 +122,7 @@ To reproduce ordinary/MTP and MTP1/MTP3 comparisons with your own images:
 
 ```bash
 python tools/xiaomi_ocr/benchmark_mtp.py \
-  --fixtures-root /path/to/ocr-fixtures --artifact models/xiaomi-ocr-0-bf16.ninfer \
+  --fixtures-root /path/to/ocr-fixtures --artifact models/xiaomi-ocr-0-bf16-MTP.ninfer \
   --optimized-binary build/apps/ninfer-serve --output-root results \
   --lanes 1 --cycles 3 --draft-window 1 --lm-head-draft --label mtp1-
 ```
