@@ -336,7 +336,7 @@ public:
         linear(r.audio_projected.p,t,"model.multi_modal_projector.linear_2",r.features_out.p,execution);
     }
 
-    void decoder(int tokens,int lane,bool decoding,const SpeechRunOptions& execution,bool packed_prefill=false,bool verifying=false){auto& r=*run;int qw=query_heads*head_dim,kw=kv_heads*head_dim;
+    void decoder(int tokens,int lane,bool decoding,const SpeechRunOptions& execution,bool packed_prefill=false,bool verifying=false,bool cache_only=false,int* decode_output=nullptr){auto& r=*run;int qw=query_heads*head_dim,kw=kv_heads*head_dim;
         auto* positions=static_cast<int*>(verifying?r.verify_positions.p:decoding?r.decode_positions.p:r.prefill_positions.p);
         for(int i=0;i<layers;++i){std::string prefix="model.language_model.layers."+std::to_string(i);
             norm(r.hidden.p,prefix+".input_layernorm",r.norm.p,tokens,hidden_size,true);
@@ -373,6 +373,9 @@ public:
                     if(!decoding){ck+=static_cast<std::size_t>(lane)*r.capacity*kw;cv+=static_cast<std::size_t>(lane)*r.capacity*kw;}
                     ops::append_contiguous_kv(r.key.p,r.value.p,ck,cv,tokens,kw,r.capacity,positions,decoding,device.stream);
                 }
+                // Draft prefill commits only layer KV. Once the last layer has
+                // stored it, its attention/FFN and vocabulary head are unused.
+                if(cache_only&&i+1==layers)return;
                 if(verifying){
                     ops::dense_bf16_verify_attention(r.query.p,ck,cv,r.attention.p,tokens,r.capacity,positions,workspace,device.stream);
                 }
@@ -394,6 +397,14 @@ public:
             ops::bf16_argmax_valid(r.logits.p,static_cast<float*>(r.arg_values.p),static_cast<int*>(r.arg_indices.p),
                 static_cast<int*>(r.timestamp_output.p),rows,classify_width,5120,device.stream);
         }
+        else if(verifying&&decode_output){
+            // A paired draft catch-up needs both cache rows, but only the last
+            // row's next-token prediction. Keep the head single-column.
+            auto* last=static_cast<std::uint16_t*>(r.hidden.p)+static_cast<std::size_t>(tokens-1)*hidden_size;
+            norm(last,"model.language_model.norm",r.norm.p,1,hidden_size,true);
+            linear(r.norm.p,1,"model.language_model.embed_tokens",r.logits.p,execution);
+            ops::bf16_argmax(r.logits.p,static_cast<float*>(r.arg_values.p),static_cast<int*>(r.arg_indices.p),decode_output,1,vocab,device.stream);
+        }
         else if(verifying){
             norm(r.hidden.p,"model.language_model.norm",r.norm.p,tokens,hidden_size,true);
             linear(r.norm.p,tokens,"model.language_model.embed_tokens",r.verify_logits.p,execution);
@@ -407,14 +418,19 @@ public:
             ops::bf16_argmax(r.logits.p,static_cast<float*>(r.arg_values.p),static_cast<int*>(r.arg_indices.p),static_cast<int*>(r.decode_ids.p),r.batch,vocab,device.stream);
         }
         else if(decoding){norm(r.hidden.p,"model.language_model.norm",r.norm.p,r.batch,hidden_size,true);linear(r.norm.p,r.batch,"model.language_model.embed_tokens",r.logits.p,execution);
-            ops::bf16_argmax(r.logits.p,static_cast<float*>(r.arg_values.p),static_cast<int*>(r.arg_indices.p),static_cast<int*>(r.decode_ids.p),r.batch,vocab,device.stream);ops::advance_positions(positions,r.batch,device.stream);}
+            ops::bf16_argmax(r.logits.p,static_cast<float*>(r.arg_values.p),static_cast<int*>(r.arg_indices.p),decode_output?decode_output:static_cast<int*>(r.decode_ids.p),r.batch,vocab,device.stream);ops::advance_positions(positions,r.batch,device.stream);}
         else{auto* last=static_cast<std::uint16_t*>(r.hidden.p)+static_cast<std::size_t>(tokens-1)*hidden_size;
             norm(last,"model.language_model.norm",r.norm.p,1,hidden_size,true);linear(r.norm.p,1,"model.language_model.embed_tokens",r.logits.p,execution);
             ops::bf16_argmax(r.logits.p,static_cast<float*>(r.arg_values.p),static_cast<int*>(r.arg_indices.p),static_cast<int*>(r.decode_ids.p)+lane,1,vocab,device.stream);}
     }
-    void decode_step(const SpeechRunOptions& execution){auto& r=*run;
-        ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,static_cast<int*>(r.decode_ids.p),static_cast<int*>(r.empty_audio_rows.p),r.hidden.p,r.batch,hidden_size,device.stream);
-        decoder(r.batch,0,true,execution);
+    void decode_step(const SpeechRunOptions& execution,const int* input_ids=nullptr,int* output_ids=nullptr){auto& r=*run;
+        ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,input_ids?input_ids:static_cast<int*>(r.decode_ids.p),static_cast<int*>(r.empty_audio_rows.p),r.hidden.p,r.batch,hidden_size,device.stream);
+        decoder(r.batch,0,true,execution,false,false,false,output_ids);
+    }
+    void paired_draft_step(const SpeechRunOptions& execution,int* output_id){auto& r=*run;
+        ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,
+            static_cast<int*>(r.verify_ids.p),static_cast<int*>(r.verify_empty_rows.p),r.hidden.p,2,hidden_size,device.stream);
+        decoder(2,0,false,execution,false,true,false,output_id);
     }
     cudaGraphExec_t captured(std::map<unsigned,cudaGraphExec_t>& cache,unsigned key,const std::function<void()>& enqueue){
         if(auto found=cache.find(key);found!=cache.end())return found->second;
@@ -424,7 +440,8 @@ public:
         CUDA_CHECK(cudaStreamEndCapture(device.stream,&graph));cudaGraphExec_t exec=nullptr;
         auto status=cudaGraphInstantiate(&exec,graph,0);cudaGraphDestroy(graph);CUDA_CHECK(status);cache.emplace(key,exec);return exec;
     }
-    SpeechResult initialize(const std::vector<SpeechFeatures>& samples,const SpeechRunOptions& execution){
+    SpeechResult initialize(const std::vector<SpeechFeatures>& samples,const SpeechRunOptions& execution,bool cache_only=false){
+        require(!cache_only||samples.size()==1,"ASR draft cache prefill requires one lane");
         require(execution.max_new_tokens>0&&std::all_of(samples.begin(),samples.end(),[&](const auto& sample){return sample.prompt_tokens.size()+static_cast<std::uint64_t>(execution.max_new_tokens)<=options.max_context;}),"ASR output budget exceeds context");
         prepare(samples);auto& r=*run;
         require(execution.max_new_tokens>0&&static_cast<std::uint64_t>(r.max_prompt)+execution.max_new_tokens<=static_cast<std::uint64_t>(r.capacity),"ASR output budget exceeds context");
@@ -444,11 +461,12 @@ public:
         }else for(int lane=0;lane<r.batch;++lane){const auto& sample=samples[lane];int tokens=sample.prompt_tokens.size(),audio_row=r.audio_offsets[lane];
             std::vector<int> rows(tokens,-1);for(int t=0;t<tokens;++t)if(sample.prompt_tokens[t]==sample.audio_token_id)rows[t]=audio_row++;
             r.prompt_ids.copy_from_host(sample.prompt_tokens.data(),tokens*4);r.audio_rows.copy_from_host(rows.data(),tokens*4);
-            auto prefill=[&]{ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,static_cast<int*>(r.prompt_ids.p),static_cast<int*>(r.audio_rows.p),r.hidden.p,tokens,hidden_size,device.stream);decoder(tokens,lane,false,execution);};
-            cudaGraphExec_t prefill_exec=nullptr;if(execution.prefill_graph)prefill_exec=captured(r.prefill_graphs,static_cast<unsigned>(execution.linear)*64+execution.causal_tensorcore_prefill*32+execution.fused_qk_norm_rope*16+execution.fused_projection_residual*8+lane,prefill);
+            auto prefill=[&]{ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,static_cast<int*>(r.prompt_ids.p),static_cast<int*>(r.audio_rows.p),r.hidden.p,tokens,hidden_size,device.stream);decoder(tokens,lane,false,execution,false,false,cache_only);};
+            cudaGraphExec_t prefill_exec=nullptr;if(execution.prefill_graph)prefill_exec=captured(r.prefill_graphs,static_cast<unsigned>(execution.linear)*64+execution.causal_tensorcore_prefill*32+execution.fused_qk_norm_rope*16+execution.fused_projection_residual*8+cache_only*128+lane,prefill);
             timer.start();if(prefill_exec)CUDA_CHECK(cudaGraphLaunch(prefill_exec,device.stream));else prefill();result.language_prefill_ms+=timer.stop_ms();result.prompt_tokens+=tokens;
         }
         r.decode_positions.copy_from_host(r.prompt_lengths.data(),r.batch*4);
+        if(cache_only)return result;
         std::vector<int> first(r.batch);r.decode_ids.copy_to_host(first.data(),r.batch*4);
         for(int lane=0;lane<r.batch;++lane)result.token_ids[lane].push_back(first[lane]);
         return result;
@@ -472,6 +490,7 @@ public:
         auto& r=*run;const bool lookup=execution.draft_source==SpeechDraftSource::NGram;
         int cursor=r.prompt_lengths[0];CudaEventTimer timer(device);
         bool single_state_valid=true;
+        bool pending_catchup=false;int catchup_token=0;
         const unsigned backend=static_cast<unsigned>(execution.linear)*64+execution.fused_qk_norm_rope*32+execution.fused_projection_residual*16;
         while(result.token_ids[0].size()<execution.max_new_tokens&&!eos(result.token_ids[0].back())){
             int remaining=execution.max_new_tokens-result.token_ids[0].size();
@@ -491,13 +510,22 @@ public:
             if(lookup){r.verify_ids.copy_from_host(candidates.data(),k*4,4);}
             else{
             auto& d=*draft->run;
-            auto reset_draft=[&]{d.decode_ids.copy_from_host(&current,4);d.decode_positions.copy_from_host(&cursor,4);};reset_draft();
-            auto propose=[&]{for(int j=0;j<k;++j){draft->decode_step(execution);
-                CUDA_CHECK(cudaMemcpyAsync(static_cast<int*>(r.verify_ids.p)+j+1,d.decode_ids.p,4,cudaMemcpyDeviceToDevice,device.stream));}};
+            const bool paired=pending_catchup;
+            if(paired){int ids[]{catchup_token,current},positions[]{cursor-1,cursor};
+                d.verify_ids.copy_from_host(ids,8);d.verify_positions.copy_from_host(positions,8);}
+            int proposal_position=cursor+(paired?1:0);
+            auto reset_draft=[&]{d.decode_positions.copy_from_host(&proposal_position,4);};reset_draft();
+            // Each step reads the previous slot and writes the next directly.
+            // The unrolled graph needs no inter-step token copies.
+            auto propose=[&]{if(paired)draft->paired_draft_step(execution,static_cast<int*>(r.verify_ids.p)+1);
+                for(int j=paired?1:0;j<k;++j)draft->decode_step(execution,
+                static_cast<int*>(r.verify_ids.p)+j,static_cast<int*>(r.verify_ids.p)+j+1);};
+            const unsigned proposal_key=backend+k+(paired?8:0);
             cudaGraphExec_t proposal_exec=nullptr;
-            if(execution.decode_graph){bool warming=!r.proposal_graphs.contains(backend+k);
-                proposal_exec=captured(r.proposal_graphs,backend+k,propose);if(warming)reset_draft();}
+            if(execution.decode_graph){bool warming=!r.proposal_graphs.contains(proposal_key);
+                proposal_exec=captured(r.proposal_graphs,proposal_key,propose);if(warming)reset_draft();}
             timer.start();if(proposal_exec)CUDA_CHECK(cudaGraphLaunch(proposal_exec,device.stream));else propose();result.draft_decode_ms+=timer.stop_ms();
+            pending_catchup=false;
             }
             auto verify=[&]{ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,
                 static_cast<int*>(r.verify_ids.p),static_cast<int*>(r.verify_empty_rows.p),r.hidden.p,rows,hidden_size,device.stream);
@@ -515,17 +543,10 @@ public:
             if(accepted==k){
                 ++result.fully_accepted_blocks;
                 if(eos(result.token_ids[0].back())||result.token_ids[0].size()==execution.max_new_tokens)break;
-                if(!lookup){auto& d=*draft->run;
-                // The draft has not consumed the last accepted proposal. Catch up once;
-                // the target's bonus prediction becomes the next common input.
-                int last=proposals[k],last_position=cursor+k;
-                d.decode_ids.copy_from_host(&last,4);d.decode_positions.copy_from_host(&last_position,4);
-                auto repair=[&]{draft->decode_step(execution);};
-                cudaGraphExec_t repair_exec=nullptr;if(execution.decode_graph){bool warming=!d.graphs.contains(backend);
-                    repair_exec=captured(d.graphs,backend,repair);
-                    if(warming){d.decode_ids.copy_from_host(&last,4);d.decode_positions.copy_from_host(&last_position,4);}}
-                timer.start();if(repair_exec)CUDA_CHECK(cudaGraphLaunch(repair_exec,device.stream));else repair();result.draft_repair_ms+=timer.stop_ms();
-                }
+                // Consume the last accepted proposal together with the target's
+                // bonus input in the next two-row draft forward. They share
+                // projections while causal positions preserve the KV frontier.
+                if(!lookup){pending_catchup=true;catchup_token=proposals[k];}
             }
             // KV rows beyond this frontier are speculative and are masked until overwritten.
             cursor+=accepted+1;
@@ -540,7 +561,7 @@ public:
         const bool lookup=execution.draft_source==SpeechDraftSource::NGram;
         require(execution.draft_tokens==0||(samples.size()==1&&(lookup?!draft:bool(draft))),"ASR draft requires one lane and either a resident external model or standalone ngram mode");
         auto result=initialize(samples,execution);auto& r=*run;CudaEventTimer timer(device);
-        if(execution.draft_tokens&&!lookup){auto initialized=draft->initialize(samples,execution);
+        if(execution.draft_tokens&&!lookup){auto initialized=draft->initialize(samples,execution,true);
             result.draft_audio_ms=initialized.audio_ms;result.draft_language_prefill_ms=initialized.language_prefill_ms;
         }
         result.weight_bytes+=draft?draft->model.weight_bytes:0;

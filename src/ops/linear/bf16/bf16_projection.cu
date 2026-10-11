@@ -245,8 +245,8 @@ void projection(const Tensor& x, const Weight& w, Output output, cudaStream_t st
     if (x.ne[1] == 1) {
         // One row per warp exposes more CTAs for narrow outputs. PhaseRows keeps
         // the existing column traversal and per-row accumulation order.
-        using Schedule = std::conditional_t<N == 1024 && (K == 2048 || K == 3584),
-                                            NarrowGemv, Gemv>;
+        using Schedule = std::conditional_t<N == 1024 && (K == 2048 || K == 3072 || K == 3584),
+            NarrowGemv, std::conditional_t<N == 4096 && K == 1024, MidRowsGemv, Gemv>>;
         bf16_gemv_kernel<Geometry, Schedule>
             <<<N / Schedule::kRowsPerCta, Schedule::kThreads, 0, stream>>>(
                 static_cast<const __nv_bfloat16*>(x.data),
