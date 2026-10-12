@@ -181,7 +181,7 @@ python tools/qwen3_asr/transcribe.py \
   --audio recording-16k.wav --warmups 0 --repeats 1 --out transcription.json
 ```
 
-Set `--draft-tokens 3` on RTX 6000D. Draft acceleration handles one audio file; four-audio batches use the main model. Engine allocations for a 60-second input are approximately **4.77 GiB** for the single model and **7.17 GiB** for target plus draft.
+On RTX 5070 Ti, use `--draft-tokens 5` and pass 1–4 WAV files to `--audio`. The historical single-lane RTX 6000D recipe uses `--draft-tokens 3`.
 
 ### Add word timestamps
 

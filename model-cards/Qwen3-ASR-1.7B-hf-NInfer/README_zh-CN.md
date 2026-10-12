@@ -181,7 +181,7 @@ python tools/qwen3_asr/transcribe.py \
   --audio recording-16k.wav --warmups 0 --repeats 1 --out transcription.json
 ```
 
-6000D 将 `--draft-tokens` 改为 `3`。草稿加速用于单条音频；四路批处理使用主模型。60 秒输入的引擎显存分配约为：单模型 **4.77 GiB**，主模型加草稿 **7.17 GiB**。
+RTX 5070 Ti 使用 `--draft-tokens 5`，`--audio` 可同时传入 1–4 个 WAV 文件。6000D 的历史单路配方使用 `--draft-tokens 3`。
 
 ### 添加逐词时间戳
 
