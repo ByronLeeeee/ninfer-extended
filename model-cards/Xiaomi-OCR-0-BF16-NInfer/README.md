@@ -36,6 +36,45 @@ Includes image processing, inference and the local HTTP request.
 | RTX 6000D | English contract | 584.2 | **212.4** | 2.75× |
 | RTX 6000D | Formulas (256 tokens) | 1202.7 | **388.8** | 3.09× |
 
+### NInfer BF16 without MTP vs. MTP1
+
+Paired warm-run medians from the same NInfer build, with BF16 weights and KV and a 4K context.
+
+**Single-request prefill and decode**
+
+| GPU | Input | NInfer BF16 prefill (tok/s) | NInfer MTP1 prefill (tok/s) | NInfer BF16 decode (tok/s) | NInfer MTP1 decode (tok/s) | Decode gain |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| RTX 5070 Ti | Chinese document | 23,117 | 22,829 | 435.1 | **682.8** | +56.9% |
+| RTX 5070 Ti | English contract | 22,233 | 22,261 | 434.2 | **688.1** | +58.5% |
+| RTX 5070 Ti | Formulas (256 tokens) | 21,631 | 21,538 | 425.1 | **678.0** | +59.5% |
+| RTX 6000D | Chinese document | 40,610 | 40,253 | 586.3 | **909.1** | +55.0% |
+| RTX 6000D | English contract | 40,648 | 40,125 | 586.1 | **914.8** | +56.1% |
+| RTX 6000D | Formulas (256 tokens) | 36,784 | 36,478 | 580.8 | **913.8** | +57.3% |
+
+**Complete single-request latency**
+
+| GPU | Input | NInfer BF16 (ms) | NInfer MTP1 (ms) | Speedup |
+| --- | --- | ---: | ---: | ---: |
+| RTX 5070 Ti | Chinese document | 438.9 | **348.9** | 1.26× |
+| RTX 5070 Ti | English contract | 443.1 | **349.9** | 1.27× |
+| RTX 5070 Ti | Formulas (256 tokens) | 841.2 | **605.4** | 1.39× |
+| RTX 6000D | Chinese document | 280.0 | **213.9** | 1.31× |
+| RTX 6000D | English contract | 281.7 | **212.0** | 1.33× |
+| RTX 6000D | Formulas (256 tokens) | 545.8 | **386.3** | 1.41× |
+
+**Four-request throughput**
+
+Total output tokens across four concurrent requests divided by complete request time, including image processing, prefill, decode and HTTP overhead.
+
+| GPU | Input | NInfer BF16 (tok/s) | NInfer MTP1 (tok/s) | Throughput gain |
+| --- | --- | ---: | ---: | ---: |
+| RTX 5070 Ti | Chinese document | 590.6 | **676.8** | +14.6% |
+| RTX 5070 Ti | English contract | 610.7 | **678.8** | +11.2% |
+| RTX 5070 Ti | Formulas (256 tokens) | 818.9 | **952.3** | +16.3% |
+| RTX 6000D | Chinese document | 995.8 | **1164.3** | +16.9% |
+| RTX 6000D | English contract | 1002.8 | **1181.0** | +17.8% |
+| RTX 6000D | Formulas (256 tokens) | 1226.4 | **1509.1** | +23.1% |
+
 ### Transformers MTP1 comparison
 
 The Transformers MTP1 reference uses a compiled PyTorch MTP adapter with the same proposal head as NInfer. See the [MTP comparison guide](https://github.com/ByronLeeeee/ninfer-extended/blob/main/docs/xiaomi-ocr-transformers-mtp.md) for its implementation.
