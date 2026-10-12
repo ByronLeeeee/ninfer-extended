@@ -1,0 +1,149 @@
+{
+  "gpu": "RTX 5070 Ti",
+  "batch": 4,
+  "repeats_per_mode": 6,
+  "aggregation": "median",
+  "scope": "Complete warm native ASR; excludes loading and CPU feature extraction",
+  "comparisons": {
+    "mixed-batch4": {
+      "audio_seconds": 31.255187499999998,
+      "modes": {
+        "0": {
+          "median_ms": 276.873644,
+          "audio_seconds_per_second": 112.8861059090189,
+          "prefill_ms": 31.198111534118652,
+          "decode_ms": 235.2987518310547,
+          "decode_tps": 420.7417229960111,
+          "min_ms": 269.700239,
+          "max_ms": 282.57437600000003,
+          "speedup_vs_ordinary": 1.0
+        },
+        "1": {
+          "median_ms": 256.304238,
+          "audio_seconds_per_second": 121.9456523383745,
+          "prefill_ms": 47.300495624542236,
+          "decode_ms": 194.11425638198853,
+          "decode_tps": 510.0089898602366,
+          "min_ms": 248.37777599999998,
+          "max_ms": 259.496891,
+          "speedup_vs_ordinary": 1.0802538661104777
+        },
+        "3": {
+          "median_ms": 219.70990899999998,
+          "audio_seconds_per_second": 142.25661301420865,
+          "prefill_ms": 47.31403160095215,
+          "decode_ms": 159.9776313304901,
+          "decode_tps": 618.8365504691694,
+          "min_ms": 210.535183,
+          "max_ms": 221.820259,
+          "speedup_vs_ordinary": 1.260178228920936
+        },
+        "5": {
+          "median_ms": 208.3974985,
+          "audio_seconds_per_second": 149.97870763789422,
+          "prefill_ms": 47.319456338882446,
+          "decode_ms": 150.1689920425415,
+          "decode_tps": 659.2572802200095,
+          "min_ms": 200.487189,
+          "max_ms": 209.002733,
+          "speedup_vs_ordinary": 1.3285842968023918
+        }
+      },
+      "exact_tokens_match": true
+    },
+    "en-30s-batch4": {
+      "audio_seconds": 120.0,
+      "modes": {
+        "0": {
+          "median_ms": 548.410321,
+          "audio_seconds_per_second": 218.81426261487155,
+          "prefill_ms": 105.45632266998291,
+          "decode_ms": 477.20463824272156,
+          "decode_tps": 779.5397859794712,
+          "min_ms": 547.261135,
+          "max_ms": 592.7267400000001,
+          "speedup_vs_ordinary": 1.0
+        },
+        "1": {
+          "median_ms": 543.166758,
+          "audio_seconds_per_second": 220.92662747229465,
+          "prefill_ms": 164.93774318695068,
+          "decode_ms": 392.97187066078186,
+          "decode_tps": 946.6326622145755,
+          "min_ms": 532.0683769999999,
+          "max_ms": 574.57705,
+          "speedup_vs_ordinary": 1.0096536890794041
+        },
+        "3": {
+          "median_ms": 482.47137699999996,
+          "audio_seconds_per_second": 248.71941781532877,
+          "prefill_ms": 164.874831199646,
+          "decode_ms": 325.50631976127625,
+          "decode_tps": 1142.835121267313,
+          "min_ms": 463.304559,
+          "max_ms": 500.21137999999996,
+          "speedup_vs_ordinary": 1.1366691313586463
+        },
+        "5": {
+          "median_ms": 452.051314,
+          "audio_seconds_per_second": 265.45658929331194,
+          "prefill_ms": 164.89209842681885,
+          "decode_ms": 299.25142335891724,
+          "decode_tps": 1243.1018568256982,
+          "min_ms": 436.464894,
+          "max_ms": 472.14273699999995,
+          "speedup_vs_ordinary": 1.213159444549253
+        }
+      },
+      "exact_tokens_match": true
+    },
+    "official-zh-batch4": {
+      "audio_seconds": 16.81575,
+      "modes": {
+        "0": {
+          "median_ms": 70.0145645,
+          "audio_seconds_per_second": 240.17502815432067,
+          "prefill_ms": 20.197376251220703,
+          "decode_ms": 48.5394561290741,
+          "decode_tps": 824.0718661723854,
+          "min_ms": 69.464415,
+          "max_ms": 71.806996,
+          "speedup_vs_ordinary": 1.0
+        },
+        "1": {
+          "median_ms": 71.683022,
+          "audio_seconds_per_second": 234.5848365600435,
+          "prefill_ms": 31.026495695114136,
+          "decode_ms": 38.111680030822754,
+          "decode_tps": 1049.5472296259063,
+          "min_ms": 71.002389,
+          "max_ms": 72.49343900000001,
+          "speedup_vs_ordinary": 0.9767245094661329
+        },
+        "3": {
+          "median_ms": 68.89034500000001,
+          "audio_seconds_per_second": 244.09443732644974,
+          "prefill_ms": 31.152223706245422,
+          "decode_ms": 36.14112043380737,
+          "decode_tps": 1106.7727188910699,
+          "min_ms": 68.633218,
+          "max_ms": 72.21433400000001,
+          "speedup_vs_ordinary": 1.0163189703869242
+        },
+        "5": {
+          "median_ms": 65.4084795,
+          "audio_seconds_per_second": 257.0882266113524,
+          "prefill_ms": 31.010799765586853,
+          "decode_ms": 32.57928013801575,
+          "decode_tps": 1227.7742640208048,
+          "min_ms": 64.872036,
+          "max_ms": 66.62608,
+          "speedup_vs_ordinary": 1.0704203038384343
+        }
+      },
+      "exact_tokens_match": true
+    }
+  },
+  "native_process_exited": true,
+  "selected_draft_tokens": 5
+}

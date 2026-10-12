@@ -6,7 +6,7 @@
 
 A BF16 NInfer version of [Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf), supporting automatic language identification and transcription in 30 languages and 22 Chinese dialects. It runs with **[NInfer Extended](https://github.com/ByronLeeeee/ninfer-extended)**, with native C++/CUDA execution for audio encoding, prefill and decode.
 
-This repository also provides a 0.6B draft model for faster single-audio inference and Qwen3-ForcedAligner-0.6B for word timestamps. The main model accepts batches of up to four audio files, automatic or specified language, context prompts and hotwords.
+This repository also provides a 0.6B draft model for faster inference and Qwen3-ForcedAligner-0.6B for word timestamps. The main model accepts batches of up to four audio files, automatic or specified language, context prompts and hotwords.
 
 ## Performance
 
@@ -80,6 +80,18 @@ A 60-second mixed recording made from seven distinct clips and silence intervals
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | RTX 5070 Ti | 5 | **0.5518** | **108.7** | 99.40 | 345.5 | 98.57% |
 | RTX 6000D | 3 | **0.5958** | **100.7** | 84.55 | 327.8 | 99.21% |
+
+### Four-lane MTP
+
+RTX 5070 Ti, BF16 1.7B target + 0.6B draft, K=5. Native build verified on 2026-10-13; six warm-run medians, including both models' audio encoding, prefill and complete decode. Loading and CPU feature extraction are excluded.
+
+| Input | Ordinary four-lane ms | MTP four-lane ms | Speedup |
+|---|---:|---:|---:|
+| Mixed English/Chinese × 4 | 276.9 | 208.4 | 1.33× |
+| English 30 s × 4 | 548.4 | 452.1 | 1.21× |
+| Chinese 4.2 s × 4 | 70.0 | 65.4 | 1.07× |
+
+[Four-lane measurements](../../docs/results/qwen3-asr-draft-batch4.json).
 
 ### ForcedAligner latency
 

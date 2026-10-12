@@ -52,6 +52,12 @@ void qk_norm_rope(const void* packed, const void* query_gamma, const void* key_g
 void append_contiguous_kv(const void* k, const void* v, void* cache_k, void* cache_v,
     int tokens, int width, int capacity, const std::int32_t* positions,
     bool decode, cudaStream_t stream);
+// Exact writes from [lanes,rows,width] to [lanes,capacity,width]. The device
+// positions array is [lanes,rows], with distinct valid positions within each
+// lane. lanes=1..4 and rows=1..6; all other cache rows remain bit-identical.
+void append_grouped_kv(const void* k, const void* v, void* cache_k, void* cache_v,
+    int lanes, int rows, int width, int capacity, const std::int32_t* positions,
+    cudaStream_t stream);
 void advance_positions(std::int32_t* positions, int lanes, cudaStream_t stream);
 void rounded_rmsnorm(const void* input, const void* gamma, void* output,
     int rows, int width, float eps, cudaStream_t stream);

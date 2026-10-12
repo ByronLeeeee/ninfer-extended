@@ -48,6 +48,17 @@ Models 拥有音频／语言／向量池化的固定数学组合、权重绑定�
 属于 Ops。音频特征提取和文本分词由 CPU 工具完成。Embedding 只执行前向和最后有效 token
 的向量池化，没有 decode 循环或常驻 KV；多条文本的 causal 范围相互独立。
 
+SpeechRecognition 可以在启动时通过 `speech_draft_artifact_path` 加载第二个 ASR
+权重文件。Program 拥有目标与草稿各自的权重、音频编码、KV、workspace 和 Graph；
+两者的 tokenizer 与 processor 资源必须一致。请求通过 `draft_tokens=1..5` 选择
+一至四路草稿解码，零值使用普通生成。目标模型决定每路接受前缀、纠正 token 和额外 token；
+各路独立维护有效 KV 前沿与结束状态，前沿以后的行被遮罩并在下一轮覆盖。
+投影和验证合批执行，完全接受后的草稿追赶使用每路两行的共享投影。
+KV 为每路完整提示与输出预算预留容量；CPU 前处理仍只执行一次。
+
+`SpeechDraftSource::NGram` 使用已提交文本的重复片段提出草稿，目标 Program 复用同一验证路径。
+这一路径仅支持单路，只加载目标权重，不创建草稿 Program 或草稿 KV；没有匹配时直接回放普通 decode Graph。
+
 `max_concurrency` 限制同时激活的请求数，不把共享 KV 容量平均切分给 lane。请求只有在 Program
 证明其完整执行资源已经得到保障后才会进入 Active；进入 Active 后，它不会因为另一个请求或
 inactive cache 的保留而丢失完成能力。

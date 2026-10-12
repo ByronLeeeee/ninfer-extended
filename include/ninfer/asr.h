@@ -21,7 +21,8 @@ enum class SpeechDraftSource : std::uint8_t { ExternalModel, NGram };
 
 struct SpeechRunOptions {
     std::uint32_t max_new_tokens = 1024;
-    // Greedy block verification, single lane, K=1..5; zero disables it.
+    // Greedy block verification, one to four external-draft lanes, K=1..5;
+    // ngram drafting remains single-lane. Zero disables drafting.
     std::uint32_t draft_tokens = 0;
     SpeechDraftSource draft_source = SpeechDraftSource::ExternalModel;
     SpeechLinearBackend linear = SpeechLinearBackend::Native;

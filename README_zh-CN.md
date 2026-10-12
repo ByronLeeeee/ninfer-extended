@@ -15,7 +15,7 @@ OpenAI/Anthropic 的 HTTP 服务。视觉、音频和语言推理共用 CUDA 算
   模型文件包含图像处理配置和 tokenizer，支持 MTP1/MTP3、接受前缀状态恢复及 BF16 草稿输出头。
 - **语音识别：** 原生音频编码器和 Qwen3 解码器，提供 `transcribe_features()`
   接口和 `ninfer-asr`。音频编码、语言 prefill 和 decode 均使用 CUDA Graph。
-  支持 0.6B、1.7B 两个尺寸，也可以用 0.6B 草拟、1.7B 验证，加速单路转写。
+  支持 0.6B、1.7B 两个尺寸，也可以用 0.6B 草拟、1.7B 验证，执行一至四路转写。
 - **词级时间戳：** Qwen3-ForcedAligner 通过一次音频与语言前向生成时间戳，
   支持独立批处理和 CUDA Graph 重放。
 - **文本向量：** 在 GPU 上完成分段 causal attention、末 token 池化、维度截取

@@ -82,7 +82,7 @@ has a 2,048-wide text decoder and 24 audio layers; the 0.6B model has a
 ## Single-audio drafting: best qualified configurations
 
 Use the same BF16 1.7B target and BF16 0.6B draft: K=5 on 5070 Ti and K=3 on 6000D.
-Both configurations match ordinary decoding token for token on all 73 labelled recordings. Four-lane batches use the single 1.7B model.
+Both historical single-lane configurations match ordinary decoding token for token on all 73 labelled recordings. External drafting now also supports batches of up to four; the four-lane comparison is listed below.
 
 | GPU | Input | K | TF inference ms | NInfer inference ms | TF audio s/s | NInfer audio s/s | Inference speedup |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -120,7 +120,7 @@ Draft acceptance counts proposed tokens accepted by the target. WER and CER comp
 | RTX 5070 Ti | 5 | 3.8261% | 1.3166% | 73/73 (100%) | 85.53% | 7.17 GiB |
 | RTX 6000D | 3 | 3.5652% | 1.2585% | 73/73 (100%) | 88.58% | 7.17 GiB |
 
-For the 60-second input, the dual-model Engine allocates about 7.17 GiB versus 4.77 GiB for the single model. K=5 changed transcripts on 6000D; use K=3 there.
+The historical 60-second measurement used full-context KV allocation (7.17 GiB for both models versus 4.77 GiB for the target alone). Current ASR reserves KV for each lane's prompt plus output budget. K=5 changed transcripts in the historical 6000D run; use the qualified K=3 recipe there.
 
 ### Download and enable
 
@@ -143,8 +143,20 @@ Omit the two draft arguments to load only 1.7B. The CPU transcription and timest
 `--draft-source ngram --draft-tokens 5` proposes repeated token sequences from
 the target history and loads only 1.7B. The 73 natural-speech recordings had no
 accepted ngram candidates, so external drafting is the measured fast path.
-Ordinary decoding remains the default; external drafting accepts one audio
-request, while ordinary ASR supports batches of up to four.
+Ordinary decoding remains the default. External drafting and ordinary ASR
+accept one to four audio lanes; ngram proposals accept one lane.
+
+## Four-lane external drafting
+
+RTX 5070 Ti, BF16 1.7B target + 0.6B draft, K=5. Native build verified on 2026-10-13; six warm-run medians, including both models' audio encoding, prefill and complete decode. Loading and CPU feature extraction are excluded.
+
+| Input | Ordinary four-lane ms | MTP four-lane ms | Speedup |
+|---|---:|---:|---:|
+| Mixed English/Chinese × 4 | 276.9 | 208.4 | 1.33× |
+| English 30 s × 4 | 548.4 | 452.1 | 1.21× |
+| Chinese 4.2 s × 4 | 70.0 | 65.4 | 1.07× |
+
+[Four-lane measurements](results/qwen3-asr-draft-batch4.json).
 
 ## Execution details
 
@@ -169,8 +181,11 @@ For two to four ASR lanes, language prefill packs the actual prompt rows for
 shared projection, normalization and FFN calls. Attention retains each sample's
 FP32 probability path, local RoPE positions and separate KV storage. The
 first-token head gathers each sample's last row and runs once for the batch.
-Workspace is sized from the total prompt rows before Graph capture. Single-lane
-ASR and forced alignment retain their existing execution paths.
+Workspace is sized from the total prompt rows and up to six verification
+rows per lane before Graph capture. Each draft lane has independent causal KV,
+accepted-prefix position and EOS state. Grouped verification uses the same
+FP32 partition/merge profile as ordinary decoding for that batch size.
+Single-lane ASR and forced alignment retain their existing execution paths.
 
 Audio convolution executes at most 32 independent 100-frame chunks per call.
 Each cuDNN plan retains its reported math type and is checked against the
@@ -186,6 +201,8 @@ cmake --build build --target asr-qualify -j
 build/asr-qualify
 build/asr-qualify --transforms
 build/asr-qualify --linear
+build/asr-qualify --verify
+build/asr-qualify --draft-decode
 ```
 
 Floating-point checks use independent FP64 attention, projection, SwiGLU,

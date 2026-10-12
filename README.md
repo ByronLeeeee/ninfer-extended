@@ -21,7 +21,7 @@ shared CUDA operators for vision, audio and language processing.
   `SpeechRecognition` Engine purpose, `transcribe_features()` API and
   `ninfer-asr` CLI. Audio encoding, language prefill and decode use CUDA Graphs.
   Both 0.6B and 1.7B ASR variants are supported, with optional native 0.6B
-  draft decoding verified by the 1.7B target for single-audio requests.
+  draft decoding verified by the 1.7B target for one to four audio lanes.
 - **Word alignment:** native Qwen3-ForcedAligner inference, independent batches
   and reusable CUDA Graphs. It produces word timestamps in one audio/language
   forward pass.

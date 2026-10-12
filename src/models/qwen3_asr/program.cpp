@@ -116,7 +116,7 @@ struct Run {
     std::vector<std::unique_ptr<Convolution>> conv;
     std::map<unsigned,cudaGraphExec_t> graphs;
     std::map<unsigned,cudaGraphExec_t> audio_graphs,prefill_graphs;
-    DeviceBuffer verify_ids,verify_positions,verify_empty_rows,verify_logits,verify_arg_values,verify_arg_indices;
+    DeviceBuffer verify_ids,verify_positions,verify_empty_rows,verify_last_rows,proposal_ids,verify_logits,verify_arg_values,verify_arg_indices;
     std::map<unsigned,cudaGraphExec_t> verify_graphs,proposal_graphs;
     ~Run(){for(auto* cache:{&graphs,&audio_graphs,&prefill_graphs,&verify_graphs,&proposal_graphs})for(auto [key,graph]:*cache)cudaGraphExecDestroy(graph);}
     DeviceBuffer buffer(std::size_t n){bytes+=n;return DeviceBuffer(n);}
@@ -206,7 +206,7 @@ public:
         }else{linear(input,tokens,name,run->delta.p,execution);residual(hidden,run->delta.p,tokens*hidden_size);}
     }
 
-    void prepare(const std::vector<SpeechFeatures>& samples){
+    void prepare(const std::vector<SpeechFeatures>& samples,int output_budget=0){
         require(!samples.empty()&&samples.size()<=options.max_concurrency,"ASR batch exceeds configured concurrency");
         std::ostringstream key;int chunks=0,audio_tokens=0,max_prompt=0,total_prompt=0,max_timestamps=0;
         std::vector<int> indices,begin,end,cu{0},offsets,lengths,prefill_offsets,last_rows;
@@ -242,17 +242,21 @@ public:
             chunks+=sample.frames/100;audio_tokens+=count;lengths.push_back(sample.prompt_tokens.size());max_prompt=std::max(max_prompt,static_cast<int>(sample.prompt_tokens.size()));
             key<<sample.frames<<':'<<count<<':'<<sample.prompt_tokens.size()<<':'<<timestamps<<':'<<physical_width<<';';
         }
-        key<<options.max_context<<':'<<samples.size();
+        // Every active lane reserves its full requested output, while unused
+        // context is not duplicated across the target and draft caches.
+        require(alignment||output_budget>0,"ASR requires an output cache budget");
+        int kv_capacity=alignment?options.max_context:max_prompt+output_budget;
+        key<<kv_capacity<<':'<<samples.size();
         if(signature!=key.str()){
             device.synchronize();run.reset();signature.clear();auto pending=std::make_unique<Run>();auto& r=*pending;
             auto required=ops::linear_swiglu_workspace_capacity_bytes(QType::BF16,2*intermediate,hidden_size,
                 ops::LinearPolicy::A16Only,1,alignment?max_prompt:total_prompt);
             required=std::max(required,ops::packed_softmax_attention_workspace_capacity_bytes({64,audio_heads,audio_heads},audio_tokens,audio_tokens,1,cu.size()-1));
-            required=std::max(required,ops::dense_bf16_decode_attention_workspace_capacity(samples.size(),options.max_context,head_dim,query_heads,kv_heads));
-            if(!alignment)required=std::max(required,ops::dense_bf16_verify_attention_workspace_capacity(6,options.max_context));
+            required=std::max(required,ops::dense_bf16_decode_attention_workspace_capacity(samples.size(),kv_capacity,head_dim,query_heads,kv_heads));
+            if(!alignment)required=std::max(required,ops::dense_bf16_verify_attention_workspace_capacity(samples.size(),6,kv_capacity));
             auto capacity=aligned(std::max<std::size_t>(64ULL*1024*1024,required));
             if(capacity!=workspace.capacity())workspace=WorkspaceArena(capacity);
-            r.batch=samples.size();r.chunks=chunks;r.audio_tokens=audio_tokens;r.max_prompt=max_prompt;r.total_prompt=total_prompt;r.capacity=options.max_context;r.audio_offsets=offsets;r.prompt_lengths=lengths;r.prefill_offsets=prefill_offsets;
+            r.batch=samples.size();r.chunks=chunks;r.audio_tokens=audio_tokens;r.max_prompt=max_prompt;r.total_prompt=total_prompt;r.capacity=kv_capacity;r.audio_offsets=offsets;r.prompt_lengths=lengths;r.prefill_offsets=prefill_offsets;
             r.max_timestamps=max_timestamps;r.timestamp_counts=timestamp_counts;
             auto bf=[&](std::size_t n){return r.buffer(n*2);};auto ints=[&](std::size_t n){return r.buffer(n*4);};
             r.input_f32=r.buffer(input.size()*4);r.cnn_input=bf(input.size());r.cnn1=bf(static_cast<std::size_t>(chunks)*conv_channels*64*50);r.cnn2=bf(static_cast<std::size_t>(chunks)*conv_channels*32*25);r.cnn3=bf(static_cast<std::size_t>(chunks)*conv_channels*16*13);
@@ -262,7 +266,7 @@ public:
             if(alignment){r.cnn_widths=ints(cnn_widths.size());r.cnn_widths.copy_from_host(cnn_widths.data(),cnn_widths.size()*4);
                 r.short_convolution=std::any_of(cnn_widths.begin(),cnn_widths.end(),[](int width){return width<100;});}
             int prefill_tokens=alignment?max_prompt:total_prompt;
-            int n=std::max(prefill_tokens,alignment?r.batch:6),qw=query_heads*head_dim,kw=kv_heads*head_dim;
+            int n=std::max(prefill_tokens,alignment?r.batch:6*r.batch),qw=query_heads*head_dim,kw=kv_heads*head_dim;
             r.hidden=bf(n*hidden_size);r.norm=bf(n*hidden_size);r.qkv=bf(static_cast<std::size_t>(n)*(qw+2*kw));r.query=bf(n*qw);r.key=bf(n*kw);r.value=bf(n*kw);r.attention=bf(n*qw);r.delta=bf(n*hidden_size);r.gate_up=bf(static_cast<std::size_t>(n)*2*intermediate);r.ffn=bf(n*intermediate);
             r.logits=bf(alignment?static_cast<std::size_t>(max_timestamps)*5120:static_cast<std::size_t>(r.batch)*vocab);r.float_output=r.buffer(static_cast<std::size_t>(audio_tokens)*std::max(audio_intermediate,3*audio_width)*4);
             r.prompt_ids=ints(prefill_tokens);r.audio_rows=ints(prefill_tokens);r.prefill_positions=ints(prefill_tokens);r.prefill_begin=ints(prefill_tokens);r.prefill_end=ints(prefill_tokens);r.decode_positions=ints(r.batch);r.decode_ids=ints(r.batch);r.empty_audio_rows=ints(r.batch);
@@ -270,8 +274,11 @@ public:
             if(!alignment){r.k_cache=bf(static_cast<std::size_t>(layers)*r.batch*r.capacity*kw);r.v_cache=bf(static_cast<std::size_t>(layers)*r.batch*r.capacity*kw);}
             auto arg_count=alignment?max_timestamps*((classify_width+1023)/1024):r.batch*((vocab+1023)/1024);
             r.arg_values=r.buffer(arg_count*4);r.arg_indices=ints(arg_count);
-            if(!alignment){constexpr int rows=6;
+            if(!alignment){int rows=6*r.batch;
                 r.verify_ids=ints(2*rows);r.verify_positions=ints(rows);r.verify_empty_rows=ints(rows);
+                r.proposal_ids=ints(rows);r.verify_last_rows=ints(r.batch);
+                std::vector<int> paired_last(r.batch);for(int lane=0;lane<r.batch;++lane)paired_last[lane]=2*lane+1;
+                r.verify_last_rows.copy_from_host(paired_last.data(),r.batch*4);
                 r.verify_logits=bf(static_cast<std::size_t>(rows)*vocab);r.verify_arg_values=r.buffer(rows*((vocab+1023)/1024)*4);r.verify_arg_indices=ints(rows*((vocab+1023)/1024));
                 std::vector<int> empty(rows,-1);r.verify_empty_rows.copy_from_host(empty.data(),rows*4);
             }
@@ -362,22 +369,25 @@ public:
                     auto* dk=static_cast<std::uint16_t*>(r.k_cache.p)+cache_offset;
                     auto* dv=static_cast<std::uint16_t*>(r.v_cache.p)+cache_offset;
                     ops::append_contiguous_kv(sk,sv,dk,dv,count,kw,r.capacity,positions+start,false,device.stream);
+                    if(cache_only&&i+1==layers)continue;
                     auto* sq=static_cast<std::uint16_t*>(r.query.p)+static_cast<std::size_t>(start)*qw;
                     auto* sa=static_cast<std::uint16_t*>(r.attention.p)+static_cast<std::size_t>(start)*qw;
                     if(execution.causal_tensorcore_prefill)ops::causal_bf16_attention(sq,dk,dv,sa,count,query_heads,kv_heads,qw,kw,device.stream,device.multiprocessor_count());
                     else ops::dense_bf16_attention(sq,dk,dv,sa,count,count,head_dim,query_heads,kv_heads,qw,kw,static_cast<int*>(r.prefill_begin.p)+start,static_cast<int*>(r.prefill_end.p)+start,positions+start,true,device.stream);
                 }
+                if(cache_only&&i+1==layers)return;
             }else{
                 if(!alignment){
                     ck=static_cast<std::uint16_t*>(r.k_cache.p)+layer_offset;cv=static_cast<std::uint16_t*>(r.v_cache.p)+layer_offset;
-                    if(!decoding){ck+=static_cast<std::size_t>(lane)*r.capacity*kw;cv+=static_cast<std::size_t>(lane)*r.capacity*kw;}
-                    ops::append_contiguous_kv(r.key.p,r.value.p,ck,cv,tokens,kw,r.capacity,positions,decoding,device.stream);
+                    if(!decoding&&!verifying){ck+=static_cast<std::size_t>(lane)*r.capacity*kw;cv+=static_cast<std::size_t>(lane)*r.capacity*kw;}
+                    if(verifying)ops::append_grouped_kv(r.key.p,r.value.p,ck,cv,r.batch,tokens/r.batch,kw,r.capacity,positions,device.stream);
+                    else ops::append_contiguous_kv(r.key.p,r.value.p,ck,cv,tokens,kw,r.capacity,positions,decoding,device.stream);
                 }
                 // Draft prefill commits only layer KV. Once the last layer has
                 // stored it, its attention/FFN and vocabulary head are unused.
                 if(cache_only&&i+1==layers)return;
                 if(verifying){
-                    ops::dense_bf16_verify_attention(r.query.p,ck,cv,r.attention.p,tokens,r.capacity,positions,workspace,device.stream);
+                    ops::dense_bf16_verify_attention(r.query.p,ck,cv,r.attention.p,r.batch,tokens/r.batch,r.capacity,positions,workspace,device.stream);
                 }
                 else if(decoding)ops::dense_bf16_decode_attention(r.query.p,ck,cv,r.attention.p,r.batch,r.capacity,head_dim,query_heads,kv_heads,positions,workspace,device.stream);
                 else if(execution.causal_tensorcore_prefill)ops::causal_bf16_attention(r.query.p,ck,cv,r.attention.p,tokens,query_heads,kv_heads,qw,kw,device.stream,device.multiprocessor_count());
@@ -398,18 +408,18 @@ public:
                 static_cast<int*>(r.timestamp_output.p),rows,classify_width,5120,device.stream);
         }
         else if(verifying&&decode_output){
-            // A paired draft catch-up needs both cache rows, but only the last
-            // row's next-token prediction. Keep the head single-column.
+            // Catch up two cache rows per lane, projecting only each last row.
             auto* last=static_cast<std::uint16_t*>(r.hidden.p)+static_cast<std::size_t>(tokens-1)*hidden_size;
-            norm(last,"model.language_model.norm",r.norm.p,1,hidden_size,true);
-            linear(r.norm.p,1,"model.language_model.embed_tokens",r.logits.p,execution);
-            ops::bf16_argmax(r.logits.p,static_cast<float*>(r.arg_values.p),static_cast<int*>(r.arg_indices.p),decode_output,1,vocab,device.stream);
+            if(r.batch>1){ops::gather_rows(r.hidden.p,static_cast<int*>(r.verify_last_rows.p),r.delta.p,r.batch,hidden_size,device.stream);last=static_cast<std::uint16_t*>(r.delta.p);}
+            norm(last,"model.language_model.norm",r.norm.p,r.batch,hidden_size,true);
+            linear(r.norm.p,r.batch,"model.language_model.embed_tokens",r.logits.p,execution);
+            ops::bf16_argmax(r.logits.p,static_cast<float*>(r.arg_values.p),static_cast<int*>(r.arg_indices.p),decode_output,r.batch,vocab,device.stream);
         }
         else if(verifying){
             norm(r.hidden.p,"model.language_model.norm",r.norm.p,tokens,hidden_size,true);
             linear(r.norm.p,tokens,"model.language_model.embed_tokens",r.verify_logits.p,execution);
             ops::bf16_argmax(r.verify_logits.p,static_cast<float*>(r.verify_arg_values.p),static_cast<int*>(r.verify_arg_indices.p),
-                static_cast<int*>(r.verify_ids.p)+6,tokens,vocab,device.stream);
+                static_cast<int*>(r.verify_ids.p)+6*r.batch,tokens,vocab,device.stream);
         }
         else if(packed_prefill){
             ops::gather_rows(r.hidden.p,static_cast<int*>(r.prefill_last_rows.p),r.delta.p,r.batch,hidden_size,device.stream);
@@ -429,8 +439,8 @@ public:
     }
     void paired_draft_step(const SpeechRunOptions& execution,int* output_id){auto& r=*run;
         ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,
-            static_cast<int*>(r.verify_ids.p),static_cast<int*>(r.verify_empty_rows.p),r.hidden.p,2,hidden_size,device.stream);
-        decoder(2,0,false,execution,false,true,false,output_id);
+            static_cast<int*>(r.verify_ids.p),static_cast<int*>(r.verify_empty_rows.p),r.hidden.p,2*r.batch,hidden_size,device.stream);
+        decoder(2*r.batch,0,false,execution,false,true,false,output_id);
     }
     cudaGraphExec_t captured(std::map<unsigned,cudaGraphExec_t>& cache,unsigned key,const std::function<void()>& enqueue){
         if(auto found=cache.find(key);found!=cache.end())return found->second;
@@ -441,9 +451,8 @@ public:
         auto status=cudaGraphInstantiate(&exec,graph,0);cudaGraphDestroy(graph);CUDA_CHECK(status);cache.emplace(key,exec);return exec;
     }
     SpeechResult initialize(const std::vector<SpeechFeatures>& samples,const SpeechRunOptions& execution,bool cache_only=false){
-        require(!cache_only||samples.size()==1,"ASR draft cache prefill requires one lane");
         require(execution.max_new_tokens>0&&std::all_of(samples.begin(),samples.end(),[&](const auto& sample){return sample.prompt_tokens.size()+static_cast<std::uint64_t>(execution.max_new_tokens)<=options.max_context;}),"ASR output budget exceeds context");
-        prepare(samples);auto& r=*run;
+        prepare(samples,execution.max_new_tokens);auto& r=*run;
         require(execution.max_new_tokens>0&&static_cast<std::uint64_t>(r.max_prompt)+execution.max_new_tokens<=static_cast<std::uint64_t>(r.capacity),"ASR output budget exceeds context");
         SpeechResult result;result.token_ids.resize(r.batch);result.weight_bytes=model.weight_bytes;result.runtime_bytes=r.bytes+convolution_workspace.bytes+blas_workspace.bytes+workspace.capacity();
         CudaEventTimer timer(device);cudaGraphExec_t audio_exec=nullptr;
@@ -456,7 +465,7 @@ public:
                 for(int token:sample.prompt_tokens){ids.push_back(token);rows.push_back(token==sample.audio_token_id?audio_row++:-1);}}
             r.prompt_ids.copy_from_host(ids.data(),ids.size()*4);r.audio_rows.copy_from_host(rows.data(),rows.size()*4);
             auto prefill=[&]{ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,static_cast<int*>(r.prompt_ids.p),static_cast<int*>(r.audio_rows.p),r.hidden.p,r.total_prompt,hidden_size,device.stream);decoder(r.total_prompt,0,false,execution,true);};
-            cudaGraphExec_t prefill_exec=nullptr;if(execution.prefill_graph)prefill_exec=captured(r.prefill_graphs,static_cast<unsigned>(execution.linear)*64+execution.causal_tensorcore_prefill*32+execution.fused_qk_norm_rope*16+execution.fused_projection_residual*8,prefill);
+            cudaGraphExec_t prefill_exec=nullptr;if(execution.prefill_graph)prefill_exec=captured(r.prefill_graphs,static_cast<unsigned>(execution.linear)*64+execution.causal_tensorcore_prefill*32+execution.fused_qk_norm_rope*16+execution.fused_projection_residual*8+cache_only*128,prefill);
             timer.start();if(prefill_exec)CUDA_CHECK(cudaGraphLaunch(prefill_exec,device.stream));else prefill();result.language_prefill_ms=timer.stop_ms();result.prompt_tokens=r.total_prompt;
         }else for(int lane=0;lane<r.batch;++lane){const auto& sample=samples[lane];int tokens=sample.prompt_tokens.size(),audio_row=r.audio_offsets[lane];
             std::vector<int> rows(tokens,-1);for(int t=0;t<tokens;++t)if(sample.prompt_tokens[t]==sample.audio_token_id)rows[t]=audio_row++;
@@ -554,12 +563,90 @@ public:
         }
         result.decode_ms=result.draft_decode_ms+result.verify_ms+result.draft_repair_ms;
     }
+    void batched_speculative_decode(SpeechResult& result,const std::vector<SpeechFeatures>& samples,const SpeechRunOptions& execution){
+        auto& r=*run;auto& d=*draft->run;const int batch=r.batch;
+        std::vector<int> cursors=r.prompt_lengths,current(batch),round_cursor(batch),proposal_position(batch);
+        std::vector<bool> finished(batch);bool catchup=false;CudaEventTimer timer(device);
+        const unsigned backend=static_cast<unsigned>(execution.linear)*64+execution.fused_qk_norm_rope*32+execution.fused_projection_residual*16;
+        const unsigned ordinary_key=static_cast<unsigned>(execution.linear)*8+execution.fused_qk_norm_rope*4+execution.fused_projection_residual*2;
+        for(;;){
+            int active=0,k=execution.draft_tokens;
+            for(int lane=0;lane<batch;++lane){const auto& tokens=result.token_ids[lane];
+                finished[lane]=eos(tokens.back())||tokens.size()==execution.max_new_tokens;
+                current[lane]=tokens.back();
+                // Finished lanes remain inert and use an in-bounds scratch
+                // frontier while other lanes finish their independent blocks.
+                round_cursor[lane]=finished[lane]?r.prompt_lengths[lane]:cursors[lane];
+                if(!finished[lane]){++active;k=std::min<int>(k,execution.max_new_tokens-tokens.size()-1);}
+            }
+            if(!active)break;
+            if(!k){
+                r.decode_ids.copy_from_host(current.data(),batch*4);r.decode_positions.copy_from_host(round_cursor.data(),batch*4);
+                timer.start();if(execution.decode_graph)CUDA_CHECK(cudaGraphLaunch(r.graphs.at(ordinary_key),device.stream));else decode_step(execution);
+                result.verify_ms+=timer.stop_ms();r.decode_ids.copy_to_host(current.data(),batch*4);
+                for(int lane=0;lane<batch;++lane)if(!finished[lane]){result.token_ids[lane].push_back(current[lane]);++result.decode_tokens;++cursors[lane];}
+                continue;
+            }
+            r.proposal_ids.copy_from_host(current.data(),batch*4);
+            for(int lane=0;lane<batch;++lane)proposal_position[lane]=round_cursor[lane]+(catchup?1:0);
+            if(catchup){std::vector<int> ids(2*batch),positions(2*batch);
+                for(int lane=0;lane<batch;++lane){const auto& tokens=result.token_ids[lane];
+                    ids[2*lane]=tokens.size()>1?tokens[tokens.size()-2]:samples[lane].prompt_tokens.back();
+                    ids[2*lane+1]=current[lane];positions[2*lane]=round_cursor[lane]-1;positions[2*lane+1]=round_cursor[lane];}
+                d.verify_ids.copy_from_host(ids.data(),ids.size()*4);d.verify_positions.copy_from_host(positions.data(),positions.size()*4);
+            }
+            auto reset_draft=[&]{d.decode_positions.copy_from_host(proposal_position.data(),batch*4);};reset_draft();
+            auto propose=[&]{
+                if(catchup)draft->paired_draft_step(execution,static_cast<int*>(r.proposal_ids.p)+batch);
+                for(int step=catchup?1:0;step<k;++step)draft->decode_step(execution,
+                    static_cast<int*>(r.proposal_ids.p)+step*batch,static_cast<int*>(r.proposal_ids.p)+(step+1)*batch);
+            };
+            unsigned proposal_key=backend+k+(catchup?8:0);cudaGraphExec_t proposal_exec=nullptr;
+            if(execution.decode_graph){bool warming=!r.proposal_graphs.contains(proposal_key);
+                proposal_exec=captured(r.proposal_graphs,proposal_key,propose);if(warming)reset_draft();}
+            timer.start();if(proposal_exec)CUDA_CHECK(cudaGraphLaunch(proposal_exec,device.stream));else propose();result.draft_decode_ms+=timer.stop_ms();
+            int rows=k+1;std::vector<int> positions(rows*batch);
+            for(int lane=0;lane<batch;++lane)std::iota(positions.begin()+lane*rows,positions.begin()+(lane+1)*rows,round_cursor[lane]);
+            r.verify_positions.copy_from_host(positions.data(),positions.size()*4);
+            auto verify=[&]{
+                // Proposals are step-major for four-column draft decode;
+                // verification packs each lane's complete causal block.
+                for(int lane=0;lane<batch;++lane)for(int step=0;step<rows;++step)
+                    CUDA_CHECK(cudaMemcpyAsync(static_cast<int*>(r.verify_ids.p)+lane*rows+step,
+                        static_cast<int*>(r.proposal_ids.p)+step*batch+lane,4,cudaMemcpyDeviceToDevice,device.stream));
+                ops::embed_audio_tokens(model.at("model.language_model.embed_tokens.weight").data,r.features_out.p,
+                    static_cast<int*>(r.verify_ids.p),static_cast<int*>(r.verify_empty_rows.p),r.hidden.p,rows*batch,hidden_size,device.stream);
+                decoder(rows*batch,0,false,execution,false,true);
+            };
+            cudaGraphExec_t verify_exec=nullptr;if(execution.decode_graph)verify_exec=captured(r.verify_graphs,backend+k,verify);
+            timer.start();if(verify_exec)CUDA_CHECK(cudaGraphLaunch(verify_exec,device.stream));else verify();result.verify_ms+=timer.stop_ms();
+            std::vector<int> records(12*batch);r.verify_ids.copy_to_host(records.data(),records.size()*4);
+            result.proposed_tokens+=k*active;++result.verification_calls;catchup=false;
+            for(int lane=0;lane<batch;++lane)if(!finished[lane]){
+                const int* proposals=records.data()+lane*rows;const int* target=records.data()+6*batch+lane*rows;
+                auto& tokens=result.token_ids[lane];int accepted=0;
+                while(accepted<k&&proposals[accepted+1]==target[accepted]){
+                    tokens.push_back(target[accepted]);++accepted;++result.decode_tokens;++result.accepted_tokens;
+                    if(eos(tokens.back()))break;
+                }
+                cursors[lane]+=accepted;
+                if(!eos(tokens.back())){
+                    tokens.push_back(target[accepted]);++result.decode_tokens;++cursors[lane];
+                    if(accepted==k){++result.fully_accepted_blocks;
+                        if(!eos(tokens.back())&&tokens.size()<execution.max_new_tokens)catchup=true;}
+                }
+                // Each lane commits its own prefix. Future speculative KV is
+                // masked by its new positions and overwritten on the next pass.
+            }
+        }
+        result.decode_ms=result.draft_decode_ms+result.verify_ms+result.draft_repair_ms;
+    }
     SpeechResult transcribe(std::vector<SpeechFeatures> samples,const SpeechRunOptions& execution){
         std::lock_guard guard(mutex);device.bind_to_current_thread();auto wall_start=std::chrono::steady_clock::now();
         require(execution.draft_tokens<=5,"ASR draft_tokens must be in [0,5]");
         require(execution.draft_source==SpeechDraftSource::ExternalModel||execution.draft_source==SpeechDraftSource::NGram,"Invalid ASR draft source");
         const bool lookup=execution.draft_source==SpeechDraftSource::NGram;
-        require(execution.draft_tokens==0||(samples.size()==1&&(lookup?!draft:bool(draft))),"ASR draft requires one lane and either a resident external model or standalone ngram mode");
+        require(execution.draft_tokens==0||(lookup?(!draft&&samples.size()==1):bool(draft)),"ASR draft requires a resident external model; standalone ngram supports one lane");
         auto result=initialize(samples,execution);auto& r=*run;CudaEventTimer timer(device);
         if(execution.draft_tokens&&!lookup){auto initialized=draft->initialize(samples,execution,true);
             result.draft_audio_ms=initialized.audio_ms;result.draft_language_prefill_ms=initialized.language_prefill_ms;
@@ -576,7 +663,7 @@ public:
         }
         result.decode_graph_used=execution.decode_graph;
         auto decode_start=std::chrono::steady_clock::now();
-        if(execution.draft_tokens)speculative_decode(result,execution);
+        if(execution.draft_tokens){if(r.batch>1)batched_speculative_decode(result,samples,execution);else speculative_decode(result,execution);}
         else for(unsigned step=1;step<execution.max_new_tokens&&!std::all_of(finished.begin(),finished.end(),[](bool value){return value;});++step){
             timer.start();if(execution.decode_graph)CUDA_CHECK(cudaGraphLaunch(r.graphs.at(graph_key),device.stream));else decode_step(execution);
             result.decode_ms+=timer.stop_ms();r.decode_ids.copy_to_host(output.data(),r.batch*4);

@@ -38,6 +38,7 @@ int main(int argc,char** argv){try{
             "[--no-graph] [--no-audio-graph] [--no-prefill-graph] [--no-decode-graph]\n"
             "[--no-audio-flash] [--no-fuse] [--no-residual-fuse] [--tensorcore-prefill] [--abba] [--variants]\n"
             "[--draft-source model|ngram] [--draft-artifact draft.ninfer] [--draft-tokens 0..5] [--draft-sweep]\n"
+            "External drafts support one to four native lanes; ngram proposals support one lane.\n"
             "Input accepts {samples:[...]} or {cases:[{id:...,samples:[...]}]}; one to four lanes.\n"
             "CPU frontend supplies log-mel features and audio-token prompts. Encoder and decoder run natively in BF16.\n";return 0;}
         else throw std::invalid_argument("Unknown option: "+arg);

@@ -56,14 +56,16 @@ void dense_bf16_decode_attention(const void* q, const void* k, const void* v, vo
     int batch, int capacity, int head_dim, int query_heads, int kv_heads,
     const std::int32_t* positions, WorkspaceArena& workspace, cudaStream_t stream);
 
-// Read-only verification over one shared BF16 cache [capacity,8*128]. Q/out
-// are contiguous [queries,16*128], queries=1..6. Each device I32 position is
-// in [0,capacity); row i attends keys [0,positions[i]]. Inputs do not alias
+// Read-only verification over independent BF16 caches [lanes,capacity,8*128].
+// Q/out are contiguous [lanes,queries,16*128], lanes=1..4, queries=1..6.
+// Each device I32 position in [lanes,queries] is in [0,capacity); row i
+// attends only its own lane's keys [0,positions[i]]. Inputs do not alias
 // the completely overwritten output. FP32 partition/merge arithmetic matches
-// the one-lane decode profile; partial state uses caller-owned scoped scratch.
-std::size_t dense_bf16_verify_attention_workspace_capacity(int queries, int capacity);
+// the corresponding ordinary batch decode profile; partial state uses caller-
+// owned scoped scratch.
+std::size_t dense_bf16_verify_attention_workspace_capacity(int lanes, int queries, int capacity);
 void dense_bf16_verify_attention(const void* q, const void* k, const void* v, void* out,
-    int queries, int capacity, const std::int32_t* positions,
+    int lanes, int queries, int capacity, const std::int32_t* positions,
     WorkspaceArena& workspace, cudaStream_t stream);
 
 } // namespace ninfer::ops

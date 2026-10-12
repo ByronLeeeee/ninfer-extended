@@ -54,8 +54,10 @@ def main():
     args = parser.parse_args()
     if not 1 <= len(args.audio) <= 4:
         parser.error('Supply one to four WAV files.')
-    if args.draft_tokens and (len(args.audio) != 1 or (args.draft_source == 'model' and args.draft_artifact is None)):
-        parser.error('Draft decoding requires one audio file; model drafting also requires --draft-artifact.')
+    if args.draft_tokens and args.draft_source == 'model' and args.draft_artifact is None:
+        parser.error('Model drafting requires --draft-artifact.')
+    if args.draft_tokens and args.draft_source == 'ngram' and len(args.audio) != 1:
+        parser.error('Ngram drafting requires one audio file.')
     if args.draft_source == 'ngram' and args.draft_artifact is not None:
         parser.error('Ngram mode loads only the target; omit --draft-artifact.')
     started = time.perf_counter()
